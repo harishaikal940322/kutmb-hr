@@ -90,7 +90,7 @@ The full proposed verification controls are in [System Core Security Baseline](.
 6. Deactivate = deny next protected operation and revoke live session privileges. Protect final System Admin atomically.
 7. Administrative privilege changes are auditable; never expose password, reset link or 2FA secret in audit data.
 
-**Status:** proposed defaults. Existing `UM-DEC-001..012` remain open until their owners resolve them. The detailed design is [DOC-011 on draft PR #1](https://github.com/harishaikal940322/kutmb-hr/pull/1), and DOC-008 does not supersede it.
+**Status:** proposed defaults. Existing `UM-DEC-001..012` remain open until their owners resolve them. The [DOC-011 Functional Design](../design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md) is consolidated into this review branch from Draft PR #1; it remains DRAFT and DOC-008 does not supersede its normative inputs.
 
 ## 7. Data architecture (logical only)
 
@@ -182,3 +182,7 @@ No physical ERD, SQL migration, source file path, credential policy, or deployme
 - [DOC-021 Cross-PR Reconciliation](../reviews/DOC-021_MOD-001_PR_Reconciliation_and_Test_Trace_v0.1_DRAFT.md): overlap and coverage across the **26 proposed functional** scenarios in Draft PR #1 and **18 proposed data integrity** scenarios in Draft PR #2; review 5 shared documentation files before any merge.
 
 No code, migrations, database, release-gate changes or physical file structure freeze are authorized by either planning document. Existing 32 normative requirements remain DRAFT; HR Core remains HOLD.
+
+## 17. Documentation exit and first coding handoff
+
+[DOC-022](../implementation/DOC-022_P1.1_First_Codex_Handoff_v0.1_DRAFT.md) is the final documentation-stage handoff, with a bounded **WP-020 isolated starter bootstrap** assignment and security stop conditions. **P0 documentation creation stops here**; source code requires explicit coding authorization and review of the starter-native location. No employee/HR Core implementation.
