@@ -1,5 +1,7 @@
 # Requirements Traceability Matrix (RTM) | HR Foundation v0.1
 
+> **Scope classification update (v0.3, 2026-10-29):** The first three registered modules are **System Core** (`MOD-001` User Management priority; `MOD-002` configuration and `MOD-003` platform/security as supporting). `MOD-004` through `MOD-011` are **HR Core**, ON HOLD or OUT OF SCOPE pending formal HR requirements. This is a presentation/scheduling clarification only: all 32 requirement IDs, AC IDs and test IDs remain unchanged and DRAFT. See [v0.3 Excel](../traceability/KUTMB_HR_System_Core_Traceability_v0.3_DRAFT.xlsx) and [MOD-001 review](MOD-001_USER_MANAGEMENT_REVIEW_v0.3.md).
+
 > **Status:** DRAFT / NOT APPROVED. **Date:** 29 October 2026.
 > **Total:** 32 requirements, 32 acceptance criteria, 32 planned tests. **Approved:** 0. **Tests passed:** 0.
 
