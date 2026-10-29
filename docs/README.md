@@ -75,3 +75,5 @@ This cross-references the 22 prior IAM technical defaults and open owner/IT deci
 - [DOC-021 Cross-PR Reconciliation & Test Traceability (DRAFT)](reviews/DOC-021_MOD-001_PR_Reconciliation_and_Test_Trace_v0.1_DRAFT.md)
 
 **Readiness:** 12 work packages prepared; 0 approved, no app code. PR #1 and PR #2 contain 5 overlapping documents that need coordinated review. 26 functional and 18 data-security scenario IDs map to 18 existing RTM test IDs (15 shared across both plans); no tests executed. Schema and physical file structure are still not approved. HR Core remains HOLD.
+
+- **Functional design:** [DOC-011 MOD-001 User Management (DRAFT)](design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md), [26 planned functional test scenarios](quality/MOD-001_Functional_Test_Scenarios_v0.1_DRAFT.md). Now part of the consolidated draft branch; not approved nor executed.
