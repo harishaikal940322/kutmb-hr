@@ -1,14 +1,19 @@
 {
   "date": "2026-10-29",
-  "version": "v0.2",
+  "version": "v0.3",
   "status": "DRAFT",
-  "xlsx": "KUTMB_HR_Traceability_Core_v0.2.xlsx",
-  "xlsx_sha256": "0a979614b5a5f0ccccb4e6f5f5630a8dcb7c54783598db0a5aa67a7e27f83d43",
+  "xlsx": "KUTMB_HR_System_Core_Traceability_v0.3_DRAFT.xlsx",
   "modules": 11,
   "requirements": 32,
   "open_questions": 14,
   "release_gates_passed": 0,
   "requirements_approved": 0,
   "change_requests": 0,
-  "notes": "Repository Excel is the compact core register (Modules, RTM, Change Requests, Impact Review); detailed source SRS is Markdown; CSV files hold review-friendly expanded tracking columns."
+  "notes": "System Core classification and MOD-001 decision queue are v0.3 draft. Previous v0.2 XLSX retained for history. Git CSV and normative SRS wording remain reviewable in text. No implementation approval is claimed.",
+  "xlsx_git_blob_sha": "cad40c53e6a9ec1ce4a0e0044954d73b5a461603",
+  "system_core_modules": 3,
+  "hr_core_modules_on_hold_or_out_of_scope": 8,
+  "open_mod001_decisions": 12,
+  "scope_decision": "docs/decisions/SCOPE-001_system-core-vs-hr-core.md",
+  "review_doc": "docs/requirements/MOD-001_USER_MANAGEMENT_REVIEW_v0.3.md"
 }
