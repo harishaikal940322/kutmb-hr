@@ -1,11 +1,10 @@
 # KUTMB HR System
 
-> **Status:** Requirements Engineering / Foundation Planning  
+> **Status:** System Core development foundation in WP-020 review
 > **Baseline:** HR Foundation v0.1 (DRAFT, 29 October 2026)  
-> **Approval:** NOT APPROVED. No implementation or testing has been completed.
+> **Approval:** Requirements remain NOT APPROVED. WP-020 verification applies only to the isolated development starter.
 
 This repository is the **single source of truth** for the KUTMB HR System, covering requirements, traceability, decisions, architecture, implementation, and verification.
-
 
 ## Scope clarification (29 October 2026)
 
@@ -13,14 +12,33 @@ This repository is the **single source of truth** for the KUTMB HR System, cover
 
 See [SCOPE-001: System Core versus HR Core](docs/decisions/SCOPE-001_system-core-vs-hr-core.md). No requirement has been newly approved by this clarification.
 
-## Current scope
+## Current implementation scope
 
-Build an HR *foundation* first, while full HR requirements are still pending:
-- User accounts, authentication, roles and permissions.
-- System configuration and reference data, including *panggilan* (assumed to mean salutation; confirmation pending).
-- Privileged action audit trail and basic security / recovery requirements.
+WP-020 establishes the Laravel, Vue, Inertia, TypeScript, Vite and MySQL development foundation only. It does not implement User Management CRUD, RBAC, account recovery, MFA, audit storage, configuration workflows or any HR Core module. `MOD-004` through `MOD-011` remain on hold until HR requirements are approved.
 
-**Out of scope until explicitly specified:** employee master, leave, attendance, payroll, overtime, claims, performance, and HR approval workflows.
+The SRS, RTM, Excel traceability master, CSV mirrors, module IDs and requirement IDs remain unchanged. Starter login is present for framework integration checks; there are no seeded accounts or committed credentials. Login identifier and future user fields remain open requirements.
+
+## Local development
+
+Docker and Docker Compose are the only host dependencies. From the repository root:
+
+```sh
+./bin/dev up
+```
+
+This creates a private `.env` with random local-only credentials, starts the app and MySQL 8.4 containers, applies the starter's baseline migrations and launches Vite. The app and Vite ports bind to localhost; MySQL has no host port. No privileged user is seeded. Use `./bin/dev down` to stop the containers. The development database persists in a named Docker volume; removing it is an explicit destructive action (`docker compose --project-name kutmb-hr down --volumes`).
+
+Useful checks:
+
+```sh
+./bin/dev test
+./bin/dev build
+./bin/dev types
+./bin/dev routes
+./bin/dev audit
+```
+
+Public registration, password recovery, email verification, MFA and passkey flows are disabled. The starter login uses its default email field only for the isolated scaffold and does not settle the open login-identifier requirement.
 
 ## Documentation
 

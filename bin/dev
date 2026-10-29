@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+ensure_env() {
+    if [[ ! -f .env ]]; then
+        umask 077
+        cp .env.example .env
+        sed -i "s|^APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32 | tr -d '\n')|" .env
+        sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -hex 32)|" .env
+        sed -i "s|^MYSQL_ROOT_PASSWORD=.*|MYSQL_ROOT_PASSWORD=$(openssl rand -hex 32)|" .env
+        sed -i "s|^DEV_UID=.*|DEV_UID=$(id -u)|" .env
+        sed -i "s|^DEV_GID=.*|DEV_GID=$(id -g)|" .env
+        chmod 600 .env
+    fi
+}
+
+compose() {
+    docker compose --project-name kutmb-hr "$@"
+}
+
+install_frontend() {
+    if [[ -f package-lock.json ]]; then
+        compose run --rm frontend npm ci
+    else
+        compose run --rm frontend npm install
+    fi
+}
+
+tooling() {
+    ensure_env
+    compose build app frontend
+    compose run --rm --user root app sh -lc 'chown -R "$DEV_UID:$DEV_GID" /var/www/html/vendor'
+    compose run --rm --user root frontend sh -lc 'chown -R "$DEV_UID:$DEV_GID" /var/www/html/node_modules'
+    compose run --rm app composer install --no-interaction
+    install_frontend
+}
+
+setup() {
+    tooling
+    compose up -d --wait db
+    compose run --rm app php artisan migrate --force
+}
+
+case "${1:-help}" in
+    setup)
+        setup
+        ;;
+    up)
+        setup
+        compose up -d app frontend
+        vite_port="$(sed -n 's/^VITE_PORT=//p' .env | tail -n 1)"
+        printf 'App: http://127.0.0.1:8000\nVite: http://127.0.0.1:%s\n' "${vite_port:-5173}"
+        ;;
+    down)
+        compose down
+        ;;
+    test)
+        setup
+        compose run --rm app php artisan test
+        ;;
+    build)
+        tooling
+        compose run --rm frontend npm run build
+        ;;
+    types)
+        tooling
+        compose run --rm frontend npm run types:check
+        ;;
+    routes)
+        tooling
+        compose run --rm app php artisan route:list --except-vendor
+        ;;
+    migrate)
+        tooling
+        compose up -d --wait db
+        compose run --rm app php artisan migrate --force
+        ;;
+    audit)
+        tooling
+        compose run --rm app composer audit
+        compose run --rm frontend npm audit --omit=dev
+        ;;
+    *)
+        printf 'Usage: %s {setup|up|down|test|build|types|routes|migrate|audit}\n' "$0"
+        exit 2
+        ;;
+esac
