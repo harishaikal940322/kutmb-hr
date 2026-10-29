@@ -2,19 +2,19 @@
 
 > v0.1 DRAFT · 29 October 2026 · **DOCUMENT REVIEW ONLY**  
 > Source branches: [PR #1 Functional Design](https://github.com/harishaikal940322/kutmb-hr/pull/1) and [PR #2 Architecture](https://github.com/harishaikal940322/kutmb-hr/pull/2). Both remain draft until separately reviewed.  
-> **No merge performed, no test executed, no business approval inferred.**
+> **Doc content consolidated into PR #2 branch; no GitHub PR merge, no tests executed and no business approval inferred.**
 
 ## 1. Source-of-truth convergence
 
-There are two draft streams based on `main`. **Both contain necessary, distinct documents**. Never overwrite a shared README or register with an older copy merely to make a merge succeed.
+There were two draft streams based on `main`. **Both contain necessary, distinct documents**. DOC-011, 26 functional scenarios, RTM navigation and the five shared guidance files have now been consolidated into the PR #2 branch. No branch has been merged into `main`; all requirements and review gates remain DRAFT.
 
 | Stream | Own documents | Special status |
 |---|---|---|
-| PR #1 | `DOC-011` functional design and 26 `SCN-UM-...` functional scenario proposals | **Not merged; do not assume DOC-011 exists on PR #2 or main** |
-| PR #2 | `DOC-008`, `SEC-001`, `DOC-013..020`, 18 `DI-TC-...` data scenarios, architecture/data/UI planning | **Not merged; no code or approved physical layout** |
+| PR #1 | `DOC-011` functional design and 26 `SCN-UM-...` functional scenario proposals | **Copied into PR #2 review branch; not merged into main** |
+| PR #2 | `DOC-008`, `SEC-001`, `DOC-013..020`, 18 `DI-TC-...` data scenarios, architecture/data/UI planning | **Now also contains DOC-011 and functional scenarios; not merged or approved** |
 | Main branch | Normative `DOC-004..006` and v0.3 RTM Excel/CSV baseline | SRS wording and requirement IDs remain DRAFT |
 
-### Shared edited files requiring explicit reconciliation
+### Shared edited files reconciled in consolidated branch (review pending)
 
 Both PR branches currently edit exactly these five files:
 
@@ -26,14 +26,14 @@ Both PR branches currently edit exactly these five files:
 | `docs/README.md` | Functional review navigation | Architecture, security, data, implementation planning navigation | Preserve both sections and accurate PR status |
 | `docs/governance/DOC_REGISTER.md` | Register `DOC-011` | Register `DOC-008` and `DOC-012..020` | Union by document ID, with no duplicate/reserved ID overwrite |
 
-Additionally, PR #1 modifies `docs/requirements/RTM.md` and `MOD-001_USER_MANAGEMENT_REVIEW_v0.3.md`. PR #2 does not modify these two source files. Preserve their PR #1 review links only if IDs/AC/test trace remain unchanged. **Workbook/CSV must be updated in the same reviewed change only when normative requirement or module lifecycle changes**, not for mere navigation links.
+Additionally, the PR #1 edits to `docs/requirements/RTM.md` and `MOD-001_USER_MANAGEMENT_REVIEW_v0.3.md` were copied into the consolidated PR #2 branch. They add review links only, retaining all 32 requirement/AC/base test IDs. **Workbook/CSV must be updated in the same reviewed change only when normative requirement or module lifecycle changes**, not for mere navigation links.
 
-### Safe proposed integration workflow
+### Completed branch reconciliation and pending main review
 
-1. Review PR #1 functional design **and** PR #2 architecture together; resolve any substantive contradiction in account fields, authorization, recovery and state model **before accepting behavior**.
-2. Choose a reviewed merge order. **Preferred**: approve and merge PR #1 first **after** its functional/design review, then update/rebase PR #2 from the new main, manually retaining both sets of shared-file changes. Or create a separate reviewer-approved integration branch that cherry-picks unique docs and reconciles common files.
-3. Inspect a full diff, confirm the joint document register has DOC-011 and DOC-008/DOC-012..020, verify all relative paths, and recheck normative IDs against v0.3 Excel.
-4. After documented sign-off, merge **only approved documentation**. A Git merge or green CI is **not** HR/IT approval and does not authorize coding. If no approval exists, leave both drafts open.
+1. **Completed:** Copied DOC-011 and 26 functional scenarios; preserved RTM and MOD-001 review links; reconciled the shared AGENTS, README, CHANGELOG, docs README and Document Register.
+2. **Pending:** Technical reviewer compares functional and architecture assumptions (identity, credentials, role assignment, state/audit, recovery) and signs off any normative decision through its existing governance process.
+3. **Pending:** Verify merged documentation diff and references, then decide whether to merge consolidated PR #2 to main. **Do not merge PR #1 separately after consolidation**, because its content is included in PR #2 and a second merge could reintroduce outdated shared-file changes.
+4. **Not done:** Business/IT policy approval, acceptance tests, coding or production work. A GitHub merge alone does not grant any of those.
 
 ## 2. Test coverage consolidation
 
@@ -77,11 +77,11 @@ Existing SRS RTM contains **32 base requirement IDs and 32 corresponding planned
 
 - [ ] Reviewers compare DOC-011 functional proposals against DOC-008/013/014/015/016/017/018/019/020.
 - [ ] Check usernames, user status, first-admin bootstrap, role assignment, recovery, MFA, audit and `User ≠ Employee` for contradictions.
-- [ ] Resolve five shared files in a reviewed diff without discarding either PR's changes.
-- [ ] Maintain one `DOC_REGISTER` row per ID, preserving `DOC-011` and `DOC-020/021`.
+- [x] Reconcile five shared files on the PR #2 review branch without discarding either PR's changes (GitHub review/merge remains pending).
+- [x] Maintain one `DOC_REGISTER` row per ID, preserving `DOC-011` and `DOC-020/021` in the consolidated branch.
 - [ ] Confirm all 26 + 18 proposed scenario IDs and all 18 mapped base test IDs remain traceable, with 0 execution claims.
 - [ ] Maintain 11 module IDs, 32 original normative requirement/AC/test IDs, v0.3 Excel and CSV mirror integrity.
 - [ ] Do not merge without review; do not mark requirement/IT approvals without a recorded actor, date, SHA and decision.
 - [ ] Do not build HR Core or perform production operations.
 
-**Current state: CROSS-PR RECONCILIATION PLANNED, NOT MERGED; NO TESTS EXECUTED.**
+**Current state: DOCUMENT CONTENT CONSOLIDATED IN PR #2, NOT REVIEW-APPROVED OR MERGED INTO MAIN; NO TESTS EXECUTED.**
