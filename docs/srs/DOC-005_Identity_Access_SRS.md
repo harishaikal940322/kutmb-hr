@@ -1,5 +1,7 @@
 # DOC-005 | Identity & Access Module SRS
 
+> **Scope clarification v0.3 (2026-10-29):** This is the **System Core** first-module specification for `MOD-001` User Management / Identity & Access. **HR Core remains on hold**. The 13 requirements below are still DRAFT; review open decisions in [MOD-001 Review v0.3](../requirements/MOD-001_USER_MANAGEMENT_REVIEW_v0.3.md) before implementation. No employee master is required for user-account creation.
+
 > **Version:** v0.1 • **Date:** 29 October 2026 • **Status:** DRAFT / NOT APPROVED • **Owner/approval:** HR/IT TBD
 >
 > This Markdown edition is derived from the draft DOC-005 DOCX baseline. All SHALL/HENDAKLAH clauses are **proposals**, not approved policy. IDs, acceptance criteria and planned tests retain their original meaning. No tests have been executed.
