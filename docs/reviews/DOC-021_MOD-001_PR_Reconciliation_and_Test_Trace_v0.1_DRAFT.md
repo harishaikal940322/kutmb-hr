@@ -1,7 +1,7 @@
 # DOC-021 | Cross-PR Reconciliation & MOD-001 Test Coverage
 
 > v0.1 DRAFT · 29 October 2026 · **DOCUMENT REVIEW ONLY**  
-> Source branches: [PR #1 Functional Design](https://github.com/harishaikal940322/kutmb-hr/pull/1) and [PR #2 Architecture](https://github.com/harishaikal940322/kutmb-hr/pull/2). Both remain draft until separately reviewed.  
+> Source branches: [PR #1 Functional Design](https://github.com/harishaikal940322/kutmb-hr/pull/1) and [PR #2 Architecture](https://github.com/harishaikal940322/kutmb-hr/pull/2). PR #1 is closed **without merge** as superseded; PR #2 remains DRAFT and open for consolidated review.  
 > **Doc content consolidated into PR #2 branch; no GitHub PR merge, no tests executed and no business approval inferred.**
 
 ## 1. Source-of-truth convergence
@@ -84,4 +84,4 @@ Existing SRS RTM contains **32 base requirement IDs and 32 corresponding planned
 - [ ] Do not merge without review; do not mark requirement/IT approvals without a recorded actor, date, SHA and decision.
 - [ ] Do not build HR Core or perform production operations.
 
-**Current state: DOCUMENT CONTENT CONSOLIDATED IN PR #2, NOT REVIEW-APPROVED OR MERGED INTO MAIN; NO TESTS EXECUTED.**
+**Current state: PR #1 CLOSED WITHOUT MERGE; CONTENT CONSOLIDATED IN PR #2 DRAFT, NOT APPROVED OR MERGED INTO MAIN; NO TESTS EXECUTED.**
