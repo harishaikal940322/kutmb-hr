@@ -1,0 +1,69 @@
+services:
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        user: '${DEV_UID:-1000}:${DEV_GID:-1000}'
+        working_dir: /var/www/html
+        command: >-
+            sh -lc 'composer install --no-interaction
+            && php artisan serve --host=0.0.0.0 --port=8000'
+        ports:
+            - '127.0.0.1:8000:8000'
+        volumes:
+            - .:/var/www/html
+            - vendor:/var/www/html/vendor
+        depends_on:
+            db:
+                condition: service_healthy
+        environment:
+            APP_ENV: local
+            APP_DEBUG: 'false'
+            COMPOSER_HOME: /tmp/composer
+            DEV_UID: ${DEV_UID:-1000}
+            DEV_GID: ${DEV_GID:-1000}
+
+    frontend:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        user: '${DEV_UID:-1000}:${DEV_GID:-1000}'
+        working_dir: /var/www/html
+        command: sh -lc 'npm ci && npm run dev -- --host 0.0.0.0 --port ${VITE_PORT:-5173}'
+        ports:
+            - '127.0.0.1:${VITE_PORT:-5173}:${VITE_PORT:-5173}'
+        volumes:
+            - .:/var/www/html
+            - vendor:/var/www/html/vendor
+            - node_modules:/var/www/html/node_modules
+        environment:
+            DEV_UID: ${DEV_UID:-1000}
+            DEV_GID: ${DEV_GID:-1000}
+            VITE_PORT: ${VITE_PORT:-5173}
+            npm_config_cache: /tmp/npm-cache
+
+    db:
+        image: mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7
+        restart: unless-stopped
+        environment:
+            MYSQL_DATABASE: ${DB_DATABASE:?Run ./bin/dev setup first}
+            MYSQL_USER: ${DB_USERNAME:?Run ./bin/dev setup first}
+            MYSQL_PASSWORD: ${DB_PASSWORD:?Run ./bin/dev setup first}
+            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Run ./bin/dev setup first}
+        volumes:
+            - mysql_data:/var/lib/mysql
+        healthcheck:
+            test:
+                [
+                    'CMD-SHELL',
+                    'mysqladmin ping -h 127.0.0.1 -u root -p$${MYSQL_ROOT_PASSWORD} --silent',
+                ]
+            interval: 5s
+            timeout: 5s
+            retries: 20
+            start_period: 20s
+
+volumes:
+    mysql_data:
+    vendor:
+    node_modules:
