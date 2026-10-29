@@ -25,3 +25,5 @@ No application features have been implemented or tested as part of this document
 | 2026-10-29 | MOD-001 FD v0.1 | Draft DOC-011 user-management functional design and 26 planned positive/negative scenarios; no normative requirement changes, no test execution | NOT APPROVED |
 
 | 2026-10-29 | Documentation exit / P1.1 handoff | Consolidated DOC-011 + functional tests and shared guidance into PR #2 review branch; prepared DOC-022 restricted starter bootstrap task; no code/approval/merge/test claims | NOT APPROVED |
+
+| 2026-10-29 | Git workflow instruction | Enforce one canonical checkout, feature branch → tested/approved merge → main; avoid future extra worktrees, preserve local WP-020 commit awaiting integration | OWNER DIRECTION |
