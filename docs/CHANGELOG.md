@@ -21,3 +21,5 @@ No application features have been implemented or tested as part of this document
 | 2026-10-29 | P0.8 Physical Design Workshop v0.1 | DOC-017 proposed MySQL tables/constraints, DOC-018 Laravel/Vue source organization options and DOC-019 ten physical design review decisions; no migrations, code or approved schema | NOT APPROVED |
 
 | 2026-10-29 | P0.9 Implementation Blueprint v0.1 | Draft DOC-020 (12 gated Codex work packages) and DOC-021 (PR #1/#2 reconciliation and 26+18 scenario mapping to 18 base test IDs); no app code or requirement/Excel changes | NOT APPROVED |
+
+| 2026-10-29 | MOD-001 FD v0.1 | Draft DOC-011 user-management functional design and 26 planned positive/negative scenarios; no normative requirement changes, no test execution | NOT APPROVED |
