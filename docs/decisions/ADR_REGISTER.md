@@ -12,6 +12,8 @@
 
 | SCOPE-001 | System Core first; HR Core waits for requirements | RECORDED SCOPE DIRECTION | MOD-001 user management priority, MOD-002/003 supporting; MOD-004 onward HOLD | [Decision](SCOPE-001_system-core-vs-hr-core.md) | HR requirements pending |
 
+| ADR-006 | Laravel 13 + Vue 3 + Inertia 3 + MySQL 8.4 LTS for System Core | PROPOSED / TECHNICAL REVIEW | Single Laravel session and authorization boundary; frontend Vue with TypeScript; no physical file structure yet | [ADR-006](ADR-006_Laravel_Vue_Inertia_MySQL_v0.1_PROPOSED.md) / [DOC-008](../architecture/DOC-008_System_Core_Solution_Architecture_v0.1_DRAFT.md) | UM-DEC-001/003/004/005/006/011 and deployment decisions |
+
 ## ADR lifecycle
 
 `PROPOSED` / `ASSUMPTION` / `OPEN` → reviewed decision with explicit approver/date/rationale → `ACCEPTED` or `REJECTED` → `SUPERSEDED` if replaced. Never equate proposal with business authorization. Later technical ADRs should use separate Markdown files and reference this register.
