@@ -5,8 +5,8 @@
 ## Sources of authority
 
 1. **Normative requirement text**: `docs/srs/DOC-004...`, `DOC-005...`, `DOC-006...` Markdown. Never silently overwrite wording using a spreadsheet cell.
-2. **Operational traceability and change control**: `KUTMB_HR_Module_Traceability_Master_v0.2_DRAFT.xlsx` in this folder. It records module lifecycle, CR, approval, evidence, issues, gates and baseline history.
-3. **Text mirrors**: `module_registry.csv`, `requirement_links.csv`, `change_requests.csv`, `impact_analysis.csv`. These aid Git diffs. They must be kept in sync with the workbook on every scope change; **they are not independent competing masters**.
+2. **Operational traceability and change control**: [`KUTMB_HR_Traceability_Core_v0.2.xlsx`](KUTMB_HR_Traceability_Core_v0.2.xlsx) in this folder. It records module IDs and status, requirement-ID links, CR entries, and impact review. Open questions and release gates remain in their dedicated Markdown registers. This core workbook is intentionally compact; normative SRS wording remains in Markdown.
+3. **Text mirrors**: `module_registry.csv`, `requirement_links.csv`, `change_requests.csv`, `impact_analysis.csv`. These carry a Git-diff-friendly expanded register schema for proposed changes. Where fields overlap with the core workbook, they must match on every commit; additional CSV-only detail (such as approval timestamps, test evidence or security impact) is supplementary until reflected in the applicable SRS/ADR and approvals. **No silent independent sources of truth.**
 4. **History**: accepted pull requests, commit SHA, signed approvals and linked test evidence. Merging to GitHub `main` does not itself mean the HR owner approved a requirement.
 
 ## To add, change or remove a module
@@ -28,4 +28,4 @@
 
 ### Excel file name policy
 
-Retain a **versioned** workbook per approved baseline when superseding, or update the working DRAFT workbook and use Git history. Keep historical rows and IDs, never overwrite the history of module deletion. The workbook name contains a version because it represents the initial governance baseline; newer versions will follow change control.
+Retain a **versioned** workbook per approved baseline when superseding, or update the working DRAFT core workbook and use Git history. Keep historical rows and IDs, never overwrite the history of module deletion. The workbook name contains a version because it represents the initial governance baseline; newer versions will follow change control.
