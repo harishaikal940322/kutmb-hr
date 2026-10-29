@@ -59,7 +59,41 @@ case "${1:-help}" in
         ;;
     test)
         setup
+        compose run --rm frontend npm run build
         compose run --rm app php artisan test
+        ;;
+    mysql-test)
+        tooling
+        compose run --rm frontend npm run build
+        test_network="kutmb-hr_default"
+        test_container="kutmb-hr-wp030-mysql-test-$$"
+        docker network inspect "$test_network" >/dev/null 2>&1 || docker network create "$test_network" >/dev/null
+        docker run --detach --rm --name "$test_container" --network "$test_network" \
+            --network-alias wp030-mysql-test \
+            --env MYSQL_ROOT_PASSWORD=wp030-test-root \
+            --env MYSQL_DATABASE=kutmb_hr_test \
+            mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7 >/dev/null
+        cleanup_mysql_test() {
+            docker rm --force "$test_container" >/dev/null 2>&1 || true
+        }
+        trap cleanup_mysql_test EXIT
+        for attempt in $(seq 1 60); do
+            if docker exec "$test_container" mysqladmin ping -h 127.0.0.1 -uroot -pwp030-test-root --silent >/dev/null 2>&1; then
+                break
+            fi
+            sleep 2
+        done
+        docker exec "$test_container" mysqladmin ping -h 127.0.0.1 -uroot -pwp030-test-root --silent
+        compose run --rm --no-deps \
+            -e APP_ENV=testing \
+            -e DB_CONNECTION=mysql \
+            -e DB_HOST=wp030-mysql-test \
+            -e DB_PORT=3306 \
+            -e DB_DATABASE=kutmb_hr_test \
+            -e DB_USERNAME=root \
+            -e DB_PASSWORD=wp030-test-root \
+            -e DB_URL= \
+            app sh -lc 'php artisan migrate:fresh --force && php artisan migrate:status && php bin/verify-database.php && php artisan test'
         ;;
     build)
         tooling
@@ -81,10 +115,17 @@ case "${1:-help}" in
     audit)
         tooling
         compose run --rm app composer audit
-        compose run --rm frontend npm audit --omit=dev
+        compose run --rm frontend npm audit
+        ;;
+    check)
+        setup
+        compose run --rm frontend npm run build
+        compose run --rm frontend composer ci:check
+        compose run --rm app composer audit
+        compose run --rm frontend npm audit
         ;;
     *)
-        printf 'Usage: %s {setup|up|down|test|build|types|routes|migrate|audit}\n' "$0"
+        printf 'Usage: %s {setup|up|down|test|mysql-test|check|build|types|routes|migrate|audit}\n' "$0"
         exit 2
         ;;
 esac

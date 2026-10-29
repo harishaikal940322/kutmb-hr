@@ -94,4 +94,25 @@ class DisabledAuthFeaturesTest extends TestCase
 
         $this->assertDatabaseCount('users', 0);
     }
+
+    public function test_no_unreviewed_provisioning_or_privilege_mutation_routes_exist(): void
+    {
+        // Fortify's password confirmation only re-authenticates the current
+        // session; it does not provision accounts or grant privileges.
+        $allowedMutations = ['login.store', 'logout', 'password.confirm.store'];
+
+        foreach (Route::getRoutes() as $route) {
+            $mutatingMethods = array_intersect($route->methods(), ['POST', 'PUT', 'PATCH', 'DELETE']);
+
+            if ($mutatingMethods === []) {
+                continue;
+            }
+
+            $this->assertContains(
+                $route->getName(),
+                $allowedMutations,
+                sprintf('Unexpected mutating route [%s] %s.', implode('|', $mutatingMethods), $route->uri()),
+            );
+        }
+    }
 }

@@ -32,11 +32,15 @@ Useful checks:
 
 ```sh
 ./bin/dev test
+./bin/dev mysql-test
 ./bin/dev build
 ./bin/dev types
+./bin/dev check
 ./bin/dev routes
 ./bin/dev audit
 ```
+
+`./bin/dev test` builds the Vite manifest before running PHPUnit. `./bin/dev mysql-test` starts a temporary, isolated MySQL 8.4 container and removes it automatically after the baseline migrations and tests; the test schema is separate from the persistent development database. `./bin/dev check` runs frontend formatting/lint, TypeScript, PHPStan, Pint, PHPUnit, a production build and dependency audits. GitHub Actions runs those checks on PHP 8.4 and 8.5, plus a separate MySQL 8.4 integration job.
 
 Public registration, password recovery, email verification, MFA and passkey flows are disabled. The starter login uses its default email field only for the isolated scaffold and does not settle the open login-identifier requirement.
 

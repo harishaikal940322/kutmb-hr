@@ -4,7 +4,6 @@ namespace Tests\Feature\Auth;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
 class AuthenticationTest extends TestCase
@@ -22,6 +21,7 @@ class AuthenticationTest extends TestCase
     {
         $user = User::factory()->create();
         $token = 'test-token';
+        $sessionId = $this->app['session']->driver()->getId();
 
         $response = $this->withSession(['_token' => $token])->post(route('login.store'), [
             '_token' => $token,
@@ -30,6 +30,7 @@ class AuthenticationTest extends TestCase
         ]);
 
         $this->assertAuthenticated();
+        $this->assertNotSame($sessionId, $this->app['session']->driver()->getId());
         $response->assertRedirect(route('dashboard', absolute: false));
     }
 
@@ -52,13 +53,16 @@ class AuthenticationTest extends TestCase
         $user = User::factory()->create();
         $token = 'test-token';
 
-        $response = $this->actingAs($user)->withSession(['_token' => $token])->post(route('logout'), [
+        $response = $this->actingAs($user)->withSession([
+            '_token' => $token,
+            'sensitive_marker' => 'must-be-flushed',
+        ])->post(route('logout'), [
             '_token' => $token,
         ]);
 
         $response->assertRedirect(route('home'));
-
         $this->assertGuest();
+        $response->assertSessionMissing('sensitive_marker');
     }
 
     public function test_users_are_rate_limited()
@@ -66,14 +70,18 @@ class AuthenticationTest extends TestCase
         $user = User::factory()->create();
         $token = 'test-token';
 
-        RateLimiter::increment(md5('login'.implode('|', [$user->email, '127.0.0.1'])), amount: 5);
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->withSession(['_token' => $token])->post(route('login.store'), [
+                '_token' => $token,
+                'email' => $user->email,
+                'password' => 'wrong-password',
+            ])->assertSessionHasErrors('email');
+        }
 
-        $response = $this->withSession(['_token' => $token])->post(route('login.store'), [
+        $this->withSession(['_token' => $token])->post(route('login.store'), [
             '_token' => $token,
             'email' => $user->email,
             'password' => 'wrong-password',
-        ]);
-
-        $response->assertTooManyRequests();
+        ])->assertTooManyRequests();
     }
 }
