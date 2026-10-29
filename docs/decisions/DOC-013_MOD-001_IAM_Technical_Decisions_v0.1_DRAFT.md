@@ -6,7 +6,7 @@
 >
 > **Coverage:** MOD-001 first, MOD-003 security/audit support, minimal MOD-002 settings. **MOD-004..011 HR Core ON HOLD.**
 >
-> **Source:** [SCOPE-001](../decisions/SCOPE-001_system-core-vs-hr-core.md), [DOC-005](../srs/DOC-005_Identity_Access_SRS.md), [UM-DEC review](../requirements/MOD-001_USER_MANAGEMENT_REVIEW_v0.3.md), [DOC-008](../architecture/DOC-008_System_Core_Solution_Architecture_v0.1_DRAFT.md), and [SEC-001](../security/SEC-001_System_Core_Security_Baseline_v0.1_DRAFT.md). DOC-011 is on independent [Draft PR #1](https://github.com/harishaikal940322/kutmb-hr/pull/1), not merged.
+> **Source:** [SCOPE-001](../decisions/SCOPE-001_system-core-vs-hr-core.md), [DOC-005](../srs/DOC-005_Identity_Access_SRS.md), [UM-DEC review](../requirements/MOD-001_USER_MANAGEMENT_REVIEW_v0.3.md), [DOC-008](../architecture/DOC-008_System_Core_Solution_Architecture_v0.1_DRAFT.md), and [SEC-001](../security/SEC-001_System_Core_Security_Baseline_v0.1_DRAFT.md). [DOC-011 Functional Design](../design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md) was consolidated from the now-closed PR #1 into the PR #2 review branch; approval remains pending.
 
 ## Status meanings
 
