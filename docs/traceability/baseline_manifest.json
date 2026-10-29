@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-29",
+  "version": "v0.2",
+  "status": "DRAFT",
+  "xlsx": "KUTMB_HR_Module_Traceability_Master_v0.2_DRAFT.xlsx",
+  "xlsx_sha256": "9cb04954bf97b65ee756aa6a149950231c33545d5e3b064100bb17353a6f1afd",
+  "modules": 11,
+  "requirements": 32,
+  "open_questions": 14,
+  "release_gates_passed": 0,
+  "requirements_approved": 0,
+  "change_requests": 0
+}
