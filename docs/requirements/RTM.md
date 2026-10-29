@@ -5,6 +5,8 @@
 > **Status:** DRAFT / NOT APPROVED. **Date:** 29 October 2026.
 > **Total:** 32 requirements, 32 acceptance criteria, 32 planned tests. **Approved:** 0. **Tests passed:** 0.
 
+> **Functional design extension:** [DOC-011 MOD-001 design (DRAFT)](../design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md) maps existing IAM/SYS requirement IDs to proposed flows; [MOD-001 test scenarios](../quality/MOD-001_Functional_Test_Scenarios_v0.1_DRAFT.md) refine existing T-IAM/SYS IDs. The RTM still has **32 unchanged requirements** and **0 executed tests**. These additions do not promote requirement status.
+
 The authoritative traceability chain is **Feature → Requirement → Acceptance Criterion → Planned Test → Evidence**. Actual test cases and evidence will be added during implementation and QA. Requirement statements and acceptance criteria are in their linked SRS documents.
 
 | Feature | Requirement / title | Acceptance criterion | Planned test | Source SRS | Priority | Status / evidence |
