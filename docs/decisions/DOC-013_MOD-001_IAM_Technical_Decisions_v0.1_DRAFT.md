@@ -77,3 +77,7 @@ Engineering can review these defaults now without knowing HR business requiremen
 ## P0.6 Data model companion
 
 [DOC-015 Logical Data Model](../data/DOC-015_MOD-001_Logical_Data_Model_v0.1_DRAFT.md) develops the logical entities and 12 data integrity invariants associated with the existing proposed defaults. [Data Integrity Test Matrix](../quality/MOD-001_Data_Integrity_Test_Matrix_v0.1_DRAFT.md) maps 18 proposed scenarios to existing test IDs. All physical database decisions, employee relationships, code layout and deployment choices remain **DEFERRED**, and all UM-DEC approvals remain OPEN.
+
+## P0.7 Engineering review status
+
+[DOC-016 Technical Readiness](../reviews/DOC-016_P0.7_System_Core_Technical_Readiness_v0.1_DRAFT.md) provides preferred engineering design defaults with precise distinction between **selected for design review** and **approved organizational policy**. All original UM-DEC decisions remain OPEN until signed off; no production session timeout, recovery channel, audit retention or privileged MFA recovery method has been accepted. File structure remains deferred.
