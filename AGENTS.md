@@ -24,3 +24,11 @@
 - Read `docs/security/SEC-001_System_Core_Security_Baseline_v0.1_DRAFT.md` for proposed security controls and `DOC-012` for the staged Vue learning plan. Never assume Vue client authorization is enough.
 - **Do not invent or freeze file/directory structure**, API topology, physical schema, hosting or Docker layout. User explicitly deferred structure planning.
 - Do not start user module implementation solely from these planning docs; close relevant UM-DEC security decisions and review gates first. HR Core remains on hold.
+
+## MOD-001 technical decision checkpoint
+
+- Consult `docs/decisions/DOC-013_MOD-001_IAM_Technical_Decisions_v0.1_DRAFT.md` and `docs/design/DOC-014_MOD-001_Authentication_Authorization_Contracts_v0.1_DRAFT.md` when planning account/auth work. These contain **design defaults**, not implementation authorization or approval.
+- Username is the preferred login principal. System Admin and Standard User are initial proposed roles; delegated User Admin must **not** be enabled by default. Public self-registration is disabled by default.
+- Do not implement recover/invite flow before an approved delivery and identity-verification channel; do not ship privileged production login without reviewed MFA/recovery. Never use default passwords or secret logging.
+- Backend must enforce active status, per-target permissions, last-admin safety and revoked access after privilege changes. Vue permission hints are never authorization.
+- The user deferred physical folder structure, migrations/ERD and deployment topology to a later workshop. No app code is requested or authorized by these planning documents.
