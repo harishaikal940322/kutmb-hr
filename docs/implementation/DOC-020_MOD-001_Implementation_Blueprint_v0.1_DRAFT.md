@@ -16,7 +16,7 @@
 - [DOC-008 Architecture](../architecture/DOC-008_System_Core_Solution_Architecture_v0.1_DRAFT.md), [SEC-001 Security Baseline](../security/SEC-001_System_Core_Security_Baseline_v0.1_DRAFT.md).
 - [DOC-013 IAM Technical Defaults](../decisions/DOC-013_MOD-001_IAM_Technical_Decisions_v0.1_DRAFT.md), [DOC-014 Contracts](../design/DOC-014_MOD-001_Authentication_Authorization_Contracts_v0.1_DRAFT.md).
 - [DOC-015 Logical Model](../data/DOC-015_MOD-001_Logical_Data_Model_v0.1_DRAFT.md), [DOC-017 Proposed MySQL Schema](../data/DOC-017_MOD-001_Physical_Schema_Proposal_v0.1_DRAFT.md), [DOC-018 Source Layout Options](../architecture/DOC-018_Laravel_Vue_Source_Organization_Options_v0.1_DRAFT.md), [DOC-019 Decisions](../reviews/DOC-019_P0.8_Physical_Design_Decision_Sheet_v0.1_DRAFT.md).
-- Separate [Draft PR #1](https://github.com/harishaikal940322/kutmb-hr/pull/1): DOC-011 Functional Design + **26 proposed functional scenarios**. These documents are **not on this branch** and must not be assumed merged.
+- [DOC-011 Functional Design](../design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md) and [26 functional scenarios](../quality/MOD-001_Functional_Test_Scenarios_v0.1_DRAFT.md) have been **copied into this consolidated review branch** from Draft PR #1. They are not merged into main or approved.
 - This branch's [18 proposed data integrity scenarios](../quality/MOD-001_Data_Integrity_Test_Matrix_v0.1_DRAFT.md); see [DOC-021 cross-PR reconciliation](../reviews/DOC-021_MOD-001_PR_Reconciliation_and_Test_Trace_v0.1_DRAFT.md) for overlap.
 
 ## 2. Authorization and gate vocabulary
@@ -38,7 +38,7 @@ IDs `WP-000..WP-110` identify technical tasks, **not new requirement IDs**. Prop
 
 | WP | Proposed work | Dependencies / start gate | Definition of done / existing trace | Initial state |
 |---|---|---|---|---|
-| WP-000 | **Reconcile PR #1 and PR #2**: align Functional Design and Architecture/technical docs; resolve shared README/AGENTS/Register conflicts; recheck all RTM and scenario links | Document review only | DOC-011 and DOC-008 refer to one coherent SRS/RTM; no lost changes; DOC-021 checklist evidenced | PLANNED / DOCS ONLY |
+| WP-000 | **Consolidate PR #1 and #2 draft docs**: copy Functional Design/scenarios and reconcile README/AGENTS/Register and RTM links | Document review only | DOC-011 and DOC-008 coexist on consolidated branch; content mapped in DOC-021 | CONSOLIDATED ON REVIEW BRANCH; REVIEW/MERGE PENDING |
 | WP-010 | **Authorize tech design**: confirm username policy, permitted user fields, bootstrap operator, role matrix, recovery feature-gates, session and audit rules | UM-DEC, PD-DEC, DOC-019, IT/reviewer decision | Approved decision register and signed scope; no implied HR approval | BLOCKED / DECISIONS |
 | WP-020 | **Inspect official starter and establish toolchain**: review pinned Laravel/Vue/Inertia/MySQL compatibility, npm/Composer provenance, dependency and version constraints | WP-000/010; explicit limited code/POC authorization | Reproducible synthetic-only dev environment; versions/CI constraints documented | BLOCKED / CODE AUTH |
 | WP-030 | **Build test harness and CI baseline**: PHP tests, TypeScript build/check, Vue component tests, lint and dependency/secret review | WP-020; test-runner approval | Test commands and CI with no fake PASS, no HR data; scoped negative test list recorded | BLOCKED |
@@ -116,7 +116,7 @@ Do not merge, deploy, create production credentials or modify real infrastructur
 
 ## 7. Hard stop conditions
 
-- PR #1 and #2 remain draft/unreconciled.
+- PR #2 remains DRAFT / unmerged. PR #1 unique functional materials are integrated on its review branch; formal sign-off and main merge remain pending.
 - No approved username/field/role/bootstrap/security decisions for a task that needs them.
 - Unknown account-recovery channel, privileged MFA recovery, session timeout, audit retention.
 - Actual starter kit schema or physical file layout not yet reviewed/accepted.
@@ -132,7 +132,7 @@ Do not merge, deploy, create production credentials or modify real infrastructur
 | Source-of-truth module IDs | 11, unchanged |
 | Normative requirement IDs | 32 DRAFT, unchanged |
 | Existing RTM base test IDs | 32, no execution evidence |
-| Functional scenario proposals in separate PR #1 | 26 |
+| Functional scenario proposals consolidated from PR #1 | 26 |
 | Data-integrity scenario proposals in PR #2 | 18 |
 | Work packages | 12 (`WP-000` to `WP-110`) |
 | Approved work packages | 0 |
@@ -142,3 +142,7 @@ Do not merge, deploy, create production credentials or modify real infrastructur
 | Coding | NOT STARTED |
 
 **Decision for this turn: Blueprint documented for review. No production, code, runtime, migration or schema change authorized.**
+
+## 9. Documentation phase exit (superseding open-ended planning)
+
+[DOC-022](DOC-022_P1.1_First_Codex_Handoff_v0.1_DRAFT.md) contains the **precise first coding assignment WP-020**. WP-000 document integration is complete on the review branch, while approval and main merge remain pending. **Do not create further numbered planning stages** just to defer implementation: the next active task is either review/merge of consolidated documentation or explicitly authorized WP-020 isolated scaffold code. Do not start real IAM account features until security, identity and operator decisions are accepted.
