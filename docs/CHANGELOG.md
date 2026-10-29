@@ -19,3 +19,5 @@ No application features have been implemented or tested as part of this document
 | 2026-10-29 | P0.7 Technical readiness v0.1 | Draft DOC-016 with 16 proposed engineering choices and 12 unresolved review items; no requirement/module/RTM/Excel changes, no code, no approval | NOT APPROVED |
 
 | 2026-10-29 | P0.8 Physical Design Workshop v0.1 | DOC-017 proposed MySQL tables/constraints, DOC-018 Laravel/Vue source organization options and DOC-019 ten physical design review decisions; no migrations, code or approved schema | NOT APPROVED |
+
+| 2026-10-29 | P0.9 Implementation Blueprint v0.1 | Draft DOC-020 (12 gated Codex work packages) and DOC-021 (PR #1/#2 reconciliation and 26+18 scenario mapping to 18 base test IDs); no app code or requirement/Excel changes | NOT APPROVED |
