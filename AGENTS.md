@@ -63,3 +63,9 @@
 - `WP-010` requires actual decisions and evidence; coding, DB migrations, bootstrap, recovery and MFA work packages are explicitly **BLOCKED until applicable security/architecture/IT gates are accepted**. A 'proceed' in planning is not a blanket production authorization.
 - Maintain 32 original requirement, AC and base test IDs. Scenario subcases do not create new SRS requirements. Do not claim 44 unique executable tests because scenario plans have overlaps.
 - No source files, folder tree, SQL, HR Core records or deployment in this documentation PR. Source repository remains public; never store credentials, secrets, real staff data or private infrastructure configuration.
+
+## MOD-001 functional design now consolidated into review branch
+
+- Read `docs/design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md` and `docs/quality/MOD-001_Functional_Test_Scenarios_v0.1_DRAFT.md` as **DRAFT proposals**. They were copied from Draft PR #1 into the consolidated architecture branch without treating them as approved or tested.
+- Preserve the original 13 IAM requirements and all 32 RTM IDs. The 26 functional subcases and 18 data subcases may overlap, and have **zero executed tests**.
+- Resolve applicable UM-DEC decisions and accept the physical-model/file-layout and security gates before code. A docs consolidation commit is **not** implementation authorization.
