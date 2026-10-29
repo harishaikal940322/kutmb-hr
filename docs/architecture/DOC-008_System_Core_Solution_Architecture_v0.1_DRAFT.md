@@ -149,3 +149,10 @@ Do not start implementation in this architecture-only change.
 - Vue security: https://vuejs.org/guide/best-practices/security
 - MySQL 8.4 LTS: https://dev.mysql.com/doc/refman/8.4/en/mysql-releases.html
 - OWASP ASVS: https://asvs.owasp.org/
+
+## 12. MOD-001 detailed technical planning handoff
+
+- [DOC-013 MOD-001 IAM Technical Decision Baseline](../decisions/DOC-013_MOD-001_IAM_Technical_Decisions_v0.1_DRAFT.md) records 22 proposed engineering defaults (username, bootstrap, RBAC, session, credential lifecycle, audit) with explicit ownership and security gates.
+- [DOC-014 MOD-001 Auth/Authz & Inertia Contracts](../design/DOC-014_MOD-001_Authentication_Authorization_Contracts_v0.1_DRAFT.md) defines safe data-flow/prop and permission boundaries, concurrency invariants, and conceptual implementation slices **without fixing any paths or schema**.
+
+These are **technical planning companions**, not changes to the v0.3 RTM, business SRS, or the existing 12 open UM-DEC decisions. Security-critical reset/MFA and data retention remain review-blocked before production. HR Core remains on hold.
