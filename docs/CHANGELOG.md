@@ -23,3 +23,5 @@ No application features have been implemented or tested as part of this document
 | 2026-10-29 | P0.9 Implementation Blueprint v0.1 | Draft DOC-020 (12 gated Codex work packages) and DOC-021 (PR #1/#2 reconciliation and 26+18 scenario mapping to 18 base test IDs); no app code or requirement/Excel changes | NOT APPROVED |
 
 | 2026-10-29 | MOD-001 FD v0.1 | Draft DOC-011 user-management functional design and 26 planned positive/negative scenarios; no normative requirement changes, no test execution | NOT APPROVED |
+
+| 2026-10-29 | Documentation exit / P1.1 handoff | Consolidated DOC-011 + functional tests and shared guidance into PR #2 review branch; prepared DOC-022 restricted starter bootstrap task; no code/approval/merge/test claims | NOT APPROVED |
