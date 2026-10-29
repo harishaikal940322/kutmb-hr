@@ -25,6 +25,7 @@
 | DOC-019 | P0.8 Physical Design Decision Sheet | Technical Review | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | MOD-001/003 | docs/reviews/DOC-019_P0.8_Physical_Design_Decision_Sheet_v0.1_DRAFT.md |
 | DOC-020 | MOD-001 Implementation Blueprint & Codex Work Packages | Implementation Plan | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | MOD-001/003 | docs/implementation/DOC-020_MOD-001_Implementation_Blueprint_v0.1_DRAFT.md |
 | DOC-021 | Cross-PR Reconciliation & MOD-001 Test Coverage | Traceability Review | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | MOD-001/003 | docs/reviews/DOC-021_MOD-001_PR_Reconciliation_and_Test_Trace_v0.1_DRAFT.md |
+| DOC-022 | Documentation Exit & WP-020 Codex Bootstrap Handoff | Implementation Handoff | Level 3 | v0.1 | DRAFT / CODE AUTHORIZATION REQUIRED | MOD-001/003 | docs/implementation/DOC-022_P1.1_First_Codex_Handoff_v0.1_DRAFT.md |
 
 ## Control rule
 
@@ -35,3 +36,5 @@ Repository Markdown tracks future approved edits. Prior generated DOCX/XLSX v0.1
 **Data integrity verification:** `docs/quality/MOD-001_Data_Integrity_Test_Matrix_v0.1_DRAFT.md` contains 18 proposed subcases using existing RTM test IDs, with 0 executed. No physical ERD/migration or file structure is approved.
 
 **Functional test scenario coverage:** `docs/quality/MOD-001_Functional_Test_Scenarios_v0.1_DRAFT.md` includes 26 PLANNED subcases; none executed. These are distinct from 18 data-integrity subcases and share some parent RTM test IDs.
+
+**Documentation integration status:** DOC-011 and 26 functional scenarios from PR #1 have been consolidated on the PR #2 review branch; RTM navigation and five shared guidance/register files reconciled. No PR merge, business approval or test execution is implied. See DOC-021 and DOC-022.
