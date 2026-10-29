@@ -32,3 +32,11 @@
 - Do not implement recover/invite flow before an approved delivery and identity-verification channel; do not ship privileged production login without reviewed MFA/recovery. Never use default passwords or secret logging.
 - Backend must enforce active status, per-target permissions, last-admin safety and revoked access after privilege changes. Vue permission hints are never authorization.
 - The user deferred physical folder structure, migrations/ERD and deployment topology to a later workshop. No app code is requested or authorized by these planning documents.
+
+## P0.6 data-model boundary
+
+- Read `docs/data/DOC-015_MOD-001_Logical_Data_Model_v0.1_DRAFT.md` and `docs/quality/MOD-001_Data_Integrity_Test_Matrix_v0.1_DRAFT.md` as **logical review material**, not executable implementation instructions.
+- Never generate Employee tables/FKs from System Core, and never commit real employee or user credentials. No physical DB migration, Eloquent mapping, folder or Docker layout has been accepted.
+- Backend must enforce canonical username uniqueness at the database boundary, last-admin concurrency-safe invariants, per-target role grants and fresh session authorization, **once approved and implemented**.
+- Mock/SQLite test successes do not prove MySQL/InnoDB locking and concurrent write behavior. Capture integration evidence when code exists.
+- Do not create new SRS requirement IDs or alter Excel/CSV from this conceptual-only design; use a formal CR if future decisions change normative scope or behavior.
