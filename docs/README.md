@@ -33,4 +33,6 @@ This Git repository is the system's source of truth. **Human-readable Markdown i
 
 ## Active scope / terminology
 
+**Current operational workbook:** [System Core Traceability Excel v0.3](traceability/KUTMB_HR_System_Core_Traceability_v0.3_DRAFT.xlsx) and [MOD-001 requirements review](requirements/MOD-001_USER_MANAGEMENT_REVIEW_v0.3.md). Existing SRS requirements remain DRAFT, with IDs unchanged.
+
 See [SCOPE-001](decisions/SCOPE-001_system-core-vs-hr-core.md): **System Core first**, prioritizing `MOD-001` User Management. **HR Core is waiting for HR requirements**. This clarification updates development sequencing and the meaning of the historical `HR Foundation` name; it does not modify the existing 32 draft requirements, 11 module IDs, workbook or gates. A subsequent controlled rebaseline should update presentation labels in Excel/CSV/SRS together.
