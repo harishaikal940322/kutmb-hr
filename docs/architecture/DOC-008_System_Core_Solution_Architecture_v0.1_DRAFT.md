@@ -156,3 +156,10 @@ Do not start implementation in this architecture-only change.
 - [DOC-014 MOD-001 Auth/Authz & Inertia Contracts](../design/DOC-014_MOD-001_Authentication_Authorization_Contracts_v0.1_DRAFT.md) defines safe data-flow/prop and permission boundaries, concurrency invariants, and conceptual implementation slices **without fixing any paths or schema**.
 
 These are **technical planning companions**, not changes to the v0.3 RTM, business SRS, or the existing 12 open UM-DEC decisions. Security-critical reset/MFA and data retention remain review-blocked before production. HR Core remains on hold.
+
+## 13. P0.6 logical data design handoff (review draft)
+
+- [DOC-015 MOD-001 Logical Data Model](../data/DOC-015_MOD-001_Logical_Data_Model_v0.1_DRAFT.md) distinguishes User, Role, Permission, UserRole, RolePermission, Session and AuditEvent; optional credential/recovery/MFA concepts are gated. Includes 12 data invariants and 12 open physical-model decisions.
+- [MOD-001 Data Integrity Test Matrix](../quality/MOD-001_Data_Integrity_Test_Matrix_v0.1_DRAFT.md) has 18 proposed subcases covering MySQL uniqueness, concurrent final-admin changes, session revocation, privilege escalation, redacted audit and no Employee dependency.
+
+**Authority:** This is a conceptual data model only. **No migration files, table names, SQL datatypes, FK or DB indexes, exact Laravel/Vue directories, deployment/Compose layout, or HR Core entities are approved or created.** Validate MySQL transaction/locking semantics in the physical-model workshop and integration tests. The 32 existing requirement IDs, v0.3 Excel and CSV mirrors have not changed.
