@@ -6,6 +6,13 @@
 
 This repository is the **single source of truth** for the KUTMB HR System, covering requirements, traceability, decisions, architecture, implementation, and verification.
 
+
+## Scope clarification (29 October 2026)
+
+**Develop System Core first, NOT HR Core.** Our first development target is **MOD-001 Identity & Access / User Management**. System security/audit and minimum required configuration support that module. **Employee & Organization and other HR Core business modules must wait for explicit HR requirements and approval**. An account is not automatically an employee record. Existing v0.1 `HR Foundation` wording is historical and does not authorize HR Core implementation.
+
+See [SCOPE-001: System Core versus HR Core](docs/decisions/SCOPE-001_system-core-vs-hr-core.md). No requirement has been newly approved by this clarification.
+
 ## Current scope
 
 Build an HR *foundation* first, while full HR requirements are still pending:
