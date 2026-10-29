@@ -30,3 +30,7 @@ This Git repository is the system's source of truth. **Human-readable Markdown i
 `DRAFT` → `IN REVIEW` → `APPROVED` (only with recorded authorization) → `SUPERSEDED`/`DEPRECATED`. Open questions use `OPEN`/`BLOCKED` until resolved with linked evidence; release gates use `NOT PASSED` until passed.
 
 **Important:** An unconfirmed requirement is allowed to appear in the baseline for planning, but must never be represented as an approved HR policy.
+
+## Active scope / terminology
+
+See [SCOPE-001](decisions/SCOPE-001_system-core-vs-hr-core.md): **System Core first**, prioritizing `MOD-001` User Management. **HR Core is waiting for HR requirements**. This clarification updates development sequencing and the meaning of the historical `HR Foundation` name; it does not modify the existing 32 draft requirements, 11 module IDs, workbook or gates. A subsequent controlled rebaseline should update presentation labels in Excel/CSV/SRS together.
