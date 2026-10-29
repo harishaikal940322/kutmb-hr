@@ -167,3 +167,11 @@ These are **technical planning companions**, not changes to the v0.3 RTM, busine
 ## 14. P0.7 Technical Readiness checkpoint
 
 [DOC-016](../reviews/DOC-016_P0.7_System_Core_Technical_Readiness_v0.1_DRAFT.md) consolidates **16 recommended engineering defaults** and **12 review items**. It distinguishes the user-selected Laravel+Vue+MySQL families from review-only version/integration proposals and security/operational blockers. It does **not** approve account policies, freeze the physical ERD/file structure, or permit application coding/production. Document review is ready, not DEV READY.
+
+## 15. P0.8 Physical Design Workshop (proposal, not freeze)
+
+- [DOC-017](../data/DOC-017_MOD-001_Physical_Schema_Proposal_v0.1_DRAFT.md): candidate MySQL data tables, keys, session/audit handling and a shared transaction-lock approach for last-admin protection.
+- [DOC-018](DOC-018_Laravel_Vue_Source_Organization_Options_v0.1_DRAFT.md): compares starter-conventional Laravel/Vue layout with domain package and separate SPA alternatives; **preferred conventional**, without creating or freezing folders.
+- [DOC-019](../reviews/DOC-019_P0.8_Physical_Design_Decision_Sheet_v0.1_DRAFT.md): 10 technical review choices with blocking gates and existing RTM links.
+
+No physical ERD, SQL migration, source file path, credential policy, or deployment choice has been **approved**. All three P0.8 artifacts remain **DRAFT**. HR Core remains HOLD.
