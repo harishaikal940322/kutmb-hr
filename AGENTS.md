@@ -40,3 +40,10 @@
 - Backend must enforce canonical username uniqueness at the database boundary, last-admin concurrency-safe invariants, per-target role grants and fresh session authorization, **once approved and implemented**.
 - Mock/SQLite test successes do not prove MySQL/InnoDB locking and concurrent write behavior. Capture integration evidence when code exists.
 - Do not create new SRS requirement IDs or alter Excel/CSV from this conceptual-only design; use a formal CR if future decisions change normative scope or behavior.
+
+## P0.7 readiness gate
+
+- Before proposing any System Core code, read `docs/reviews/DOC-016_P0.7_System_Core_Technical_Readiness_v0.1_DRAFT.md`. Its **engineering-selected defaults are not approved HR/IT requirements**.
+- Never mark UM-DEC/DATA-DEC closed, accept an ADR, pass a release gate, or claim DEV READY without the relevant reviewer decision/evidence.
+- The approved stack *families* are Laravel + Vue + MySQL; specific versions/Inertia remain recommendations. No user module or HR Core source code in this docs-only PR.
+- Physical ERD, MySQL migrations, Laravel/Vue folder structure and deployment topology remain for an explicit future workshop, per requestor.
