@@ -69,3 +69,10 @@
 - Read `docs/design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md` and `docs/quality/MOD-001_Functional_Test_Scenarios_v0.1_DRAFT.md` as **DRAFT proposals**. They were copied from Draft PR #1 into the consolidated architecture branch without treating them as approved or tested.
 - Preserve the original 13 IAM requirements and all 32 RTM IDs. The 26 functional subcases and 18 data subcases may overlap, and have **zero executed tests**.
 - Resolve applicable UM-DEC decisions and accept the physical-model/file-layout and security gates before code. A docs consolidation commit is **not** implementation authorization.
+
+## Documentation exit and next code boundary
+
+- Documentation from former draft PR #1 (DOC-011, 26 functional scenarios and links) has been consolidated into current draft PR #2 branch, without main merge or policy approval.
+- Read `docs/implementation/DOC-022_P1.1_First_Codex_Handoff_v0.1_DRAFT.md` before the **first coding task**. WP-020 is a strictly isolated Laravel Vue MySQL starter proof of concept, not User Management/RBAC implementation.
+- **No further documentation-only phase is required** to define WP-020; obtain explicit permission for code, inspect repo and starter layout, preserve docs and HR Core HOLD boundaries, and run only authorized synthetic smoke tests.
+- Do not auto-merge open PRs, claim requirement approvals, pass gates, create real users/production secrets or deploy. If starter auth routes include public signup or unsupported reset, disable them before demo or security acceptance.
