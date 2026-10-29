@@ -87,7 +87,7 @@ Authorized work package: WP-<ID> [provide exact ID, accepted requirements and re
 Base branch and expected SHA: <exact Git refs>.
 Read first: AGENTS.md, SCOPE-001, DOC-005, DOC-008, DOC-013..020,
 SEC-001, DOC-019, the accepted decision set, RTM, and any approved DOC-011.
-Execute ONLY the named work package, in a clean isolated branch/worktree.
+Execute ONLY the named work package, using a short-lived feature branch within the ONE canonical checkout. Do not create new worktrees or project clones.
 No HR Core entities, requirements, sample personal data or unapproved routes.
 Backend authorization and validation are authoritative; Vue never controls access.
 No default administrator password, secret logging or public self-registration.
@@ -146,3 +146,7 @@ Do not merge, deploy, create production credentials or modify real infrastructur
 ## 9. Documentation phase exit (superseding open-ended planning)
 
 [DOC-022](DOC-022_P1.1_First_Codex_Handoff_v0.1_DRAFT.md) contains the **precise first coding assignment WP-020**. WP-000 document integration is complete on the review branch, while approval and main merge remain pending. **Do not create further numbered planning stages** just to defer implementation: the next active task is either review/merge of consolidated documentation or explicitly authorized WP-020 isolated scaffold code. Do not start real IAM account features until security, identity and operator decisions are accepted.
+
+## 10. Git integration policy update (29 October 2026)
+
+The owner now requires one canonical source directory (`/home/haris/www/kutmb-hr`) and a **main-first integration cycle**. Each completed WP must be committed, pushed, tested/reviewed, merged to main and verified before the next WP. A failed check or mandated review remains a merge blocker, not permission to bypass. Former worktree-per-task examples are superseded. WP-020 has a locally audited commit `0ccae0bd25711705f58dec3c5e222d475d20b778`, **not yet pushed or merged**; reported 13 PHPUnit tests/74 assertions are local evidence, not GitHub Actions evidence. Planning documents do not record business approval.
