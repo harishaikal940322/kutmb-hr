@@ -11,6 +11,7 @@ This Git repository is the system's source of truth. **Human-readable Markdown i
 - **Level 2**: [System SRS](srs/DOC-004_System_Wide_SRS.md), [RTM](requirements/RTM.md), [Decision Register](decisions/ADR_REGISTER.md), [Release Gates](quality/RELEASE_GATES.md)
 - **Level 3**: [Identity & Access SRS](srs/DOC-005_Identity_Access_SRS.md), [Configuration SRS](srs/DOC-006_Configuration_Reference_Data_SRS.md)
 - **Change tracking (operational)**: [Excel master + Git mirrors](traceability/README.md), including module lifecycle, CR log, impact analysis and signed decisions.
+- **Functional design:** [DOC-011 MOD-001 User Management (DRAFT)](design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md), [26 planned functional test scenarios](quality/MOD-001_Functional_Test_Scenarios_v0.1_DRAFT.md). These are review proposals, not approved policies.
 - **Intake**: [Open Questions](requirements/OPEN_QUESTIONS.md)
 - **Reserved**: DOC-007 Employee & Organization SRS; DOC-008 Solution Architecture
 
