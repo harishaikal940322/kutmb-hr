@@ -17,3 +17,8 @@
 - The **current development target is System Core**, beginning with `MOD-001` User Management / Identity & Access. `MOD-002` configuration and `MOD-003` security/audit are supporting work, not permission to implement HR domain rules.
 - **HR Core is ON HOLD until HR provides and approves requirements**. Do not build employee master or HR workflow modules or derive HR policies from example fields, speculative assumptions or legacy `HR Foundation` naming.
 - Changing presentation terminology is not an approved business requirement or permission to skip user-module security/architecture reviews.
+
+## MOD-001 planning packet (DRAFT)
+
+- Read `docs/design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md` and `docs/quality/MOD-001_Functional_Test_Scenarios_v0.1_DRAFT.md` as proposals, **not implementation instructions**.
+- Before coding, resolve the applicable UM-DEC decisions, update DOC-005/RTM/Excel+CSV if normative requirements change, and record DOC-008 architecture/ADR choices. A design PR and 26 planned scenarios do not mean testing or approval.
