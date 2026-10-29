@@ -22,7 +22,7 @@ Build an HR *foundation* first, while full HR requirements are still pending:
 - [Identity & Access SRS (DOC-005)](docs/srs/DOC-005_Identity_Access_SRS.md)
 - [Configuration & Reference Data SRS (DOC-006)](docs/srs/DOC-006_Configuration_Reference_Data_SRS.md)
 - [Requirements traceability](docs/requirements/RTM.md)
-- [Module lifecycle, change requests and Excel tracker](docs/traceability/README.md)
+- [Module lifecycle and Excel tracker](docs/traceability/README.md) ([core workbook](docs/traceability/KUTMB_HR_Traceability_Core_v0.2.xlsx))
 - [Open questions](docs/requirements/OPEN_QUESTIONS.md)
 - [Decision register](docs/decisions/ADR_REGISTER.md)
 - [Release gates](docs/quality/RELEASE_GATES.md)
