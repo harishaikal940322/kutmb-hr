@@ -23,6 +23,9 @@
 | DOC-018 | Laravel Vue Source Organization Options | Source Architecture | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | System Core | docs/architecture/DOC-018_Laravel_Vue_Source_Organization_Options_v0.1_DRAFT.md |
 | DOC-019 | P0.8 Physical Design Decision Sheet | Technical Review | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | MOD-001/003 | docs/reviews/DOC-019_P0.8_Physical_Design_Decision_Sheet_v0.1_DRAFT.md |
 
+| DOC-020 | MOD-001 Implementation Blueprint & Codex Work Packages | Implementation Plan | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | MOD-001/003 | docs/implementation/DOC-020_MOD-001_Implementation_Blueprint_v0.1_DRAFT.md |
+| DOC-021 | Cross-PR Reconciliation & MOD-001 Test Coverage | Traceability Review | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | MOD-001/003 | docs/reviews/DOC-021_MOD-001_PR_Reconciliation_and_Test_Trace_v0.1_DRAFT.md |
+
 ## Control rule
 
 Repository Markdown tracks future approved edits. Prior generated DOCX/XLSX v0.1 files were drafting inputs and are not authoritative over newer commits. Before promotion, capture reviewer identity, review date, change reference, approval record and a tested RTM snapshot.
