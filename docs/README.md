@@ -43,5 +43,7 @@ See [SCOPE-001](decisions/SCOPE-001_system-core-vs-hr-core.md): **System Core fi
 - [SEC-001 Security Baseline and Threat Review](security/SEC-001_System_Core_Security_Baseline_v0.1_DRAFT.md)
 - [ADR-006 Inertia-first architecture proposal](decisions/ADR-006_Laravel_Vue_Inertia_MySQL_v0.1_PROPOSED.md)
 - [DOC-012 Vue Onboarding and Delivery Plan](learning/DOC-012_Vue_Onboarding_MOD-001_v0.1_DRAFT.md)
+- [DOC-013 MOD-001 IAM technical defaults (DRAFT)](decisions/DOC-013_MOD-001_IAM_Technical_Decisions_v0.1_DRAFT.md)
+- [DOC-014 Laravel ↔ Vue authentication/authorization contracts (DRAFT)](design/DOC-014_MOD-001_Authentication_Authorization_Contracts_v0.1_DRAFT.md)
 
 Only the **Laravel + Vue + MySQL stack families** are user-selected. Versions, Inertia integration, role/security policy, auth methods and MySQL LTS target remain proposed. Physical file structure, actual ERD and deployment topology are expressly deferred. None of these design documents permits HR Core development.
