@@ -47,3 +47,11 @@
 - Never mark UM-DEC/DATA-DEC closed, accept an ADR, pass a release gate, or claim DEV READY without the relevant reviewer decision/evidence.
 - The approved stack *families* are Laravel + Vue + MySQL; specific versions/Inertia remain recommendations. No user module or HR Core source code in this docs-only PR.
 - Physical ERD, MySQL migrations, Laravel/Vue folder structure and deployment topology remain for an explicit future workshop, per requestor.
+
+## P0.8 physical design proposals (NOT implementation authorization)
+
+- Read DOC-017 (candidate MySQL schema), DOC-018 (source organization alternatives), DOC-019 (10 pending physical design decisions) before planning first Laravel/Vue files.
+- The **preferred** source organization is official Laravel Vue starter conventions, with modest System Core feature grouping. Do **not** create folders, migrations, Eloquent models, seeders, Vue pages or a separate API based on illustrative documents alone.
+- The proposed `iam_guard` transaction lock is a reviewable design candidate. Do not claim last-admin concurrency safety without ensuring every relevant mutation shares its lock and tests PASS on MySQL/InnoDB.
+- Keep public repository free of production secrets, personal employee data and confidential infra. HR Core MOD-004..011 remains HOLD.
+- The 10 physical design review items in DOC-019 are still OPEN; user and IT review must precede schema/code freeze.
