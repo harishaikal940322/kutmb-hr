@@ -17,3 +17,5 @@ No application features have been implemented or tested as part of this document
 | 2026-10-29 | P0.6 Logical data v0.1 | Draft DOC-015 System Core logical model, 12 proposed invariants, 12 unresolved data decisions and 18 MySQL/security test subcases. No migrations, physical ERD, file structure, module scope or SRS/RTM changes. | NOT APPROVED |
 
 | 2026-10-29 | P0.7 Technical readiness v0.1 | Draft DOC-016 with 16 proposed engineering choices and 12 unresolved review items; no requirement/module/RTM/Excel changes, no code, no approval | NOT APPROVED |
+
+| 2026-10-29 | P0.8 Physical Design Workshop v0.1 | DOC-017 proposed MySQL tables/constraints, DOC-018 Laravel/Vue source organization options and DOC-019 ten physical design review decisions; no migrations, code or approved schema | NOT APPROVED |
