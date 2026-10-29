@@ -55,3 +55,11 @@
 - The proposed `iam_guard` transaction lock is a reviewable design candidate. Do not claim last-admin concurrency safety without ensuring every relevant mutation shares its lock and tests PASS on MySQL/InnoDB.
 - Keep public repository free of production secrets, personal employee data and confidential infra. HR Core MOD-004..011 remains HOLD.
 - The 10 physical design review items in DOC-019 are still OPEN; user and IT review must precede schema/code freeze.
+
+## P0.9 proposed implementation work packages (NOT STARTED)
+
+- Read `docs/implementation/DOC-020_MOD-001_Implementation_Blueprint_v0.1_DRAFT.md` for proposed `WP-000..WP-110` and `docs/reviews/DOC-021_MOD-001_PR_Reconciliation_and_Test_Trace_v0.1_DRAFT.md` for branch and test overlap.
+- **WP-000 documentation reconciliation comes first.** Draft PR #1 contains DOC-011 and 26 functional scenarios; Draft PR #2 contains architecture and 18 data scenarios. Five common docs require manual reviewed reconciliation. Never silently discard one PR's edits.
+- `WP-010` requires actual decisions and evidence; coding, DB migrations, bootstrap, recovery and MFA work packages are explicitly **BLOCKED until applicable security/architecture/IT gates are accepted**. A 'proceed' in planning is not a blanket production authorization.
+- Maintain 32 original requirement, AC and base test IDs. Scenario subcases do not create new SRS requirements. Do not claim 44 unique executable tests because scenario plans have overlaps.
+- No source files, folder tree, SQL, HR Core records or deployment in this documentation PR. Source repository remains public; never store credentials, secrets, real staff data or private infrastructure configuration.
