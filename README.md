@@ -28,6 +28,8 @@ Build an HR *foundation* first, while full HR requirements are still pending:
 - [System-wide SRS (DOC-004)](docs/srs/DOC-004_System_Wide_SRS.md)
 - [Identity & Access SRS (DOC-005)](docs/srs/DOC-005_Identity_Access_SRS.md)
 - [Configuration & Reference Data SRS (DOC-006)](docs/srs/DOC-006_Configuration_Reference_Data_SRS.md)
+- [DOC-015 MOD-001 Logical Data Model (DRAFT)](docs/data/DOC-015_MOD-001_Logical_Data_Model_v0.1_DRAFT.md)
+- [MOD-001 Data Integrity / MySQL Concurrency Test Matrix (DRAFT)](docs/quality/MOD-001_Data_Integrity_Test_Matrix_v0.1_DRAFT.md)
 - [DOC-013 MOD-001 IAM Technical Defaults (DRAFT)](docs/decisions/DOC-013_MOD-001_IAM_Technical_Decisions_v0.1_DRAFT.md)
 - [DOC-014 Authentication, Authorization & Inertia Contracts (DRAFT)](docs/design/DOC-014_MOD-001_Authentication_Authorization_Contracts_v0.1_DRAFT.md)
 - [DOC-008 System Core Solution Architecture (DRAFT)](docs/architecture/DOC-008_System_Core_Solution_Architecture_v0.1_DRAFT.md)
