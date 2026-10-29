@@ -14,7 +14,10 @@
 | DOC-008 | Solution Architecture | Architecture | Level 3 | TBD | NOT STARTED | Semua | RESERVED |
 | DOC-009 | ADR / Decision Register | Register | Level 2 | v0.1 | DRAFT | Semua | docs/decisions/ADR_REGISTER.md |
 | DOC-010 | Roadmap & Gates | Plan | Level 2 | v0.1 | DRAFT | Semua | docs/quality/RELEASE_GATES.md |
+| DOC-011 | MOD-001 User Management Functional Design | Functional Design | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | MOD-001 | docs/design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md |
 
 ## Control rule
 
 Repository Markdown tracks future approved edits. Prior generated DOCX/XLSX v0.1 files were drafting inputs and are not authoritative over newer commits. Before promotion, capture reviewer identity, review date, change reference, approval record and a tested RTM snapshot.
+
+**Supplemental QA:** `docs/quality/MOD-001_Functional_Test_Scenarios_v0.1_DRAFT.md` refines the existing RTM test IDs into 26 proposed scenarios. No test execution is claimed.
