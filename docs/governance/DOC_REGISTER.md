@@ -15,12 +15,14 @@
 | DOC-009 | ADR / Decision Register | Register | Level 2 | v0.1 | DRAFT | Semua | docs/decisions/ADR_REGISTER.md |
 | DOC-010 | Roadmap & Gates | Plan | Level 2 | v0.1 | DRAFT | Semua | docs/quality/RELEASE_GATES.md |
 | DOC-012 | Vue Onboarding for MOD-001 | Learning Plan | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | MOD-001 UI | docs/learning/DOC-012_Vue_Onboarding_MOD-001_v0.1_DRAFT.md |
-
 | DOC-013 | MOD-001 IAM Technical Decision Baseline | Technical Decisions | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | MOD-001/003 | docs/decisions/DOC-013_MOD-001_IAM_Technical_Decisions_v0.1_DRAFT.md |
 | DOC-014 | MOD-001 Auth & Inertia Contracts | Interface / Security Design | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | MOD-001 | docs/design/DOC-014_MOD-001_Authentication_Authorization_Contracts_v0.1_DRAFT.md |
+| DOC-015 | MOD-001 System Core Logical Data Model | Logical Data Design | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | MOD-001/003 | docs/data/DOC-015_MOD-001_Logical_Data_Model_v0.1_DRAFT.md |
 
 ## Control rule
 
 Repository Markdown tracks future approved edits. Prior generated DOCX/XLSX v0.1 files were drafting inputs and are not authoritative over newer commits. Before promotion, capture reviewer identity, review date, change reference, approval record and a tested RTM snapshot.
 
 **Supplementary proposal documents:** `SEC-001` security baseline and `ADR-006` are DRAFT in this review branch. **DOC-011 Functional Design** is under separate Draft PR #1 and must not be marked merged or approved here.
+
+**Data integrity verification:** `docs/quality/MOD-001_Data_Integrity_Test_Matrix_v0.1_DRAFT.md` contains 18 proposed subcases using existing RTM test IDs, with 0 executed. No physical ERD/migration or file structure is approved.
