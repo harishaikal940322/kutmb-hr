@@ -47,3 +47,10 @@ See [SCOPE-001](decisions/SCOPE-001_system-core-vs-hr-core.md): **System Core fi
 - [DOC-014 Laravel ↔ Vue authentication/authorization contracts (DRAFT)](design/DOC-014_MOD-001_Authentication_Authorization_Contracts_v0.1_DRAFT.md)
 
 Only the **Laravel + Vue + MySQL stack families** are user-selected. Versions, Inertia integration, role/security policy, auth methods and MySQL LTS target remain proposed. Physical file structure, actual ERD and deployment topology are expressly deferred. None of these design documents permits HR Core development.
+
+## P0.6 System Core Data Design (logical only)
+
+- [DOC-015 MOD-001 Logical Data Model v0.1 (DRAFT)](data/DOC-015_MOD-001_Logical_Data_Model_v0.1_DRAFT.md)
+- [18 planned Data Integrity & Concurrency Test Subcases](quality/MOD-001_Data_Integrity_Test_Matrix_v0.1_DRAFT.md)
+
+The physical ERD, MySQL schema/migrations, source file structure and deployment layout are **deliberately not fixed**. Existing SRS/RTM/Excel/CSV remain unchanged. HR Core is on hold pending official requirements.
