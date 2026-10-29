@@ -163,3 +163,7 @@ These are **technical planning companions**, not changes to the v0.3 RTM, busine
 - [MOD-001 Data Integrity Test Matrix](../quality/MOD-001_Data_Integrity_Test_Matrix_v0.1_DRAFT.md) has 18 proposed subcases covering MySQL uniqueness, concurrent final-admin changes, session revocation, privilege escalation, redacted audit and no Employee dependency.
 
 **Authority:** This is a conceptual data model only. **No migration files, table names, SQL datatypes, FK or DB indexes, exact Laravel/Vue directories, deployment/Compose layout, or HR Core entities are approved or created.** Validate MySQL transaction/locking semantics in the physical-model workshop and integration tests. The 32 existing requirement IDs, v0.3 Excel and CSV mirrors have not changed.
+
+## 14. P0.7 Technical Readiness checkpoint
+
+[DOC-016](../reviews/DOC-016_P0.7_System_Core_Technical_Readiness_v0.1_DRAFT.md) consolidates **16 recommended engineering defaults** and **12 review items**. It distinguishes the user-selected Laravel+Vue+MySQL families from review-only version/integration proposals and security/operational blockers. It does **not** approve account policies, freeze the physical ERD/file structure, or permit application coding/production. Document review is ready, not DEV READY.
