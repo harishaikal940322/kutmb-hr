@@ -68,3 +68,10 @@ This cross-references the 22 prior IAM technical defaults and open owner/IT deci
 - [DOC-019 Physical Design Decision Sheet](reviews/DOC-019_P0.8_Physical_Design_Decision_Sheet_v0.1_DRAFT.md)
 
 **Purpose:** Discuss the layout/schema, not freeze it. No migrations, source code or HR Core implementation are authorized. All 10 P0.8 decision items still require review.
+
+## P0.9 Implementation Blueprint (documentation only)
+
+- [DOC-020 MOD-001 Codex Implementation Blueprint v0.1 (DRAFT)](implementation/DOC-020_MOD-001_Implementation_Blueprint_v0.1_DRAFT.md)
+- [DOC-021 Cross-PR Reconciliation & Test Traceability (DRAFT)](reviews/DOC-021_MOD-001_PR_Reconciliation_and_Test_Trace_v0.1_DRAFT.md)
+
+**Readiness:** 12 work packages prepared; 0 approved, no app code. PR #1 and PR #2 contain 5 overlapping documents that need coordinated review. 26 functional and 18 data-security scenario IDs map to 18 existing RTM test IDs (15 shared across both plans); no tests executed. Schema and physical file structure are still not approved. HR Core remains HOLD.
