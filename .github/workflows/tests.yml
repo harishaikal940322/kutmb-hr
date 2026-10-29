@@ -52,7 +52,8 @@ jobs:
           coverage: none
 
       - name: Verify PHP runtime
-        run: php -r 'printf("PHP %s\n", PHP_VERSION); exit(PHP_VERSION === "8.5.12" ? 0 : 1);'
+        run: >-
+          php -r 'printf("PHP %s\n", PHP_VERSION); exit(PHP_VERSION === "8.5.12" ? 0 : 1);'
 
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -67,7 +68,9 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Install Vite Plus Linux native binding
-        run: npm install --no-save --package-lock=false "@voidzero-dev/vite-plus-$(node -p '`${process.platform}-${process.arch}-gnu`')@1.4.0"
+        run: |
+          native_package="@voidzero-dev/vite-plus-$(node -p 'process.platform + "-" + process.arch + "-gnu"')@1.4.0"
+          npm install --no-save --package-lock=false "$native_package"
 
       - name: Generate ephemeral application key
         run: cp .env.example .env && php artisan key:generate --force
