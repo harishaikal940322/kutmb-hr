@@ -31,7 +31,7 @@
 
 Repository Markdown tracks future approved edits. Prior generated DOCX/XLSX v0.1 files were drafting inputs and are not authoritative over newer commits. Before promotion, capture reviewer identity, review date, change reference, approval record and a tested RTM snapshot.
 
-**Supplementary proposal documents:** `SEC-001` security baseline and `ADR-006` are DRAFT in this review branch. **DOC-011 Functional Design** is under separate Draft PR #1 and must not be marked merged or approved here.
+**Supplementary proposal documents:** `SEC-001` and `ADR-006` remain DRAFT. **DOC-011 Functional Design and its 26 scenarios have been copied into the PR #2 review branch** from PR #1; PR #1 was closed without merge as superseded. No business approval or source code implied.
 
 **Data integrity verification:** `docs/quality/MOD-001_Data_Integrity_Test_Matrix_v0.1_DRAFT.md` contains 18 proposed subcases using existing RTM test IDs, with 0 executed. No physical ERD/migration or file structure is approved.
 
