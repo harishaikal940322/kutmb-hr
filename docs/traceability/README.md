@@ -1,11 +1,13 @@
 # HR Traceability: operational master and Git mirrors
 
-**Baseline:** v0.2 DRAFT, 2026-10-29. No business approvals; no test execution. **Repo visibility: PUBLIC**, keep out HR personal data and secrets.
+> **Current operational workbook:** [KUTMB_HR_System_Core_Traceability_v0.3_DRAFT.xlsx](KUTMB_HR_System_Core_Traceability_v0.3_DRAFT.xlsx) | **Status:** DRAFT (2026-10-29). Version v0.2 is retained as historical baseline. System Core = MOD-001..003; HR Core = MOD-004..011 (HOLD/out of scope). See [MOD-001 review](../requirements/MOD-001_USER_MANAGEMENT_REVIEW_v0.3.md).
+
+**Baseline:** v0.3 DRAFT, 2026-10-29. No business approvals; no test execution. **Repo visibility: PUBLIC**, keep out HR personal data and secrets.
 
 ## Sources of authority
 
 1. **Normative requirement text**: `docs/srs/DOC-004...`, `DOC-005...`, `DOC-006...` Markdown. Never silently overwrite wording using a spreadsheet cell.
-2. **Operational traceability and change control**: [`KUTMB_HR_Traceability_Core_v0.2.xlsx`](KUTMB_HR_Traceability_Core_v0.2.xlsx) in this folder. It records module IDs and status, requirement-ID links, CR entries, and impact review. Open questions and release gates remain in their dedicated Markdown registers. This core workbook is intentionally compact; normative SRS wording remains in Markdown.
+2. **Operational traceability and change control**: [`KUTMB_HR_System_Core_Traceability_v0.3_DRAFT.xlsx`](KUTMB_HR_System_Core_Traceability_v0.3_DRAFT.xlsx) in this folder. It records module IDs and status, requirement-ID links, CR entries, and impact review. Open questions and release gates remain in their dedicated Markdown registers. This v0.3 workbook includes an overview, module registry, RTM, MOD-001 review queue, change and impact logs, and scope policy. It is intentionally focused; normative SRS wording remains in Markdown.
 3. **Text mirrors**: `module_registry.csv`, `requirement_links.csv`, `change_requests.csv`, `impact_analysis.csv`. These carry a Git-diff-friendly expanded register schema for proposed changes. Where fields overlap with the core workbook, they must match on every commit; additional CSV-only detail (such as approval timestamps, test evidence or security impact) is supplementary until reflected in the applicable SRS/ADR and approvals. **No silent independent sources of truth.**
 4. **History**: accepted pull requests, commit SHA, signed approvals and linked test evidence. Merging to GitHub `main` does not itself mean the HR owner approved a requirement.
 
@@ -22,9 +24,9 @@
 
 ## Baseline inventory
 
-- 11 module IDs: 3 foundation proposals, 1 deferred employee module, 7 future HR modules out of scope.
+- 11 module IDs: 3 System Core draft proposals (MOD-001..003) and 8 HR Core modules on hold or out of scope (MOD-004..011).
 - 32 requirement IDs with matching acceptance and planned test IDs.
-- 14 unresolved questions, 8 unpassed gates, 0 approved requirements and 0 CR entries.
+- 14 general unresolved questions and 12 specific MOD-001 review decisions (some overlap), 8 unpassed gates, 0 approved requirements and 0 CR entries.
 
 ### Excel file name policy
 
