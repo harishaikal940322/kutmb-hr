@@ -13,3 +13,5 @@ No application features have been implemented or tested as part of this document
 | 2026-10-29 | DOC-008 arch v0.1 | Draft Laravel + Vue + MySQL System Core architecture, Inertia 3 preference, SEC-001 security threat model, ADR-006 and DOC-012 Vue onboarding; defer physical structure and code | NOT APPROVED |
 
 | 2026-10-29 | MOD-001 TD v0.1 | Draft 22 IAM/security technical defaults, 8 additional readiness gates and Laravel–Vue auth/authorization contracts; reset, MFA and audit retention remain gated. No requirement, module, Excel or code changes. | NOT APPROVED |
+
+| 2026-10-29 | P0.6 Logical data v0.1 | Draft DOC-015 System Core logical model, 12 proposed invariants, 12 unresolved data decisions and 18 MySQL/security test subcases. No migrations, physical ERD, file structure, module scope or SRS/RTM changes. | NOT APPROVED |
