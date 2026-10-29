@@ -2,12 +2,13 @@
   "date": "2026-10-29",
   "version": "v0.2",
   "status": "DRAFT",
-  "xlsx": "KUTMB_HR_Module_Traceability_Master_v0.2_DRAFT.xlsx",
-  "xlsx_sha256": "9cb04954bf97b65ee756aa6a149950231c33545d5e3b064100bb17353a6f1afd",
+  "xlsx": "KUTMB_HR_Traceability_Core_v0.2.xlsx",
+  "xlsx_sha256": "0a979614b5a5f0ccccb4e6f5f5630a8dcb7c54783598db0a5aa67a7e27f83d43",
   "modules": 11,
   "requirements": 32,
   "open_questions": 14,
   "release_gates_passed": 0,
   "requirements_approved": 0,
-  "change_requests": 0
+  "change_requests": 0,
+  "notes": "Repository Excel is the compact core register (Modules, RTM, Change Requests, Impact Review); detailed source SRS is Markdown; CSV files hold review-friendly expanded tracking columns."
 }
