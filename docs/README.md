@@ -60,3 +60,11 @@ The physical ERD, MySQL schema/migrations, source file structure and deployment 
 - [DOC-016 System Core Technical Readiness v0.1 DRAFT](reviews/DOC-016_P0.7_System_Core_Technical_Readiness_v0.1_DRAFT.md)
 
 This cross-references the 22 prior IAM technical defaults and open owner/IT decisions, recommending 16 engineering choices while retaining 12 unresolved review questions. **No review or release gate is passed.** Continue through a separate owner-involved physical ERD and source file structure workshop after the critical account/auth/security choices are accepted. HR Core remains HOLD.
+
+## P0.8 Physical Design Workshop (draft options)
+
+- [DOC-017 MySQL Physical Schema Proposal](data/DOC-017_MOD-001_Physical_Schema_Proposal_v0.1_DRAFT.md)
+- [DOC-018 Laravel + Vue File Organization Alternatives](architecture/DOC-018_Laravel_Vue_Source_Organization_Options_v0.1_DRAFT.md)
+- [DOC-019 Physical Design Decision Sheet](reviews/DOC-019_P0.8_Physical_Design_Decision_Sheet_v0.1_DRAFT.md)
+
+**Purpose:** Discuss the layout/schema, not freeze it. No migrations, source code or HR Core implementation are authorized. All 10 P0.8 decision items still require review.
