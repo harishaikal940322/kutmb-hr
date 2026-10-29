@@ -76,3 +76,12 @@
 - Read `docs/implementation/DOC-022_P1.1_First_Codex_Handoff_v0.1_DRAFT.md` before the **first coding task**. WP-020 is a strictly isolated Laravel Vue MySQL starter proof of concept, not User Management/RBAC implementation.
 - **No further documentation-only phase is required** to define WP-020; obtain explicit permission for code, inspect repo and starter layout, preserve docs and HR Core HOLD boundaries, and run only authorized synthetic smoke tests.
 - Do not auto-merge open PRs, claim requirement approvals, pass gates, create real users/production secrets or deploy. If starter auth routes include public signup or unsupported reset, disable them before demo or security acceptance.
+
+## Current Git workflow: single checkout, main-first (owner direction 2026-10-29)
+
+- **Canonical project directory:** `/home/haris/www/kutmb-hr`. Reuse the one existing checkout for all future tasks. Do **not** create a fresh `git worktree`, clone, duplicate project source tree or independent project directory for each task.
+- Create a short-lived feature/task branch **inside the same checkout**, starting from an up-to-date `main`. Do not code directly on `main`.
+- After each task: run mandatory local tests and reviews, commit, push feature branch, obtain any required GitHub checks/reviews, merge into `main`, push/sync `main`, verify its head/clean status; only then start the next task.
+- Never bypass enforced branch protection, failing checks or mandatory reviews; report a genuine blocker with its evidence. A draft PR alone does **not** prove review is legally/technically required. GitHub merge is not business/HR sign-off.
+- **Existing legacy WP-020 worktree:** retain until commit `0ccae0bd25711705f58dec3c5e222d475d20b778` is integrated and its state/volumes have been checked. Cleanup may occur only after safe verification. Do not touch unrelated detached worktrees.
+- This section overrides older isolated-worktree examples in historical planning text. No real HR Core data or features, credentials or production deployment without separate approval.
