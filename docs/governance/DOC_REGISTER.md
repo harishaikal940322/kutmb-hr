@@ -18,6 +18,7 @@
 | DOC-013 | MOD-001 IAM Technical Decision Baseline | Technical Decisions | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | MOD-001/003 | docs/decisions/DOC-013_MOD-001_IAM_Technical_Decisions_v0.1_DRAFT.md |
 | DOC-014 | MOD-001 Auth & Inertia Contracts | Interface / Security Design | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | MOD-001 | docs/design/DOC-014_MOD-001_Authentication_Authorization_Contracts_v0.1_DRAFT.md |
 | DOC-015 | MOD-001 System Core Logical Data Model | Logical Data Design | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | MOD-001/003 | docs/data/DOC-015_MOD-001_Logical_Data_Model_v0.1_DRAFT.md |
+| DOC-016 | P0.7 System Core Technical Readiness & Design Review | Technical Review | Level 3 | v0.1 | DRAFT / REVIEW REQUIRED | MOD-001/003 | docs/reviews/DOC-016_P0.7_System_Core_Technical_Readiness_v0.1_DRAFT.md |
 
 ## Control rule
 
