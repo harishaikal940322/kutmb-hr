@@ -82,4 +82,4 @@ This cross-references the 22 prior IAM technical defaults and open owner/IT deci
 
 - [DOC-022: P1.1 First Codex Handoff (DRAFT)](implementation/DOC-022_P1.1_First_Codex_Handoff_v0.1_DRAFT.md)
 
-The planning documentation has been **consolidated into one review branch**. Next work is **explicitly authorized WP-020 starter bootstrap** using only synthetic data, *not* another documentation-only phase. Work remains gated until implementation authority and starter-native placement are confirmed; HR Core stays HOLD. Draft PR #1 has been incorporated into Draft PR #2 review content but neither has been merged to main.
+The planning documentation has been **consolidated into one review branch**. Next work is **explicitly authorized WP-020 starter bootstrap** using only synthetic data, *not* another documentation-only phase. Work remains gated until implementation authority and starter-native placement are confirmed; HR Core stays HOLD. PR #1 was closed without merge after its content was incorporated into Draft PR #2; PR #2 is still open for review and not merged to main.
