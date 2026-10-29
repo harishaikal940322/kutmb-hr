@@ -23,18 +23,19 @@ compose() {
 
 install_frontend() {
     if [[ -f package-lock.json ]]; then
-        compose run --rm frontend npm ci
+        compose run --rm --no-deps frontend npm ci
     else
-        compose run --rm frontend npm install
+        compose run --rm --no-deps frontend npm install
     fi
+    compose run --rm --no-deps frontend sh -lc 'native="@voidzero-dev/vite-plus-$(node -p '\''`${process.platform}-${process.arch}-gnu`'\'')@1.4.0"; npm install --no-save --package-lock=false "$native"'
 }
 
 tooling() {
     ensure_env
     compose build app frontend
-    compose run --rm --user root app sh -lc 'chown -R "$DEV_UID:$DEV_GID" /var/www/html/vendor'
-    compose run --rm --user root frontend sh -lc 'chown -R "$DEV_UID:$DEV_GID" /var/www/html/node_modules'
-    compose run --rm app composer install --no-interaction
+    compose run --rm --no-deps --user root app sh -lc 'chown -R "$DEV_UID:$DEV_GID" /var/www/html/vendor'
+    compose run --rm --no-deps --user root frontend sh -lc 'chown -R "$DEV_UID:$DEV_GID" /var/www/html/node_modules'
+    compose run --rm --no-deps app composer install --no-interaction --prefer-dist
     install_frontend
 }
 
@@ -58,42 +59,40 @@ case "${1:-help}" in
         compose down
         ;;
     test)
-        setup
-        compose run --rm frontend npm run build
-        compose run --rm app php artisan test
+        exec "$ROOT_DIR/bin/dev" mysql-test
         ;;
     mysql-test)
         tooling
         compose run --rm frontend npm run build
         test_network="kutmb-hr_default"
-        test_container="kutmb-hr-wp030-mysql-test-$$"
+        test_container="kutmb-hr-wp040-mysql-test-$$"
         docker network inspect "$test_network" >/dev/null 2>&1 || docker network create "$test_network" >/dev/null
         docker run --detach --rm --name "$test_container" --network "$test_network" \
-            --network-alias wp030-mysql-test \
-            --env MYSQL_ROOT_PASSWORD=wp030-test-root \
+            --network-alias wp040-mysql-test \
+            --env MYSQL_ROOT_PASSWORD=wp040-test-root \
             --env MYSQL_DATABASE=kutmb_hr_test \
-            mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7 >/dev/null
+            mysql:26.10.0@sha256:7b16ec7caa94ca7e92f4c5ec287de69d2e8738db056ceb629022951a6f6d910b >/dev/null
         cleanup_mysql_test() {
             docker rm --force "$test_container" >/dev/null 2>&1 || true
         }
         trap cleanup_mysql_test EXIT
         for attempt in $(seq 1 60); do
-            if docker exec "$test_container" mysqladmin ping -h 127.0.0.1 -uroot -pwp030-test-root --silent >/dev/null 2>&1; then
+            if docker exec "$test_container" mysqladmin ping -h 127.0.0.1 -uroot -pwp040-test-root --silent >/dev/null 2>&1; then
                 break
             fi
             sleep 2
         done
-        docker exec "$test_container" mysqladmin ping -h 127.0.0.1 -uroot -pwp030-test-root --silent
+        docker exec "$test_container" mysqladmin ping -h 127.0.0.1 -uroot -pwp040-test-root --silent
         compose run --rm --no-deps \
             -e APP_ENV=testing \
             -e DB_CONNECTION=mysql \
-            -e DB_HOST=wp030-mysql-test \
+            -e DB_HOST=wp040-mysql-test \
             -e DB_PORT=3306 \
             -e DB_DATABASE=kutmb_hr_test \
             -e DB_USERNAME=root \
-            -e DB_PASSWORD=wp030-test-root \
+            -e DB_PASSWORD=wp040-test-root \
             -e DB_URL= \
-            app sh -lc 'php artisan migrate:fresh --force && php artisan migrate:status && php bin/verify-database.php && php artisan test'
+            frontend sh -lc 'php artisan migrate:fresh --force && php artisan migrate:status && php bin/verify-database.php && composer ci:check'
         ;;
     build)
         tooling
@@ -118,10 +117,8 @@ case "${1:-help}" in
         compose run --rm frontend npm audit
         ;;
     check)
-        setup
-        compose run --rm frontend npm run build
-        compose run --rm frontend composer ci:check
-        compose run --rm app composer audit
+        "$ROOT_DIR/bin/dev" mysql-test
+        compose run --rm --no-deps app composer audit
         compose run --rm frontend npm audit
         ;;
     *)

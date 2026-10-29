@@ -26,7 +26,7 @@ Docker and Docker Compose are the only host dependencies. From the repository ro
 ./bin/dev up
 ```
 
-This creates a private `.env` with random local-only credentials, starts the app and MySQL 8.4 containers, applies the starter's baseline migrations and launches Vite. The app and Vite ports bind to localhost; MySQL has no host port. No privileged user is seeded. Use `./bin/dev down` to stop the containers. The development database persists in a named Docker volume; removing it is an explicit destructive action (`docker compose --project-name kutmb-hr down --volumes`).
+This creates a private `.env` with random local-only credentials, starts the app on PHP 8.5.12 and MySQL 26.10.0 containers, applies the starter's baseline migrations and launches Vite. The app and Vite ports bind to localhost; MySQL has no host port. No privileged user is seeded. Use `./bin/dev down` to stop the containers. The development database persists in a new named Docker volume, `kutmb-hr_mysql_data_php8512_mysql26100`; the prior MySQL 8.4 volume is retained and must not be mounted by MySQL 26.10.0. Removing the active volume is an explicit destructive action (`docker compose --project-name kutmb-hr down --volumes`).
 
 Useful checks:
 
@@ -40,7 +40,7 @@ Useful checks:
 ./bin/dev audit
 ```
 
-`./bin/dev test` builds the Vite manifest before running PHPUnit. `./bin/dev mysql-test` starts a temporary, isolated MySQL 8.4 container and removes it automatically after the baseline migrations and tests; the test schema is separate from the persistent development database. `./bin/dev check` runs frontend formatting/lint, TypeScript, PHPStan, Pint, PHPUnit, a production build and dependency audits. GitHub Actions runs those checks on PHP 8.4 and 8.5, plus a separate MySQL 8.4 integration job.
+`./bin/dev test` and `./bin/dev mysql-test` build the Vite manifest, then run baseline migrations and checks against a temporary MySQL 26.10.0 container that is removed automatically; tests never use SQLite or the persistent development database. `./bin/dev check` runs frontend formatting/lint, TypeScript, PHPStan, Pint, PHPUnit, a production build and dependency audits. GitHub Actions uses PHP 8.5.12 and MySQL 26.10.0.
 
 Public registration, password recovery, email verification, MFA and passkey flows are disabled. The starter login uses its default email field only for the isolated scaffold and does not settle the open login-identifier requirement.
 

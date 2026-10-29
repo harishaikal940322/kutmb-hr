@@ -11,67 +11,11 @@ permissions:
 
 jobs:
   ci:
-    name: PHP ${{ matrix.php }} / SQLite
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        php: ['8.4', '8.5']
-
-    env:
-      APP_ENV: testing
-      DB_CONNECTION: sqlite
-      DB_DATABASE: database/database.sqlite
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
-        with:
-          php-version: ${{ matrix.php }}
-          tools: composer:v2
-          coverage: none
-
-      - name: Setup Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '22'
-          cache: npm
-
-      - name: Install PHP dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
-
-      - name: Install JavaScript dependencies
-        run: npm ci --no-audit --no-fund
-
-      - name: Generate ephemeral application key
-        run: cp .env.example .env && php artisan key:generate --force
-
-      - name: Prepare SQLite database
-        run: touch database/database.sqlite
-
-      - name: Build frontend assets
-        run: npm run build
-
-      - name: Run CI Checks
-        run: composer ci:check
-
-      - name: Audit PHP dependencies
-        run: composer audit
-
-      - name: Audit JavaScript dependencies
-        run: npm audit
-
-  mysql-integration:
-    name: MySQL 8.4 integration
+    name: PHP 8.5.12 / MySQL 26.10.0
     runs-on: ubuntu-latest
     services:
       mysql:
-        image: mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7
+        image: mysql:26.10.0@sha256:7b16ec7caa94ca7e92f4c5ec287de69d2e8738db056ceb629022951a6f6d910b
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: kutmb_hr_test
@@ -81,7 +25,7 @@ jobs:
           --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"
           --health-interval=5s
           --health-timeout=5s
-          --health-retries=20
+          --health-retries=30
 
     env:
       APP_ENV: testing
@@ -102,10 +46,14 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
-          php-version: '8.4'
+          php-version: '8.5.12'
           tools: composer:v2
-          extensions: mbstring, pdo_mysql, pdo_sqlite, zip
+          extensions: mbstring, pdo_mysql, zip
           coverage: none
+
+      - name: Verify PHP runtime
+        run: >-
+          php -r 'printf("PHP %s\n", PHP_VERSION); exit(PHP_VERSION === "8.5.12" ? 0 : 1);'
 
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -119,25 +67,38 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Install Vite Plus Linux native binding
+        run: |
+          native_package="@voidzero-dev/vite-plus-$(node -p 'process.platform + "-" + process.arch + "-gnu"')@1.4.0"
+          npm install --no-save --package-lock=false "$native_package"
+
       - name: Generate ephemeral application key
         run: cp .env.example .env && php artisan key:generate --force
 
       - name: Build frontend assets
         run: npm run build
 
-      - name: Verify disposable MySQL engine
-        run: mysql --host=127.0.0.1 --user=root --password=root --database=kutmb_hr_test --execute='SELECT VERSION() AS mysql_version, DATABASE() AS test_database;'
+      - name: Verify disposable MySQL runtime
+        env:
+          MYSQL_PWD: root
+        run: |
+          actual_version="$(mysql --host=127.0.0.1 --user=root --database=kutmb_hr_test --batch --skip-column-names --execute='SELECT VERSION()')"
+          printf 'MySQL %s\n' "$actual_version"
+          [[ "$actual_version" == 26.10.0* ]]
 
       - name: Apply and verify baseline migrations
         run: |
           php artisan migrate:fresh --force
           php artisan migrate:status
 
-      - name: Verify database connectivity
+      - name: Verify Laravel PDO connectivity
         run: php bin/verify-database.php
 
-      - name: Run feature and integration tests on MySQL
-        run: php artisan test
+      - name: Run CI checks on MySQL
+        run: composer ci:check
 
       - name: Audit PHP dependencies
         run: composer audit
+
+      - name: Audit JavaScript dependencies
+        run: npm audit
