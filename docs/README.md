@@ -36,3 +36,12 @@ This Git repository is the system's source of truth. **Human-readable Markdown i
 **Current operational workbook:** [System Core Traceability Excel v0.3](traceability/KUTMB_HR_System_Core_Traceability_v0.3_DRAFT.xlsx) and [MOD-001 requirements review](requirements/MOD-001_USER_MANAGEMENT_REVIEW_v0.3.md). Existing SRS requirements remain DRAFT, with IDs unchanged.
 
 See [SCOPE-001](decisions/SCOPE-001_system-core-vs-hr-core.md): **System Core first**, prioritizing `MOD-001` User Management. **HR Core is waiting for HR requirements**. This clarification updates development sequencing and the meaning of the historical `HR Foundation` name; it does not modify the existing 32 draft requirements, 11 module IDs, workbook or gates. A subsequent controlled rebaseline should update presentation labels in Excel/CSV/SRS together.
+
+## P0.4 Solution Architecture (technical planning only)
+
+- [DOC-008 System Core Solution Architecture v0.1 DRAFT](architecture/DOC-008_System_Core_Solution_Architecture_v0.1_DRAFT.md)
+- [SEC-001 Security Baseline and Threat Review](security/SEC-001_System_Core_Security_Baseline_v0.1_DRAFT.md)
+- [ADR-006 Inertia-first architecture proposal](decisions/ADR-006_Laravel_Vue_Inertia_MySQL_v0.1_PROPOSED.md)
+- [DOC-012 Vue Onboarding and Delivery Plan](learning/DOC-012_Vue_Onboarding_MOD-001_v0.1_DRAFT.md)
+
+Only the **Laravel + Vue + MySQL stack families** are user-selected. Versions, Inertia integration, role/security policy, auth methods and MySQL LTS target remain proposed. Physical file structure, actual ERD and deployment topology are expressly deferred. None of these design documents permits HR Core development.
