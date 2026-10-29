@@ -49,3 +49,10 @@ The following 13 requirement IDs already exist in DOC-005 and the RTM:
 ## Change management
 
 Once decisions are received, record requestor, answer, effective date and impacted requirement IDs. If normative behavior changes, create a Change Request and update SRS, RTM, Excel and CSV mirrors together. Do not silently rename existing requirement IDs.
+
+## Functional design review packet
+
+- [DOC-011 MOD-001 Functional Design v0.1 DRAFT](../design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md): proposed account fields, role-permission matrix, account lifecycle, security and audit flows.
+- [MOD-001 Functional Test Scenarios v0.1 DRAFT](../quality/MOD-001_Functional_Test_Scenarios_v0.1_DRAFT.md): 26 planned positive/negative scenarios with existing T-IAM/SYS IDs. No test execution.
+
+**Review handling:** All 12 decisions above remain OPEN. A draft design is not an HR/IT approval, implementation authorization or change to the 32 requirements.
