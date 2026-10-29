@@ -77,3 +77,9 @@ This cross-references the 22 prior IAM technical defaults and open owner/IT deci
 **Readiness:** 12 work packages prepared; 0 approved, no app code. PR #1 and PR #2 contain 5 overlapping documents that need coordinated review. 26 functional and 18 data-security scenario IDs map to 18 existing RTM test IDs (15 shared across both plans); no tests executed. Schema and physical file structure are still not approved. HR Core remains HOLD.
 
 - **Functional design:** [DOC-011 MOD-001 User Management (DRAFT)](design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md), [26 planned functional test scenarios](quality/MOD-001_Functional_Test_Scenarios_v0.1_DRAFT.md). Now part of the consolidated draft branch; not approved nor executed.
+
+## Documentation stage exit / first coding handoff
+
+- [DOC-022: P1.1 First Codex Handoff (DRAFT)](implementation/DOC-022_P1.1_First_Codex_Handoff_v0.1_DRAFT.md)
+
+The planning documentation has been **consolidated into one review branch**. Next work is **explicitly authorized WP-020 starter bootstrap** using only synthetic data, *not* another documentation-only phase. Work remains gated until implementation authority and starter-native placement are confirmed; HR Core stays HOLD. Draft PR #1 has been incorporated into Draft PR #2 review content but neither has been merged to main.
