@@ -175,3 +175,10 @@ These are **technical planning companions**, not changes to the v0.3 RTM, busine
 - [DOC-019](../reviews/DOC-019_P0.8_Physical_Design_Decision_Sheet_v0.1_DRAFT.md): 10 technical review choices with blocking gates and existing RTM links.
 
 No physical ERD, SQL migration, source file path, credential policy, or deployment choice has been **approved**. All three P0.8 artifacts remain **DRAFT**. HR Core remains HOLD.
+
+## 16. P0.9 Implementation Blueprint & Reconciliation
+
+- [DOC-020 Implementation Blueprint](../implementation/DOC-020_MOD-001_Implementation_Blueprint_v0.1_DRAFT.md): **12 scoped, security-gated Codex work packages** (WP-000..WP-110), each with requirements, dependencies, acceptance and evidence. The first package is **documentation reconciliation**, not coding.
+- [DOC-021 Cross-PR Reconciliation](../reviews/DOC-021_MOD-001_PR_Reconciliation_and_Test_Trace_v0.1_DRAFT.md): overlap and coverage across the **26 proposed functional** scenarios in Draft PR #1 and **18 proposed data integrity** scenarios in Draft PR #2; review 5 shared documentation files before any merge.
+
+No code, migrations, database, release-gate changes or physical file structure freeze are authorized by either planning document. Existing 32 normative requirements remain DRAFT; HR Core remains HOLD.
