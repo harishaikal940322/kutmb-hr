@@ -54,3 +54,9 @@ Only the **Laravel + Vue + MySQL stack families** are user-selected. Versions, I
 - [18 planned Data Integrity & Concurrency Test Subcases](quality/MOD-001_Data_Integrity_Test_Matrix_v0.1_DRAFT.md)
 
 The physical ERD, MySQL schema/migrations, source file structure and deployment layout are **deliberately not fixed**. Existing SRS/RTM/Excel/CSV remain unchanged. HR Core is on hold pending official requirements.
+
+## P0.7 Technical Readiness Review (planning only)
+
+- [DOC-016 System Core Technical Readiness v0.1 DRAFT](reviews/DOC-016_P0.7_System_Core_Technical_Readiness_v0.1_DRAFT.md)
+
+This cross-references the 22 prior IAM technical defaults and open owner/IT decisions, recommending 16 engineering choices while retaining 12 unresolved review questions. **No review or release gate is passed.** Continue through a separate owner-involved physical ERD and source file structure workshop after the critical account/auth/security choices are accepted. HR Core remains HOLD.
