@@ -88,7 +88,7 @@ Authentication failure must not reveal whether the username exists. Cookies/sess
 | S5 | Own profile and audit | AC-IAM-FR-008, AC-IAM-AUD-001; T-IAM-FR-008, T-IAM-AUD-001 | TD-002/016 |
 | S6 | Approved reset/invitation and admin MFA | AC-IAM-FR-004; T-IAM-FR-004 | **BLOCKED** TD-014/015 |
 
-These six slices are **planning order only**, not work authorization. Final priorities require integration with the 26 planned scenarios in [Draft PR #1](https://github.com/harishaikal940322/kutmb-hr/pull/1).
+These six slices are **planning order only**, not work authorization. Final priorities are cross-mapped to the 26 [functional scenarios now consolidated on this branch](../quality/MOD-001_Functional_Test_Scenarios_v0.1_DRAFT.md). They remain DRAFT and unexecuted.
 
 ## 7. Definition of ready (technical review, not release)
 
