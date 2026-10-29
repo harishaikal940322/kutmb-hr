@@ -76,3 +76,7 @@ Risk labels are preliminary and not assigned from a formal organizational risk a
 - [ ] Security reviewer or delegated technical authority records sign-off with commit SHA and residual risk.
 
 **Current result: 0 PASS, no tests executed, all security gates OPEN.**
+
+## IAM decision and contract cross-reference
+
+Proposed technical defaults and residual gates are documented in [DOC-013](../decisions/DOC-013_MOD-001_IAM_Technical_Decisions_v0.1_DRAFT.md). The Inertia/Laravel trust boundary, permission denial cases and concurrency invariants are in [DOC-014](../design/DOC-014_MOD-001_Authentication_Authorization_Contracts_v0.1_DRAFT.md). **Both remain DRAFT** and do not close any existing release/security gate.
