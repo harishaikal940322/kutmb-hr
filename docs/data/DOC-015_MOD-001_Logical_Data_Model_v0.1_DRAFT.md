@@ -6,7 +6,7 @@
 >
 > **Coverage:** MOD-001 User Management and necessary MOD-003 security/audit. MOD-002 configuration only if explicitly needed. **MOD-004..MOD-011 HR Core ON HOLD pending HR requirements.**
 >
-> **Depends on:** [SCOPE-001](../decisions/SCOPE-001_system-core-vs-hr-core.md), [DOC-005 IAM SRS](../srs/DOC-005_Identity_Access_SRS.md), [DOC-008 architecture](../architecture/DOC-008_System_Core_Solution_Architecture_v0.1_DRAFT.md), [DOC-013 technical defaults](../decisions/DOC-013_MOD-001_IAM_Technical_Decisions_v0.1_DRAFT.md) and [DOC-014 contracts](../design/DOC-014_MOD-001_Authentication_Authorization_Contracts_v0.1_DRAFT.md). [DOC-011 Functional Design](https://github.com/harishaikal940322/kutmb-hr/pull/1) remains an independent open draft PR.
+> **Depends on:** [SCOPE-001](../decisions/SCOPE-001_system-core-vs-hr-core.md), [DOC-005 IAM SRS](../srs/DOC-005_Identity_Access_SRS.md), [DOC-008 architecture](../architecture/DOC-008_System_Core_Solution_Architecture_v0.1_DRAFT.md), [DOC-013 technical defaults](../decisions/DOC-013_MOD-001_IAM_Technical_Decisions_v0.1_DRAFT.md) and [DOC-014 contracts](../design/DOC-014_MOD-001_Authentication_Authorization_Contracts_v0.1_DRAFT.md). [DOC-011 Functional Design](../design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md) was consolidated from the superseded closed PR #1; all policies remain DRAFT.
 
 ## 1. Design objectives and non-goals
 
