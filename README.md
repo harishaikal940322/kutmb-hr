@@ -28,6 +28,8 @@ Build an HR *foundation* first, while full HR requirements are still pending:
 - [System-wide SRS (DOC-004)](docs/srs/DOC-004_System_Wide_SRS.md)
 - [Identity & Access SRS (DOC-005)](docs/srs/DOC-005_Identity_Access_SRS.md)
 - [Configuration & Reference Data SRS (DOC-006)](docs/srs/DOC-006_Configuration_Reference_Data_SRS.md)
+- [MOD-001 Functional Design (DOC-011, DRAFT)](docs/design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md)
+- [MOD-001 Functional Test Scenarios (26 planned, not executed)](docs/quality/MOD-001_Functional_Test_Scenarios_v0.1_DRAFT.md)
 - [DOC-020 MOD-001 Implementation Blueprint / Codex Work Packages (DRAFT)](docs/implementation/DOC-020_MOD-001_Implementation_Blueprint_v0.1_DRAFT.md)
 - [DOC-021 Cross-PR Reconciliation & Test Traceability (DRAFT)](docs/reviews/DOC-021_MOD-001_PR_Reconciliation_and_Test_Trace_v0.1_DRAFT.md)
 - [DOC-017 MySQL Physical Schema Proposal (DRAFT)](docs/data/DOC-017_MOD-001_Physical_Schema_Proposal_v0.1_DRAFT.md)
