@@ -73,3 +73,7 @@
 Engineering can review these defaults now without knowing HR business requirements. To promote one to **ACCEPTED**, record actor/reviewer, date, exact decision, alternatives, why and linked SRS/RTM/Excel/CSV changes **if normative behavior changes**. Do not mark UM-DEC-001..012 as RESOLVED merely because a default is documented.
 
 **Next technical deliverable after review:** contract-level security/authorization and onboarding verification, followed by *separate joint discussion* of ERD and physical file structure. **No implementation/code in this PR.**
+
+## P0.6 Data model companion
+
+[DOC-015 Logical Data Model](../data/DOC-015_MOD-001_Logical_Data_Model_v0.1_DRAFT.md) develops the logical entities and 12 data integrity invariants associated with the existing proposed defaults. [Data Integrity Test Matrix](../quality/MOD-001_Data_Integrity_Test_Matrix_v0.1_DRAFT.md) maps 18 proposed scenarios to existing test IDs. All physical database decisions, employee relationships, code layout and deployment choices remain **DEFERRED**, and all UM-DEC approvals remain OPEN.
