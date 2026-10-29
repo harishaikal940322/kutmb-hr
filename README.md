@@ -30,6 +30,8 @@ Build an HR *foundation* first, while full HR requirements are still pending:
 - [Configuration & Reference Data SRS (DOC-006)](docs/srs/DOC-006_Configuration_Reference_Data_SRS.md)
 - [Requirements traceability](docs/requirements/RTM.md)
 - [Module lifecycle and Excel tracker](docs/traceability/README.md) ([current Excel v0.3 DRAFT](docs/traceability/KUTMB_HR_System_Core_Traceability_v0.3_DRAFT.xlsx))
+- [MOD-001 Functional Design (DOC-011, DRAFT)](docs/design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md)
+- [MOD-001 Functional Test Scenarios (26 planned, not executed)](docs/quality/MOD-001_Functional_Test_Scenarios_v0.1_DRAFT.md)
 - [MOD-001 User Management requirements review](docs/requirements/MOD-001_USER_MANAGEMENT_REVIEW_v0.3.md)
 - [Open questions](docs/requirements/OPEN_QUESTIONS.md)
 - [Decision register](docs/decisions/ADR_REGISTER.md)
