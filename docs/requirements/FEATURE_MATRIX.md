@@ -1,5 +1,7 @@
 # DOC-001 | Master Feature Matrix
 
+**Scope interpretation v0.3:** F-001 through F-008 correspond to **System Core proposals**. F-009 and F-010 are **HR Core placeholders**, not approved requirements; all HR Core implementation is on hold pending HR review. MOD-001 is the first planned User Management development module. No feature IDs were added or removed by this clarification.
+
 > v0.1, 29 October 2026 • **DRAFT / NOT APPROVED**
 
 | ID | Feature | Domain | Origin | Scope | Source | Phase |
