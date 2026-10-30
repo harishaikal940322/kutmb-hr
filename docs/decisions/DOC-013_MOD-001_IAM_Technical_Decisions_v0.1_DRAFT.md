@@ -81,3 +81,22 @@ Engineering can review these defaults now without knowing HR business requiremen
 ## P0.7 Engineering review status
 
 [DOC-016 Technical Readiness](../reviews/DOC-016_P0.7_System_Core_Technical_Readiness_v0.1_DRAFT.md) provides preferred engineering design defaults with precise distinction between **selected for design review** and **approved organizational policy**. All original UM-DEC decisions remain OPEN until signed off; no production session timeout, recovery channel, audit retention or privileged MFA recovery method has been accepted. File structure remains deferred.
+
+## 30 October 2026 owner development direction
+
+The technical owner selected the DOC-019 PD-001..PD-010 development baseline for the bounded WP-040B schema implementation. This records implementation direction only; it does **not** approve organizational security policy, close UM-DEC/DATA-DEC items, approve a release gate, or authorize production use. The resulting schema and code remain subject to review.
+
+| PD | Selected for development | Boundary / status |
+|---|---|---|
+| PD-001 | BIGINT unsigned internal IDs | Development baseline selected; no public identifier implied |
+| PD-002 | Username with canonical lowercase value, max 64 characters | ASCII syntax and deterministic no-loss normalization implemented; username login remains inactive |
+| PD-003 | ACTIVE / INACTIVE | PENDING_SETUP deferred; authentication enforcement not implemented |
+| PD-004 | Relational RBAC with Laravel Policies/Gates | Schema only; no assignment endpoints or approved role matrix |
+| PD-005 | Shared `iam_guard` transaction lock primitive | Infrastructure row and MySQL lock compatibility only; no last-admin guarantee claimed |
+| PD-006 | Native Laravel database sessions | Existing starter session table retained |
+| PD-007 | Restricted `audit_events` with allowlisted metadata | Minimal schema/model foundation; no reader route or retention policy |
+| PD-008 | Existing Laravel Vue starter structure | No custom framework or DDD structure |
+| PD-009 | Typed Inertia props and server-side authorization | Existing application direction; no new privileged UI or authorization endpoints |
+| PD-010 | Pinned PHP 8.5.12 / MySQL 26.10.0 runtime | Development and disposable-test target; production hosting remains undecided |
+
+**Decision state:** owner-selected for development, not formal IT/HR/security approval. The 12 UM-DEC items, applicable DATA-DEC items, release gates, MFA/recovery, audit retention/privacy and production readiness retain their existing statuses. No normative SRS/RTM behavior or requirement ID is changed by this implementation direction.

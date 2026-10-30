@@ -92,7 +92,7 @@ case "${1:-help}" in
             -e DB_USERNAME=root \
             -e DB_PASSWORD=wp040-test-root \
             -e DB_URL= \
-            frontend sh -lc 'php artisan migrate:fresh --force && php artisan migrate:status && php bin/verify-database.php && composer ci:check'
+            frontend sh -lc 'php artisan migrate:fresh --force && php artisan migrate:status && php artisan migrate:rollback --force && php artisan migrate --force && php artisan migrate:status && php bin/verify-database.php && composer ci:check'
         ;;
     build)
         tooling

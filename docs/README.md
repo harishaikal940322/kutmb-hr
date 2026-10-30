@@ -67,14 +67,14 @@ This cross-references the 22 prior IAM technical defaults and open owner/IT deci
 - [DOC-018 Laravel + Vue File Organization Alternatives](architecture/DOC-018_Laravel_Vue_Source_Organization_Options_v0.1_DRAFT.md)
 - [DOC-019 Physical Design Decision Sheet](reviews/DOC-019_P0.8_Physical_Design_Decision_Sheet_v0.1_DRAFT.md)
 
-**Purpose:** Discuss the layout/schema, not freeze it. No migrations, source code or HR Core implementation are authorized. All 10 P0.8 decision items still require review.
+**Purpose/status:** The owner selected the ten DOC-019 technical choices for bounded development on 2026-10-30. WP-040B implements the identity/RBAC schema on a review branch with synthetic data. This is not formal IT/HR/security approval, production authorization, or release readiness. The security and policy decisions remain open.
 
 ## P0.9 Implementation Blueprint (documentation only)
 
 - [DOC-020 MOD-001 Codex Implementation Blueprint v0.1 (DRAFT)](implementation/DOC-020_MOD-001_Implementation_Blueprint_v0.1_DRAFT.md)
 - [DOC-021 Cross-PR Reconciliation & Test Traceability (DRAFT)](reviews/DOC-021_MOD-001_PR_Reconciliation_and_Test_Trace_v0.1_DRAFT.md)
 
-**Readiness:** 12 work packages prepared; 0 approved, no app code. PR #1 and PR #2 contain 5 overlapping documents that need coordinated review. 26 functional and 18 data-security scenario IDs map to 18 existing RTM test IDs (15 shared across both plans); no tests executed. Schema and physical file structure are still not approved. HR Core remains HOLD.
+**Readiness:** DOC-011 and its scenarios remain draft; WP-040B is a bounded code implementation using starter structure. Existing scenario IDs remain planned and are not replaced by these implementation tests. HR Core remains HOLD.
 
 - **Functional design:** [DOC-011 MOD-001 User Management (DRAFT)](design/DOC-011_MOD-001_Functional_Design_v0.1_DRAFT.md), [26 planned functional test scenarios](quality/MOD-001_Functional_Test_Scenarios_v0.1_DRAFT.md). Now part of the consolidated draft branch; not approved nor executed.
 
@@ -82,4 +82,4 @@ This cross-references the 22 prior IAM technical defaults and open owner/IT deci
 
 - [DOC-022: P1.1 First Codex Handoff (DRAFT)](implementation/DOC-022_P1.1_First_Codex_Handoff_v0.1_DRAFT.md)
 
-The planning documentation has been **consolidated into one review branch**. Next work is **explicitly authorized WP-020 starter bootstrap** using only synthetic data, *not* another documentation-only phase. Work remains gated until implementation authority and starter-native placement are confirmed; HR Core stays HOLD. PR #1 was closed without merge after its content was incorporated into Draft PR #2; PR #2 is still open for review and not merged to main.
+The planning documentation was **consolidated into one review branch**. WP-020 is implemented; WP-040B is the current owner-authorized identity/RBAC schema implementation using synthetic data, with review and integration through normal Git controls. Organizational security decisions and HR Core remain gated. PR history in the preceding handoff is historical; verify current GitHub state before acting.
