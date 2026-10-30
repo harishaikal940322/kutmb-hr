@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
-import { LayoutGrid, UserRound } from '@lucide/vue';
+import { Link, usePage } from '@inertiajs/vue3';
+import { LayoutGrid, UsersRound, UserRound } from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -28,6 +28,7 @@ const mainNavItems: NavItem[] = [
         icon: UserRound,
     },
 ];
+const page = usePage<{ userDirectoryPreview: boolean }>();
 </script>
 
 <template>
@@ -45,7 +46,20 @@ const mainNavItems: NavItem[] = [
         </SidebarHeader>
 
         <SidebarContent>
-            <NavMain :items="mainNavItems" />
+            <NavMain
+                :items="[
+                    ...mainNavItems,
+                    ...(page.props.userDirectoryPreview
+                        ? [
+                              {
+                                  title: 'User Directory',
+                                  href: '/users',
+                                  icon: UsersRound,
+                              },
+                          ]
+                        : []),
+                ]"
+            />
         </SidebarContent>
 
         <SidebarFooter>
