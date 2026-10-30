@@ -21,12 +21,20 @@ class ProfileController extends Controller
             abort(403);
         }
 
+        $roleNames = $user->roles()
+            ->orderBy('roles.name')
+            ->pluck('roles.name')
+            ->all();
+
         return Inertia::render('MyProfile', [
             'profile' => [
                 'displayName' => $user->name,
                 'username' => $user->username,
                 'email' => $user->email,
                 'status' => $user->status,
+            ],
+            'myAccess' => [
+                'roleNames' => $roleNames,
             ],
         ]);
     }
