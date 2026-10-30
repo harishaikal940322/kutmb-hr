@@ -43,7 +43,7 @@ return [
     |
     */
 
-    'username' => 'email',
+    'username' => 'username',
 
     'email' => 'email',
 
@@ -58,7 +58,8 @@ return [
     |
     */
 
-    'lowercase_usernames' => true,
+    // Canonicalization is performed by App\\Support\\Identity\\Username.
+    'lowercase_usernames' => false,
 
     /*
     |--------------------------------------------------------------------------

@@ -16,7 +16,7 @@ See [SCOPE-001: System Core versus HR Core](docs/decisions/SCOPE-001_system-core
 
 WP-020 established the Laravel, Vue, Inertia, TypeScript, Vite and MySQL development foundation. WP-040B adds identity/RBAC schema, an IAM transaction guard and restricted audit storage foundation. It does not implement User Management CRUD, privileged assignment endpoints, first-admin bootstrap, account recovery, MFA, HR employee relationships, configuration workflows or any HR Core module. `MOD-004` through `MOD-011` remain on hold until HR requirements are approved.
 
-The SRS, RTM, Excel traceability master, CSV mirrors, module IDs and requirement IDs remain unchanged. Starter login remains email-based for framework integration checks; username login and authentication enforcement of account status are not implemented. There are no seeded accounts or committed credentials.
+The SRS, RTM, Excel traceability master, CSV mirrors, module IDs and requirement IDs remain unchanged. WP-050A implements username-only login through Fortify, canonical username lookup, ACTIVE-only authentication and live database-backed status checks on web requests. Email is not a login fallback. Accounts with a NULL username remain unchanged and cannot log in; any account migration or provisioning procedure requires separate approval. These are technical implementation choices, not organizational approval of identity, session or production-security policy. There are no seeded accounts or committed credentials.
 
 ## Local development
 
@@ -42,7 +42,7 @@ Useful checks:
 
 `./bin/dev test` and `./bin/dev mysql-test` build the Vite manifest, then run baseline migrations and checks against a temporary MySQL 26.10.0 container that is removed automatically; tests never use SQLite or the persistent development database. `./bin/dev check` runs frontend formatting/lint, TypeScript, PHPStan, Pint, PHPUnit, a production build and dependency audits. GitHub Actions uses PHP 8.5.12 and MySQL 26.10.0.
 
-Public registration, password recovery, email verification, MFA and passkey flows are disabled. The starter login uses its default email field only for the isolated scaffold and does not settle the open login-identifier requirement.
+Public registration, password recovery, email verification, MFA and passkey flows are disabled. Login uses username and password with Laravel Fortify sessions, CSRF protection, login throttling, session rotation and logout invalidation. Persistent Remember Me authentication is disabled. MFA/recovery, session timeout, bootstrap, role authorization, audit retention and production security remain gated for review.
 
 ## Documentation
 

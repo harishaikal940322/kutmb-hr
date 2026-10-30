@@ -4,7 +4,6 @@ import InputError from '@/components/InputError.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
 import TextLink from '@/components/TextLink.vue';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
@@ -13,7 +12,7 @@ import { store } from '@/routes/login';
 defineOptions({
     layout: {
         title: 'Log in to your account',
-        description: 'Enter your email and password below to log in',
+        description: 'Enter your username and password below to log in',
     },
 });
 
@@ -40,18 +39,18 @@ defineProps<{
     >
         <div class="grid gap-6">
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="username">Username</Label>
                 <Input
-                    id="email"
-                    type="email"
-                    name="email"
+                    id="username"
+                    type="text"
+                    name="username"
                     required
                     v-focus
                     :tabindex="1"
-                    autocomplete="email"
-                    placeholder="email@example.com"
+                    autocomplete="username"
+                    placeholder="Username"
                 />
-                <InputError :message="errors.email" />
+                <InputError :message="errors.username" />
             </div>
 
             <div class="grid gap-2">
@@ -69,17 +68,10 @@ defineProps<{
                 <InputError :message="errors.password" />
             </div>
 
-            <div class="flex items-center justify-between">
-                <Label for="remember" class="flex items-center space-x-3">
-                    <Checkbox id="remember" name="remember" :tabindex="3" />
-                    <span>Remember me</span>
-                </Label>
-            </div>
-
             <Button
                 type="submit"
                 class="mt-4 w-full"
-                :tabindex="4"
+                :tabindex="3"
                 :disabled="processing"
                 data-test="login-button"
             >
