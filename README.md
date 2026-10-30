@@ -14,9 +14,9 @@ See [SCOPE-001: System Core versus HR Core](docs/decisions/SCOPE-001_system-core
 
 ## Current implementation scope
 
-WP-020 established the Laravel, Vue, Inertia, TypeScript, Vite and MySQL development foundation. WP-040B adds identity/RBAC schema, an IAM transaction guard and restricted audit storage foundation. It does not implement User Management CRUD, privileged assignment endpoints, first-admin bootstrap, account recovery, MFA, HR employee relationships, configuration workflows or any HR Core module. `MOD-004` through `MOD-011` remain on hold until HR requirements are approved.
+WP-020 established the Laravel, Vue, Inertia, TypeScript, Vite and MySQL development foundation. WP-040B adds identity/RBAC schema, an IAM transaction guard and restricted audit storage foundation. WP-050B1 provides an opt-in local developer account command; it does not implement User Management CRUD, privileged assignment endpoints, production first-admin bootstrap, account recovery, MFA, HR employee relationships, configuration workflows or any HR Core module. `MOD-004` through `MOD-011` remain on hold until HR requirements are approved.
 
-The SRS, RTM, Excel traceability master, CSV mirrors, module IDs and requirement IDs remain unchanged. WP-050A implements username-only login through Fortify, canonical username lookup, ACTIVE-only authentication and live database-backed status checks on web requests. Email is not a login fallback. Accounts with a NULL username remain unchanged and cannot log in; any account migration or provisioning procedure requires separate approval. These are technical implementation choices, not organizational approval of identity, session or production-security policy. There are no seeded accounts or committed credentials.
+The SRS, RTM, Excel traceability master, CSV mirrors, module IDs and requirement IDs remain unchanged. WP-050A implements username-only login through Fortify, canonical username lookup, ACTIVE-only authentication and live database-backed status checks on web requests. Email is not a login fallback. Accounts with a NULL username remain unchanged and cannot log in; non-local account migration or provisioning requires separate approval. These are technical implementation choices, not organizational approval of identity, session or production-security policy. There are no seeded accounts or committed credentials.
 
 ## Local development
 
@@ -27,6 +27,14 @@ Docker and Docker Compose are the only host dependencies. From the repository ro
 ```
 
 This creates a private `.env` with random local-only credentials, starts the app on PHP 8.5.12 and MySQL 26.10.0 containers, applies the starter's baseline migrations and launches Vite. The app and Vite ports bind to localhost; MySQL has no host port. No privileged user is seeded. Use `./bin/dev down` to stop the containers. The development database persists in a new named Docker volume, `kutmb-hr_mysql_data_php8512_mysql26100`; the prior MySQL 8.4 volume is retained and must not be mounted by MySQL 26.10.0. Removing the active volume is an explicit destructive action (`docker compose --project-name kutmb-hr down --volumes`).
+
+To create an unassigned local developer account, explicitly add `IAM_LOCAL_ACCOUNT_BOOTSTRAP_ENABLED=true` to the private `.env`, then run:
+
+```sh
+docker compose --project-name kutmb-hr exec app php artisan iam:bootstrap-local-account
+```
+
+The command prompts for username, display name, and a hidden password with confirmation. It creates an ACTIVE account with no roles or permissions. Remove the opt-in setting after use. This command is denied outside `local`/`testing` and is not a production System Admin bootstrap or public registration flow.
 
 Useful checks:
 
@@ -42,7 +50,7 @@ Useful checks:
 
 `./bin/dev test` and `./bin/dev mysql-test` build the Vite manifest, then run baseline migrations and checks against a temporary MySQL 26.10.0 container that is removed automatically; tests never use SQLite or the persistent development database. `./bin/dev check` runs frontend formatting/lint, TypeScript, PHPStan, Pint, PHPUnit, a production build and dependency audits. GitHub Actions uses PHP 8.5.12 and MySQL 26.10.0.
 
-Public registration, password recovery, email verification, MFA and passkey flows are disabled. Login uses username and password with Laravel Fortify sessions, CSRF protection, login throttling, session rotation and logout invalidation. Persistent Remember Me authentication is disabled. MFA/recovery, session timeout, bootstrap, role authorization, audit retention and production security remain gated for review.
+Public registration, password recovery, email verification, MFA and passkey flows are disabled. Login uses username and password with Laravel Fortify sessions, CSRF protection, login throttling, session rotation and logout invalidation. Persistent Remember Me authentication is disabled. Production first-admin bootstrap, MFA/recovery, session timeout, role authorization, audit retention and production security remain gated for review.
 
 ## Documentation
 
