@@ -3,6 +3,8 @@
 namespace Tests\Feature\Profile;
 
 use App\Models\AuditEvent;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +44,7 @@ class MyProfileTest extends TestCase
                     'name' => 'Synthetic Profile User',
                     'email' => 'profile@example.test',
                 ])
+                ->where('myAccess', ['roleNames' => []])
                 ->missing('profile.password')
                 ->missing('profile.remember_token')
                 ->missing('profile.session_id')
@@ -49,6 +52,11 @@ class MyProfileTest extends TestCase
                 ->missing('auth.user.remember_token')
                 ->missing('auth.user.username_canonical')
                 ->missing('auth.user.session_id')
+                ->missing('myAccess.permissions')
+                ->missing('myAccess.roleObjects')
+                ->missing('permissions')
+                ->missing('roles')
+                ->missing('users')
                 ->missing('session')
             );
     }
@@ -121,6 +129,57 @@ class MyProfileTest extends TestCase
         $this->assertDatabaseCount('user_roles', 0);
         $this->assertFalse(Gate::forUser($user)->allows('permission', 'users.manage'));
         $this->assertFalse(Gate::forUser($user)->allows('permission', 'roles.manage'));
+    }
+
+    public function test_my_access_shows_only_the_current_users_role_names_and_no_permission_graph(): void
+    {
+        $user = User::factory()->create(['username' => 'access.owner']);
+        $other = User::factory()->create(['username' => 'access.other']);
+        $role = Role::query()->create(['code' => 'synthetic-viewer', 'name' => 'Synthetic Viewer']);
+        $otherRole = Role::query()->create(['code' => 'synthetic-operator', 'name' => 'Synthetic Operator']);
+        $permission = Permission::query()->create(['code' => 'synthetic.read', 'name' => 'Synthetic Read']);
+
+        $user->roles()->attach($role);
+        $role->permissions()->attach($permission);
+        $other->roles()->attach($otherRole);
+
+        $this->actingAs($user)->get(route('profile'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('MyProfile')
+                ->where('myAccess', ['roleNames' => ['Synthetic Viewer']])
+                ->missing('myAccess.permissions')
+                ->missing('myAccess.roleObjects')
+                ->missing('permissions')
+                ->missing('roles')
+                ->missing('users')
+            );
+
+        $this->actingAs($other)->get(route('profile'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('MyProfile')
+                ->where('myAccess', ['roleNames' => ['Synthetic Operator']])
+            );
+    }
+
+    public function test_role_assignment_changes_are_reflected_on_the_next_profile_request(): void
+    {
+        $user = User::factory()->create(['username' => 'access.refresh']);
+        $role = Role::query()->create(['code' => 'synthetic-member', 'name' => 'Synthetic Member']);
+
+        $this->actingAs($user)->get(route('profile'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('myAccess.roleNames', [])
+            );
+
+        $user->roles()->attach($role);
+
+        $this->get(route('profile'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('myAccess.roleNames', ['Synthetic Member'])
+            );
     }
 
     public function test_active_user_can_update_only_their_trimmed_display_name_and_audit_is_redacted(): void

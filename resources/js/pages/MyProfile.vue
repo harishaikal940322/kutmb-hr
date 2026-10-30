@@ -27,6 +27,9 @@ const props = defineProps<{
         email: string | null;
         status: string;
     };
+    myAccess: {
+        roleNames: string[];
+    };
 }>();
 
 const form = useForm({ display_name: props.profile.displayName });
@@ -210,5 +213,37 @@ function updateDisplayName() {
                 </form>
             </section>
         </div>
+
+        <section
+            aria-labelledby="my-access-heading"
+            class="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-7"
+        >
+            <div class="space-y-1">
+                <h2 id="my-access-heading" class="font-semibold">My Access</h2>
+                <p class="text-sm text-muted-foreground">
+                    Current role names assigned to your account. Role names are
+                    shown for reference and do not define permissions here.
+                </p>
+            </div>
+
+            <div v-if="myAccess.roleNames.length > 0" class="mt-5">
+                <h3 class="text-sm font-medium">Assigned roles</h3>
+                <ul class="mt-2 flex flex-wrap gap-2">
+                    <li
+                        v-for="roleName in myAccess.roleNames"
+                        :key="roleName"
+                        class="rounded-full border border-border bg-muted/50 px-3 py-1.5 text-sm"
+                    >
+                        {{ roleName }}
+                    </li>
+                </ul>
+            </div>
+            <p
+                v-else
+                class="mt-5 rounded-lg bg-muted/50 px-4 py-3 text-sm text-muted-foreground"
+            >
+                No roles assigned.
+            </p>
+        </section>
     </section>
 </template>
