@@ -1,10 +1,14 @@
 # KUTMB HR System
 
-> **Status:** System Core starter plus WP-040B identity/RBAC schema in review
+> **Status:** System Core implementation through WP-070D1; development paused for planning and technical review
 > **Baseline:** HR Foundation v0.1 (DRAFT, 29 October 2026)  
-> **Approval:** Requirements remain NOT APPROVED. WP-040B is owner-authorized technical development using synthetic data only.
+> **Approval:** Requirements remain NOT APPROVED. WP-070D1 is a local/testing-only read-only preview, not production administration approval.
 
 This repository is the **single source of truth** for the KUTMB HR System, covering requirements, traceability, decisions, architecture, implementation, and verification.
+
+## Current development checkpoint
+
+Read [CURRENT_HANDOFF.md](docs/implementation/CURRENT_HANDOFF.md) first when resuming work in a new ChatGPT/Codex session.
 
 ## Scope clarification (29 October 2026)
 
@@ -14,7 +18,7 @@ See [SCOPE-001: System Core versus HR Core](docs/decisions/SCOPE-001_system-core
 
 ## Current implementation scope
 
-WP-020 established the Laravel, Vue, Inertia, TypeScript, Vite and MySQL development foundation. WP-040B adds identity/RBAC schema, an IAM transaction guard and restricted audit storage foundation. WP-050B1 provides an opt-in local developer account command; it does not implement User Management CRUD, privileged assignment endpoints, production first-admin bootstrap, account recovery, MFA, HR employee relationships, configuration workflows or any HR Core module. `MOD-004` through `MOD-011` remain on hold until HR requirements are approved.
+WP-020 established the Laravel, Vue, Inertia, TypeScript, Vite and MySQL development foundation. WP-040 adds identity/RBAC schema and integrity foundations; WP-050A/B1 add username authentication and opt-in local account bootstrap; WP-060A/B/C add server-side authorization and a tested last-admin transaction foundation; WP-070A/B/C adds the dashboard and profile views/own display-name edit, and WP-070D1 adds a local/testing-only read-only User Directory preview. This is not privileged account CRUD or role assignment. Production first-admin bootstrap, recovery, MFA, HR employee relationships, configuration workflows and all HR Core modules remain unimplemented or gated. `MOD-004` through `MOD-011` remain on hold until HR requirements are approved.
 
 The SRS, RTM, Excel traceability master, CSV mirrors, module IDs and requirement IDs remain unchanged. WP-050A implements username-only login through Fortify, canonical username lookup, ACTIVE-only authentication and live database-backed status checks on web requests. Email is not a login fallback. Accounts with a NULL username remain unchanged and cannot log in; non-local account migration or provisioning requires separate approval. These are technical implementation choices, not organizational approval of identity, session or production-security policy. There are no seeded accounts or committed credentials.
 
