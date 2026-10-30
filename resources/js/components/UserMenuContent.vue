@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { Link, router } from '@inertiajs/vue3';
-import { LogOut } from '@lucide/vue';
+import { LogOut, UserRound } from '@lucide/vue';
 import {
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import UserInfo from '@/components/UserInfo.vue';
-import { logout } from '@/routes';
+import { logout, profile } from '@/routes';
 import type { User } from '@/types';
 
 type Props = {
@@ -27,6 +27,13 @@ defineProps<Props>();
             <UserInfo :user="user" :show-email="true" />
         </div>
     </DropdownMenuLabel>
+    <DropdownMenuSeparator />
+    <DropdownMenuItem :as-child="true">
+        <Link :href="profile()" class="block w-full cursor-pointer">
+            <UserRound class="mr-2 h-4 w-4" />
+            My Profile
+        </Link>
+    </DropdownMenuItem>
     <DropdownMenuSeparator />
     <DropdownMenuItem :as-child="true">
         <Link
