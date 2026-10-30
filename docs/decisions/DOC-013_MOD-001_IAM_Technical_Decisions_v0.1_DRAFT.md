@@ -89,8 +89,8 @@ The technical owner selected the DOC-019 PD-001..PD-010 development baseline for
 | PD | Selected for development | Boundary / status |
 |---|---|---|
 | PD-001 | BIGINT unsigned internal IDs | Development baseline selected; no public identifier implied |
-| PD-002 | Username with canonical lowercase value, max 64 characters | ASCII syntax and deterministic no-loss normalization implemented; username login remains inactive |
-| PD-003 | ACTIVE / INACTIVE | PENDING_SETUP deferred; authentication enforcement not implemented |
+| PD-002 | Username with canonical lowercase value, max 64 characters | ASCII syntax and deterministic no-loss normalization implemented; WP-050A uses it for username-only login |
+| PD-003 | ACTIVE / INACTIVE | PENDING_SETUP deferred; WP-050A enforces ACTIVE at login and rechecks status against MySQL on web requests |
 | PD-004 | Relational RBAC with Laravel Policies/Gates | Schema only; no assignment endpoints or approved role matrix |
 | PD-005 | Shared `iam_guard` transaction lock primitive | Infrastructure row and MySQL lock compatibility only; no last-admin guarantee claimed |
 | PD-006 | Native Laravel database sessions | Existing starter session table retained |
@@ -100,3 +100,5 @@ The technical owner selected the DOC-019 PD-001..PD-010 development baseline for
 | PD-010 | Pinned PHP 8.5.12 / MySQL 26.10.0 runtime | Development and disposable-test target; production hosting remains undecided |
 
 **Decision state:** owner-selected for development, not formal IT/HR/security approval. The 12 UM-DEC items, applicable DATA-DEC items, release gates, MFA/recovery, audit retention/privacy and production readiness retain their existing statuses. No normative SRS/RTM behavior or requirement ID is changed by this implementation direction.
+
+**WP-050A implementation note:** Laravel Fortify authenticates only by the canonical username key and password; email is not accepted as an alternate principal. The web middleware re-reads account status from MySQL on each request and invalidates an authenticated session if the account is no longer ACTIVE. Remember Me is disabled in the interface and ignored by the login request. Legacy users with NULL usernames are preserved and cannot authenticate until a separately approved account migration/provisioning procedure is defined. These implementation facts do not close organizational security decisions or release gates.
