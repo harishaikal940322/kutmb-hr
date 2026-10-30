@@ -33,6 +33,23 @@ class IdentityRbacSchemaTest extends TestCase
         $this->assertTrue(Schema::hasColumns('sessions', ['id', 'user_id', 'payload', 'last_activity']));
     }
 
+    public function test_database_accepts_only_active_or_inactive_user_statuses(): void
+    {
+        $active = User::factory()->create(['status' => 'ACTIVE']);
+        $inactive = User::factory()->create(['status' => 'INACTIVE']);
+
+        $this->assertSame('ACTIVE', $active->fresh()->status);
+        $this->assertSame('INACTIVE', $inactive->fresh()->status);
+
+        $this->expectException(QueryException::class);
+        DB::table('users')->insert([
+            'name' => 'Synthetic Invalid Status',
+            'email' => 'invalid-status@example.test',
+            'password' => 'synthetic-hash',
+            'status' => 'PENDING_SETUP',
+        ]);
+    }
+
     public function test_canonical_username_is_ascii_lowercase_and_database_unique(): void
     {
         $user = User::factory()->create(['username' => 'Case.User-1']);
@@ -41,6 +58,85 @@ class IdentityRbacSchemaTest extends TestCase
 
         $this->expectException(QueryException::class);
         User::factory()->create(['username' => 'case.user-1']);
+    }
+
+    public function test_database_rejects_username_canonical_mismatch_and_invalid_raw_username(): void
+    {
+        try {
+            DB::table('users')->insert([
+                'name' => 'Synthetic Mismatch',
+                'email' => 'mismatch@example.test',
+                'password' => 'synthetic-hash',
+                'username' => 'CaseName',
+                'username_canonical' => 'different',
+                'status' => 'ACTIVE',
+            ]);
+            $this->fail('A mismatched username/canonical pair was accepted.');
+        } catch (QueryException) {
+            $this->assertDatabaseCount('users', 0);
+        }
+
+        foreach (['bad/name', '.leading', "newline\n", 'éclair', ''] as $index => $invalidUsername) {
+            try {
+                DB::table('users')->insert([
+                    'name' => 'Synthetic Invalid Username',
+                    'email' => "invalid-username-{$index}@example.test",
+                    'password' => 'synthetic-hash',
+                    'username' => $invalidUsername,
+                    'username_canonical' => strtolower($invalidUsername),
+                    'status' => 'ACTIVE',
+                ]);
+                $this->fail('An invalid raw username was accepted.');
+            } catch (QueryException) {
+                $this->assertDatabaseCount('users', 0);
+            }
+        }
+    }
+
+    public function test_database_rejects_case_variants_with_same_canonical_username(): void
+    {
+        DB::table('users')->insert([
+            'name' => 'Synthetic First',
+            'email' => 'first@example.test',
+            'password' => 'synthetic-hash',
+            'username' => 'CaseVariant',
+            'username_canonical' => 'casevariant',
+            'status' => 'ACTIVE',
+        ]);
+
+        $this->expectException(QueryException::class);
+        DB::table('users')->insert([
+            'name' => 'Synthetic Second',
+            'email' => 'second@example.test',
+            'password' => 'synthetic-hash',
+            'username' => 'CASEVARIANT',
+            'username_canonical' => 'casevariant',
+            'status' => 'ACTIVE',
+        ]);
+    }
+
+    public function test_nullable_username_pair_remains_valid_for_legacy_accounts(): void
+    {
+        $user = User::factory()->create(['username' => null]);
+
+        $this->assertNull($user->fresh()->username);
+        $this->assertNull($user->fresh()->username_canonical);
+    }
+
+    public function test_identity_migration_rollback_fails_before_schema_or_user_changes_for_null_email(): void
+    {
+        $user = User::factory()->create(['email' => null, 'username' => null]);
+        $migration = require database_path('migrations/2026_10_30_000001_add_identity_fields_to_users_table.php');
+
+        try {
+            $migration->down();
+            $this->fail('Rollback should require explicit remediation of the null email.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('Manually remediate every NULL email', $exception->getMessage());
+        }
+
+        $this->assertTrue(Schema::hasColumns('users', ['username', 'username_canonical', 'status']));
+        $this->assertDatabaseHas('users', ['id' => $user->id, 'email' => null]);
     }
 
     public function test_username_length_and_permitted_characters_are_explicit(): void

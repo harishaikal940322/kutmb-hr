@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -18,10 +19,17 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::table('users')->whereNull('email')->exists()) {
+            throw new RuntimeException('Cannot roll back identity fields while users.email contains NULL. Manually remediate every NULL email before retrying; no identity columns or user rows were changed.');
+        }
+
+        Schema::table('users', function (Blueprint $table) {
+            $table->string('email')->nullable(false)->change();
+        });
+
         Schema::table('users', function (Blueprint $table) {
             $table->dropUnique(['username_canonical']);
             $table->dropColumn(['username', 'username_canonical', 'status']);
-            $table->string('email')->nullable(false)->change();
         });
     }
 };
