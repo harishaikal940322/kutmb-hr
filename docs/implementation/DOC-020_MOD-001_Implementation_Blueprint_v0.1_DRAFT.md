@@ -136,16 +136,16 @@ Do not merge, deploy, create production credentials or modify real infrastructur
 | Data-integrity scenario proposals in PR #2 | 18 |
 | Work packages | 12 (`WP-000` to `WP-110`) |
 | Approved work packages | 0 |
-| Tests executed/passed | 0 / 0 |
+| WP-040B local tests executed/passed | 28 / 28 tests, 123 assertions on disposable MySQL 26.10.0 |
 | Existing release gates passed | 0/8 |
 | HR Core | HOLD, not available for development |
-| Coding | NOT STARTED |
+| Coding | WP-020 starter established; WP-040B identity/RBAC schema implementation in progress on `implementation/wp-040b-identity-rbac-schema` |
 
-**Decision for this turn: Blueprint documented for review. No production, code, runtime, migration or schema change authorized.**
+**Historical decision at authoring:** Blueprint documented for review; no production change authorized. Owner subsequently authorized WP-040B technical development using synthetic data; no production or organizational policy approval follows.
 
 ## 9. Documentation phase exit (superseding open-ended planning)
 
-[DOC-022](DOC-022_P1.1_First_Codex_Handoff_v0.1_DRAFT.md) contains the **precise first coding assignment WP-020**. WP-000 document integration is complete on the review branch, while approval and main merge remain pending. **Do not create further numbered planning stages** just to defer implementation: the next active task is either review/merge of consolidated documentation or explicitly authorized WP-020 isolated scaffold code. Do not start real IAM account features until security, identity and operator decisions are accepted.
+[DOC-022](DOC-022_P1.1_First_Codex_Handoff_v0.1_DRAFT.md) contains the historical **first coding assignment WP-020**, now implemented. The owner subsequently authorized WP-040B schema implementation with synthetic data; its integration remains subject to normal code review and CI. Do not start real account-management features until the applicable security, identity and operator decisions are accepted.
 
 ## 10. Git integration policy update (29 October 2026)
 

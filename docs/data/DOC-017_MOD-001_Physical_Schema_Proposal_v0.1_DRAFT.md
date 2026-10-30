@@ -1,7 +1,7 @@
 # DOC-017 | P0.8 MOD-001 Physical Schema Proposal
 
-> v0.1 DRAFT · 29 October 2026 · **DESIGN REVIEW ONLY**  
-> **No SQL/migrations executed. No schema, file layout or deployment freeze.**  
+> v0.1 DRAFT · 29 October 2026 · **DESIGN REVIEW ONLY WHEN AUTHORED**
+> DOC-019 development baseline was selected by the technical owner on 30 October 2026; WP-040B implements a bounded subset on a review branch. This draft itself is not formal IT/HR/security approval or a production schema freeze.
 > Scope: MOD-001 and essential MOD-003; HR Core MOD-004..011 HOLD.  
 > Input: [DOC-015 logical model](DOC-015_MOD-001_Logical_Data_Model_v0.1_DRAFT.md), [DOC-013 technical defaults](../decisions/DOC-013_MOD-001_IAM_Technical_Decisions_v0.1_DRAFT.md), [DOC-016 readiness](../reviews/DOC-016_P0.7_System_Core_Technical_Readiness_v0.1_DRAFT.md), [DOC-005 SRS](../srs/DOC-005_Identity_Access_SRS.md).
 

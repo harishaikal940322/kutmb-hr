@@ -1,8 +1,8 @@
 # KUTMB HR System
 
-> **Status:** System Core development foundation in WP-020 review
+> **Status:** System Core starter plus WP-040B identity/RBAC schema in review
 > **Baseline:** HR Foundation v0.1 (DRAFT, 29 October 2026)  
-> **Approval:** Requirements remain NOT APPROVED. WP-020 verification applies only to the isolated development starter.
+> **Approval:** Requirements remain NOT APPROVED. WP-040B is owner-authorized technical development using synthetic data only.
 
 This repository is the **single source of truth** for the KUTMB HR System, covering requirements, traceability, decisions, architecture, implementation, and verification.
 
@@ -14,9 +14,9 @@ See [SCOPE-001: System Core versus HR Core](docs/decisions/SCOPE-001_system-core
 
 ## Current implementation scope
 
-WP-020 establishes the Laravel, Vue, Inertia, TypeScript, Vite and MySQL development foundation only. It does not implement User Management CRUD, RBAC, account recovery, MFA, audit storage, configuration workflows or any HR Core module. `MOD-004` through `MOD-011` remain on hold until HR requirements are approved.
+WP-020 established the Laravel, Vue, Inertia, TypeScript, Vite and MySQL development foundation. WP-040B adds identity/RBAC schema, an IAM transaction guard and restricted audit storage foundation. It does not implement User Management CRUD, privileged assignment endpoints, first-admin bootstrap, account recovery, MFA, HR employee relationships, configuration workflows or any HR Core module. `MOD-004` through `MOD-011` remain on hold until HR requirements are approved.
 
-The SRS, RTM, Excel traceability master, CSV mirrors, module IDs and requirement IDs remain unchanged. Starter login is present for framework integration checks; there are no seeded accounts or committed credentials. Login identifier and future user fields remain open requirements.
+The SRS, RTM, Excel traceability master, CSV mirrors, module IDs and requirement IDs remain unchanged. Starter login remains email-based for framework integration checks; username login and authentication enforcement of account status are not implemented. There are no seeded accounts or committed credentials.
 
 ## Local development
 

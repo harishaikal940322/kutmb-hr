@@ -4,7 +4,7 @@
 |---|---|---|---|
 | 2026-10-29 | v0.1 | Initialize HR Foundation specification as Markdown source of truth; 32 draft requirements, 14 unresolved questions, 8 unpassed gates | NOT APPROVED |
 
-No application features have been implemented or tested as part of this documentation baseline.
+No application features were implemented as part of the initial documentation baseline; later implementation entries are recorded below.
 
 | 2026-10-29 | v0.2 | Add MOD-001..MOD-011, compact Excel traceability core, CSV change/impact registers and module change-control process | NOT APPROVED |
 
@@ -27,3 +27,5 @@ No application features have been implemented or tested as part of this document
 | 2026-10-29 | Documentation exit / P1.1 handoff | Consolidated DOC-011 + functional tests and shared guidance into PR #2 review branch; prepared DOC-022 restricted starter bootstrap task; no code/approval/merge/test claims | NOT APPROVED |
 
 | 2026-10-29 | Git workflow instruction | Enforce one canonical checkout, feature branch → tested/approved merge → main; avoid future extra worktrees, preserve local WP-020 commit awaiting integration | OWNER DIRECTION |
+
+| 2026-10-30 | WP-040B identity/RBAC schema development direction | Owner selected DOC-019 PD-001..PD-010 for synthetic-data schema development; additive user identity fields, relational RBAC, IAM guard and restricted audit foundation implemented on review branch. Organizational approvals and release gates remain open. | OWNER DEVELOPMENT DIRECTION; NOT HR/IT/SECURITY APPROVAL |
