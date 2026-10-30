@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\DisableRememberMe;
 use App\Http\Middleware\EnsureActiveAccount;
+use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
@@ -22,6 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->group('protected', [
             'auth',
             EnsureActiveAccount::class,
+        ]);
+
+        $middleware->alias([
+            'permission' => EnsurePermission::class,
         ]);
 
         $middleware->web(append: [
