@@ -14,9 +14,11 @@ class EnsureActiveAccount
     {
         $user = $request->user();
 
-        $currentStatus = $user === null ? null : User::query()->whereKey($user->getAuthIdentifier())->value('status');
+        $currentAccount = $user === null
+            ? null
+            : User::query()->select(['username', 'status'])->whereKey($user->getAuthIdentifier())->first();
 
-        if ($user !== null && $currentStatus !== 'ACTIVE') {
+        if ($user !== null && ($currentAccount === null || $currentAccount->username === null || $currentAccount->status !== 'ACTIVE')) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
