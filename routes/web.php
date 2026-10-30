@@ -8,4 +8,5 @@ Route::inertia('/', 'Welcome')->name('home');
 Route::middleware('protected')->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
     Route::get('profile', [ProfileController::class, 'show'])->name('profile');
+    Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
 });

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Profile;
 
+use App\Models\AuditEvent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -120,5 +121,108 @@ class MyProfileTest extends TestCase
         $this->assertDatabaseCount('user_roles', 0);
         $this->assertFalse(Gate::forUser($user)->allows('permission', 'users.manage'));
         $this->assertFalse(Gate::forUser($user)->allows('permission', 'roles.manage'));
+    }
+
+    public function test_active_user_can_update_only_their_trimmed_display_name_and_audit_is_redacted(): void
+    {
+        $user = User::factory()->create([
+            'name' => 'Before Name',
+            'username' => 'self.edit',
+            'email' => 'self@example.test',
+            'status' => 'ACTIVE',
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('profile'))
+            ->patch(route('profile.update'), ['display_name' => '  Updated Name  '])
+            ->assertRedirect(route('profile'))
+            ->assertSessionHas('success', 'Display name updated.');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'name' => 'Updated Name',
+            'username' => 'self.edit',
+            'email' => 'self@example.test',
+            'status' => 'ACTIVE',
+        ]);
+
+        $event = AuditEvent::query()->where('target_ref', 'user:'.$user->id)->sole();
+        $this->assertSame($user->id, $event->actor_id);
+        $this->assertSame('iam.profile.display_name_updated', $event->action_code);
+        $this->assertSame('SUCCESS', $event->outcome);
+        $this->assertSame(['source' => 'self_service', 'changed_fields' => ['name']], (array) $event->metadata);
+        $this->assertStringNotContainsString('Updated Name', (string) $event->getRawOriginal('metadata'));
+    }
+
+    public function test_blank_and_overlong_display_names_are_rejected(): void
+    {
+        $user = User::factory()->create(['name' => 'Keep This Name']);
+
+        foreach (['   ', str_repeat('a', 256)] as $invalidName) {
+            $this->actingAs($user)
+                ->from(route('profile'))
+                ->patch(route('profile.update'), ['display_name' => $invalidName])
+                ->assertRedirect(route('profile'))
+                ->assertSessionHasErrors('display_name');
+        }
+
+        $this->assertDatabaseHas('users', ['id' => $user->id, 'name' => 'Keep This Name']);
+        $this->assertDatabaseCount('audit_events', 0);
+    }
+
+    public function test_restricted_fields_and_other_user_target_tampering_are_rejected(): void
+    {
+        $user = User::factory()->create([
+            'name' => 'Original Name',
+            'username' => 'owner.account',
+            'email' => 'owner@example.test',
+            'status' => 'ACTIVE',
+        ]);
+        $other = User::factory()->create(['name' => 'Other Name', 'username' => 'other.account']);
+        $restricted = [
+            'username' => 'attacker.username',
+            'email' => 'attacker@example.test',
+            'status' => 'INACTIVE',
+            'roles' => ['system-admin'],
+            'permissions' => ['users.manage'],
+            'password' => 'synthetic-forbidden-password',
+            'user_id' => $other->id,
+        ];
+
+        foreach ($restricted as $field => $value) {
+            $this->actingAs($user)
+                ->from(route('profile'))
+                ->patch(route('profile.update'), ['display_name' => 'Attempted Name', $field => $value])
+                ->assertRedirect(route('profile'))
+                ->assertSessionHasErrors('display_name');
+        }
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'name' => 'Original Name',
+            'username' => 'owner.account',
+            'email' => 'owner@example.test',
+            'status' => 'ACTIVE',
+        ]);
+        $this->assertDatabaseHas('users', ['id' => $other->id, 'name' => 'Other Name']);
+        $this->assertDatabaseCount('audit_events', 0);
+    }
+
+    public function test_guests_and_inactive_accounts_cannot_update_display_name(): void
+    {
+        $this->patch(route('profile.update'), ['display_name' => 'Guest Change'])
+            ->assertRedirect(route('login'));
+
+        $user = User::factory()->create(['name' => 'Inactive Name']);
+        $this->actingAs($user)->withSession(['sensitive_marker' => 'discard-me']);
+        DB::table('users')->where('id', $user->id)->update(['status' => 'INACTIVE']);
+
+        $this->patch(route('profile.update'), ['display_name' => 'Blocked Change'])
+            ->assertRedirect(route('login'))
+            ->assertSessionMissing('sensitive_marker');
+
+        $this->assertGuest();
+        $this->assertDatabaseHas('users', ['id' => $user->id, 'name' => 'Inactive Name']);
+        $this->assertDatabaseCount('audit_events', 0);
     }
 }

@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, useForm } from '@inertiajs/vue3';
 import { AtSign, Mail, ShieldCheck, UserRound } from '@lucide/vue';
 import { dashboard } from '@/routes';
+import InputError from '@/components/InputError.vue';
+import Input from '@/components/ui/input/Input.vue';
 
 defineOptions({
     layout: {
@@ -18,7 +20,7 @@ defineOptions({
     },
 });
 
-defineProps<{
+const props = defineProps<{
     profile: {
         displayName: string;
         username: string;
@@ -26,6 +28,12 @@ defineProps<{
         status: string;
     };
 }>();
+
+const form = useForm({ display_name: props.profile.displayName });
+
+function updateDisplayName() {
+    form.patch('/profile', { preserveScroll: true });
+}
 </script>
 
 <template>
@@ -149,12 +157,57 @@ defineProps<{
                     </div>
                 </dl>
 
-                <p
-                    class="mx-6 mb-6 rounded-lg bg-muted/50 px-4 py-3 text-xs leading-5 text-muted-foreground sm:mx-7"
+                <form
+                    class="space-y-4 border-t border-border px-6 py-5 sm:px-7"
+                    @submit.prevent="updateDisplayName"
                 >
-                    Profile details are read-only. Account changes are not
-                    available here.
-                </p>
+                    <div class="space-y-2">
+                        <label for="display_name" class="text-sm font-medium">
+                            Edit display name
+                        </label>
+                        <Input
+                            id="display_name"
+                            v-model="form.display_name"
+                            name="display_name"
+                            autocomplete="name"
+                            maxlength="255"
+                            required
+                            :aria-invalid="Boolean(form.errors.display_name)"
+                            aria-describedby="display_name-help display_name-error"
+                        />
+                        <p
+                            id="display_name-help"
+                            class="text-xs leading-5 text-muted-foreground"
+                        >
+                            This changes only the name shown on your account.
+                        </p>
+                        <InputError
+                            id="display_name-error"
+                            :message="form.errors.display_name"
+                        />
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button
+                            type="submit"
+                            :disabled="form.processing"
+                            class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                        >
+                            {{
+                                form.processing
+                                    ? 'Saving…'
+                                    : 'Save display name'
+                            }}
+                        </button>
+                        <p
+                            v-if="form.recentlySuccessful"
+                            role="status"
+                            aria-live="polite"
+                            class="text-sm text-muted-foreground"
+                        >
+                            Display name updated.
+                        </p>
+                    </div>
+                </form>
             </section>
         </div>
     </section>
