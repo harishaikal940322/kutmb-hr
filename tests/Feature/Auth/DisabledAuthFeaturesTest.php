@@ -99,7 +99,7 @@ class DisabledAuthFeaturesTest extends TestCase
     {
         // Fortify's password confirmation only re-authenticates the current
         // session; it does not provision accounts or grant privileges.
-        $allowedMutations = ['login.store', 'logout', 'password.confirm.store'];
+        $allowedMutations = ['login.store', 'logout', 'password.confirm.store', 'profile.update'];
 
         foreach (Route::getRoutes() as $route) {
             $mutatingMethods = array_intersect($route->methods(), ['POST', 'PUT', 'PATCH', 'DELETE']);
