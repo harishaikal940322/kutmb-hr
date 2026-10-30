@@ -33,14 +33,22 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function configureDefaults(): void
     {
-        Gate::before(function (User $user, string $ability): bool {
+        Gate::before(function (?User $user): ?bool {
+            if ($user === null) {
+                return false;
+            }
+
             $accountIsActive = DB::table('users')
                 ->where('id', $user->getAuthIdentifier())
                 ->whereNotNull('username')
                 ->where('status', 'ACTIVE')
                 ->exists();
 
-            if (! $accountIsActive) {
+            return $accountIsActive ? null : false;
+        });
+
+        Gate::define('permission', function (?User $user, string $permissionCode): bool {
+            if ($user === null) {
                 return false;
             }
 
@@ -48,7 +56,7 @@ class AppServiceProvider extends ServiceProvider
                 ->join('role_permissions', 'role_permissions.role_id', '=', 'user_roles.role_id')
                 ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
                 ->where('user_roles.user_id', $user->getAuthIdentifier())
-                ->where('permissions.code', $ability)
+                ->where('permissions.code', $permissionCode)
                 ->exists();
         });
 
