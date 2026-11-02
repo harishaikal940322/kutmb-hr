@@ -10,6 +10,10 @@
 - **Current scope:** System Core, primarily MOD-001 Identity & Access. **HR Core MOD-004..011 remains ON HOLD** pending approved HR requirements.
 - Requirements remain DRAFT. The stack family is selected, while organizational policies and production readiness remain unapproved.
 
+## 2 November 2026 authentication planning addendum
+
+The technical owner selected **planning for enforced MFA** and a **conditional 8-character minimum password length**. The transition design and required gates are recorded in [SEC-002 MFA/Password Policy Plan](../security/SEC-002_MFA_Password_Policy_Implementation_Plan_2026-11-02.md), [DOC-013](../decisions/DOC-013_MOD-001_IAM_Technical_Decisions_v0.1_DRAFT.md) and [SEC-001](../security/SEC-001_System_Core_Security_Baseline_v0.1_DRAFT.md). The old **15-character minimum remains applicable to any single-factor login**. No MFA or 8-character runtime change has been implemented or tested from this documentation decision. UM-DEC-011, normative SRS/RTM/Excel alignment, recovery/security approval and production release gates remain open. This addendum does not alter the historical 30 October verified implementation checkpoint recorded above.
+
 ## Completed implementation
 
 These work packages are evidenced by merged PRs and commits on `main`. Their merges and CI are technical evidence only; they do not approve HR/IT policy.
