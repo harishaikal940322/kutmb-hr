@@ -27,7 +27,7 @@ In scope for requirements review: accounts, login/logout, account activation/dea
 | UM-DEC-008 | IAM-FR-005 / IAM-AUD-001 | Deactivation vs deletion and retention requirements? | Deactivate rather than erase audit history | IT / Compliance | OPEN |
 | UM-DEC-009 | SYS-DR-001 | Must users map to employees, and when? | No mandatory employee record in System Core | HR / IT | OPEN |
 | UM-DEC-010 | SYS-NFR-001 | Target language, keyboard and mobile requirements? | Start accessible and responsive; confirm detailed targets | Requestor / IT | OPEN |
-| UM-DEC-011 | SYS-SEC-001 / SYS-SEC-002 | MFA, brute-force limits, rate limit and security controls? | Design least-privilege security baseline, confirm controls | IT / Security | OPEN |
+| UM-DEC-011 | SYS-SEC-001 / SYS-SEC-002 | MFA, brute-force limits, rate limit and security controls? | **2 Nov owner direction:** plan enforced MFA and an **8-character minimum only for MFA-protected password sign-in**; keep **15** on any single-factor path. [SEC-002](../security/SEC-002_MFA_Password_Policy_Implementation_Plan_2026-11-02.md). Method/recovery and institutional approval still open | IT / Security | OPEN |
 | UM-DEC-012 | SYS-AUD-001 / IAM-AUD-001 | Audit access and retention period? | Audit privileged changes; retention awaiting policy | IT / Compliance | OPEN |
 
 ## Review outcomes (not yet approved)
