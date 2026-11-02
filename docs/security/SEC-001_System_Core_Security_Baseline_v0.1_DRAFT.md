@@ -21,7 +21,7 @@
 | Privilege escalation via self-profile or mass assignment | Separate account/admin DTO allowlists; reject role/status in self-service edits; forbid privilege grants beyond actor scope | T-IAM-FR-008, T-IAM-FR-006 | CRITICAL | UM-DEC-002/004 |
 | Loss of last active admin | Concurrency-safe transaction + invariant; deny simultaneous conflicting mutations; controlled emergency recovery | T-IAM-FR-010 | CRITICAL | Bootstrap/recovery open |
 | Session survives account deactivation or role revocation | Session invalidate/recheck authorization; protected requests must fail on revoked access; cache invalidation strategy | T-IAM-FR-009 | CRITICAL | UM-DEC-006 |
-| Credential theft / credential stuffing | Framework password hashing, rate limiting, safe errors, secure cookie session, login monitoring; MFA for privileged users prior to production (proposal) | T-IAM-FR-003, T-SYS-SEC-002 | HIGH | UM-DEC-011 |
+| Credential theft / credential stuffing | Framework password hashing, rate limiting, safe errors, secure cookie session, login monitoring; MFA for all accounts using the proposed 8-character minimum, and privileged users before production (owner-selected proposal) | T-IAM-FR-003, T-SYS-SEC-002 | HIGH | UM-DEC-011 |
 | CSRF / cross-origin attacks | Laravel CSRF middleware, same-origin browser design, HTTPS, cookie SameSite policy | T-SYS-SEC-001 | HIGH | Domain/hosting TBD |
 | XSS / HTML injection | Vue auto-escaping, no untrusted `v-html`, CSP review, response encoding and strict prop shaping | T-SYS-SEC-002 | HIGH | CSP deployment TBD |
 | Reset link/token abuse | Short-lived single-use approved recovery, validation, rate limiting, do not leak token to logs | T-IAM-FR-004 | HIGH | UM-DEC-005 |
@@ -43,9 +43,10 @@ Risk labels are preliminary and not assigned from a formal organizational risk a
 4. Account inactivity and role revocation must be rechecked against backend state. A formerly authorized browser with an old tab cannot perform a protected operation after deactivation.
 5. Starter kit **public register routes must be disabled** unless an approved policy permits self-registration.
 6. System Admin bootstrap: one-time protected process, explicit operator approval, no seeded default password. Record bootstrap provenance.
-7. Privileged MFA: recommended required before production; exact mechanism (authenticator/recovery codes/provider) needs security review and safe reset path.
+7. **MFA-first password transition (2 November owner direction):** plan enforced MFA for all accounts eligible for 8-character passwords. Until every affected sign-in/recovery/enrollment path requires a proven second factor, preserve the **15-character single-factor minimum**. The effective reduction is blocked pending implementation, security review and approval. See [SEC-002](SEC-002_MFA_Password_Policy_Implementation_Plan_2026-11-02.md).
 8. If emergency admin recovery is needed, design an audited break-glass process with separate authorization; **do not override last-admin check with a hidden bypass**.
 9. Password reset/invitation must wait for approved delivery method; no hardcoded admin password, default SMTP, WhatsApp delivery of credentials, or logs containing secrets.
+10. MFA enrollment/challenge/recovery and removal must be secure, audited and re-authenticated where appropriate; protect TOTP seeds and one-use recovery codes, prevent challenge replay and password-only fallbacks; do not expose second-factor material via Inertia props, logs or developer fixtures.
 
 ## Roles and authorizations
 
@@ -68,6 +69,7 @@ Risk labels are preliminary and not assigned from a formal organizational risk a
 
 - [ ] Approved privileged role/permission matrix; forbidden endpoints tested for each role.
 - [ ] Login, logout, recovery and account deactivation attack cases defined and executed.
+- [ ] MFA enrollment, challenge, recovery, factor change and no-bypass tests PASS before any 8-character policy is made effective; confirm 15-character minimum remains on any single-factor path.
 - [ ] Admin bootstrap / last-admin concurrency tests PASS against MySQL with evidence.
 - [ ] CSRF, authorization, mass-assignment, XSS and secret-exposure regression tests PASS.
 - [ ] Audit events tested and access/retention decision recorded.
