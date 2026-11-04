@@ -9,7 +9,6 @@ ensure_env() {
         umask 077
         cp .env.example .env
         sed -i "s|^APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32 | tr -d '\n')|" .env
-        sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -hex 32)|" .env
         sed -i "s|^DEV_UID=.*|DEV_UID=$(id -u)|" .env
         sed -i "s|^DEV_GID=.*|DEV_GID=$(id -g)|" .env
         chmod 600 .env
@@ -64,7 +63,7 @@ wait_for_shared_mysql() {
 }
 
 ensure_dev_database() {
-    local database username password database_exists user_exists
+    local database username password
     database="$(env_value DB_DATABASE)"
     username="$(env_value DB_USERNAME)"
     password="$(env_value DB_PASSWORD)"
@@ -73,40 +72,17 @@ ensure_dev_database() {
         printf 'DB_DATABASE and DB_USERNAME must contain only letters, numbers, and underscores.\n' >&2
         return 1
     fi
-    if [[ ! "$password" =~ ^[A-Fa-f0-9]{32,}$ ]]; then
-        printf 'DB_PASSWORD must be a 32-character-or-longer hexadecimal development password.\n' >&2
-        printf 'Set it in the private .env file; it will not be written to Git.\n' >&2
+    if [[ -z "$password" ]]; then
+        printf 'Set DB_PASSWORD in .env to the existing shared MySQL account password.\n' >&2
+        printf 'This setup does not create or change MySQL accounts.\n' >&2
         return 1
     fi
-
-    database_exists="$(printf "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name = '%s';\\n" "$database" | docker exec -i mysql sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --protocol=socket -uroot --batch --skip-column-names')"
-    user_exists="$(printf "SELECT COUNT(*) FROM mysql.user WHERE User = '%s' AND Host = '%%';\\n" "$username" | docker exec -i mysql sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --protocol=socket -uroot --batch --skip-column-names')"
-
-    if [[ "$user_exists" == '1' ]]; then
-        if [[ "$database_exists" != '1' ]] || ! docker exec \
-            --env KUTMB_DB_PASSWORD="$password" \
-            --env KUTMB_DB_USERNAME="$username" \
-            --env KUTMB_DB_DATABASE="$database" \
-            mysql sh -lc 'MYSQL_PWD="$KUTMB_DB_PASSWORD" mysql --protocol=TCP -h127.0.0.1 -u"$KUTMB_DB_USERNAME" "$KUTMB_DB_DATABASE" -e "SELECT 1" >/dev/null 2>&1'; then
-            printf 'The shared MySQL account already exists but its credentials do not match .env. No password was changed.\n' >&2
-            return 1
-        fi
-        return 0
-    fi
-
-    {
-        if [[ "$database_exists" != '1' ]]; then
-            printf 'CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;\n' "$database"
-        fi
-        printf "CREATE USER IF NOT EXISTS '%s'@'%%' IDENTIFIED BY '%s';\n" "$username" "$password"
-        printf "GRANT ALL PRIVILEGES ON \`%s\`.* TO '%s'@'%%';\n" "$database" "$username"
-    } | docker exec -i mysql sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --protocol=socket -uroot --batch --skip-column-names'
 
     docker exec \
         --env KUTMB_DB_PASSWORD="$password" \
         --env KUTMB_DB_USERNAME="$username" \
         --env KUTMB_DB_DATABASE="$database" \
-        mysql sh -lc 'MYSQL_PWD="$KUTMB_DB_PASSWORD" mysql --protocol=TCP -h127.0.0.1 -u"$KUTMB_DB_USERNAME" "$KUTMB_DB_DATABASE" -e "SELECT 1" >/dev/null'
+        mysql sh -lc 'MYSQL_PWD="$KUTMB_DB_PASSWORD" mysql --protocol=TCP -h127.0.0.1 -u"$KUTMB_DB_USERNAME" -e "CREATE DATABASE IF NOT EXISTS $KUTMB_DB_DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci" && MYSQL_PWD="$KUTMB_DB_PASSWORD" mysql --protocol=TCP -h127.0.0.1 -u"$KUTMB_DB_USERNAME" "$KUTMB_DB_DATABASE" -e "SELECT 1" >/dev/null'
 }
 
 compose() {
