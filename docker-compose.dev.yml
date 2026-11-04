@@ -35,8 +35,10 @@ services:
             VITE_PORT: ${VITE_PORT:-5173}
             npm_config_cache: /tmp/npm-cache
         networks:
-            - proxy
-            - data
+            proxy:
+                aliases:
+                    - kutmb-hr-app
+            data: {}
 
 volumes:
     vendor:

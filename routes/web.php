@@ -1,10 +1,16 @@
 <?php
 
+use App\Http\Controllers\LocalSystemAdminBootstrapController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserDirectoryController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
+
+Route::get('register', [LocalSystemAdminBootstrapController::class, 'create'])
+    ->name('register');
+Route::post('register', [LocalSystemAdminBootstrapController::class, 'store'])
+    ->name('register.store');
 
 Route::middleware('protected')->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');

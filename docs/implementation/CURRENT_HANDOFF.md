@@ -22,7 +22,7 @@ The owner replaced the former branch-per-task/planning-heavy method with the con
 
 | Area | Implemented state | Boundary / next dependency |
 |---|---|---|
-| Identity and account management | Username/password authentication, active-account enforcement, self display-name update, read-only profile and local/testing-only User Directory preview | Production account creation, activation/deactivation and first-admin bootstrap are not implemented; bootstrap/operator decisions remain open |
+| Identity and account management | Username/password authentication, active-account enforcement, self display-name update, read-only profile and local/testing-only User Directory preview; one-time local/testing first-System-Admin registration | Production account creation, activation/deactivation and bootstrap remain unavailable; bootstrap/operator decisions remain open |
 | Roles and permissions | RBAC schema and server-side authorization foundation; local directory preview checks `iam.users.view`; MySQL last-admin transaction foundation | No role-grant UI/API or approved organizational role/permission matrix; do not grant access by inference |
 | Authentication and authorization | Fortify username login, session authentication, active status rechecked on protected requests, server authorization | Public signup and unsupported recovery remain disabled/gated; role-change/session revocation policy and privileged production access remain gated |
 | Password policy | No 8-character policy is implemented. Local bootstrap enforces at least 15 characters. `Password::defaults()` currently applies a 12-character minimum plus composition rules in production when used | SEC-002's 8-character target is conditional on complete enforced MFA; UM-DEC-011 and policy/security approval remain open. Review the existing 12-character default against the documented single-factor 15-character direction before enabling any production password-setting flow |
@@ -41,6 +41,14 @@ The owner replaced the former branch-per-task/planning-heavy method with the con
 
 Login UI browser review is complete. Profile/User Directory visual review still needs an authorized local account and preview permission. The next feature slice is account lifecycle and role assignment, but it is **not ready** until the operator/role matrix and related security/recovery requirements are resolved. Continue into requirements review for those open decisions; do not start MFA or lower the single-factor password minimum as a substitute.
 
+### Local first-System-Admin registration — 4 November 2026
+
+- Added `/register` as a one-time local/testing bootstrap page. It is available only when `IAM_LOCAL_ACCOUNT_BOOTSTRAP_ENABLED=true` and the users table is empty; it remains unavailable in production. It serializes first-account creation with the shared `iam_guard` lock, creates an active account, attaches the `system-admin` role, and records an audit event. It does not auto-login or grant any role permissions.
+- The owner selected System Admin for this local bootstrap. This does not close `UM-DEC-003/004` or establish an approved production bootstrap, role catalogue, or permission matrix. No account was created during implementation; the local dev database was empty when checked. The local private `.env` flag is enabled for browser review and is not tracked.
+- The shared Docker proxy had an `app` DNS name collision with SDH Business Portal. KUTMB now advertises `kutmb-hr-app` on `docker_proxy`, and the external Nginx vhost routes to that unique alias. No external Nginx file is tracked in this repository.
+- Files changed for this scope: `.env.example`, `README.md`, `docker-compose.dev.yml`, `phpunit.xml`, `routes/web.php`, `app/Http/Controllers/LocalSystemAdminBootstrapController.php`, `resources/js/pages/auth/Register.vue`, `tests/Feature/Auth/LocalSystemAdminBootstrapTest.php`, and this handoff. Existing Dashboard, MyProfile, User Directory and `docker/` local changes remain untouched and unstaged.
+- Checks: focused disposable-MySQL feature tests passed (4 tests, 38 assertions); PHP lint, targeted Pint, PHPStan (512 MB), frontend type check/build, Compose validation, `nginx -t`, and HTTP `/register` smoke check passed. No persistent database was modified by the tests. Browser page displayed the registration form; no form was submitted.
+
 ### Browser review follow-up — 4 November 2026
 
 - Started the existing local stack with `./bin/dev up`; it reported **Nothing to migrate**. The existing MySQL volume was preserved. The script removed the stopped orphan `kutmb-hr-frontend-1` container while reconciling services.
@@ -52,7 +60,7 @@ Login UI browser review is complete. Profile/User Directory visual review still 
 ### Shared Docker development setup — 4 November 2026
 
 - Reworked `docker-compose.dev.yml` and `bin/dev` to run only the KUTMB app, attaching it to the standalone `docker_proxy` and `docker_data` networks. App DB and Redis hosts are `mysql` and `redis`; browser URL is `http://kutmb-hr.localhost:8080` through the standalone Nginx container.
-- Added `/home/haris/docker/nginx/conf.d/kutmb-hr.conf` for the KUTMB route and recreated only the Nginx container so its configured bind mounts load. Shared MySQL and Redis stayed running. `./bin/dev up` created/used the dedicated `kutmb_hr_dev` schema and initially provisioned a project-specific MySQL account; the account was later removed per the owner’s clarification below. It removed the former project-local app/Nginx/MySQL containers but did not remove their persistent volume.
+- Added `/home/haris/docker/nginx/conf.d/kutmb-hr.conf` for the KUTMB route and recreated only the Nginx container so its configured bind mounts load. Shared MySQL and Redis stayed running. `./bin/dev up` created/used the dedicated `kutmb_hr_dev` schema and initially provisioned a project-specific MySQL account; the account was later removed per the owner’s clarification below. It removed the former project-local app/Nginx/MySQL containers but did not remove their persistent volume. The KUTMB app uses the unique `kutmb-hr-app` proxy alias to avoid collisions with other projects.
 - Checks: `bash -n bin/dev`; Compose config validation; `nginx -t`; `/login` returned HTTP 200 through port 8080; app DNS resolution for MySQL and Redis succeeded. No application test suite was run.
 - Files changed in the repository for this setup: `.env.example`, `README.md`, `bin/dev`, `docker-compose.dev.yml` (replacing the old all-in-one development Compose file), and this handoff. Local `.env` and Nginx files under `/home/haris/docker/nginx/conf.d/` are not tracked.
 - Next: continue the approved System Core scope after the browser UI review follow-up; HR Core remains on hold and the account-management/security decisions listed above remain unresolved.
@@ -101,7 +109,7 @@ These work packages are evidenced by merged PRs and commits on `main`. Their mer
 
 - User Directory is **local/testing only**, controlled by `IAM_LOCAL_USER_DIRECTORY_PREVIEW_ENABLED=false` by default. Production remains denied even if the flag is enabled.
 - Access requires an active authenticated account and the candidate RBAC permission `iam.users.view`. No permission is automatically granted. This permission code is technical preview plumbing, not approved organizational policy.
-- No production System Admin is seeded or created by default. No production first-admin bootstrap, role-grant workflow, MFA or recovery is implemented.
+- No production System Admin is seeded or created by default. The local bootstrap creates a role membership only and grants no permissions. No production first-admin bootstrap, role-grant workflow, MFA or recovery is implemented.
 - No privileged account-management mutation endpoints were added. The directory exposes only display name, username and status; it does not expose email, credentials, permission graphs or Employee/HR Core joins.
 - There is no Employee schema or HR Core feature. MOD-004..011 stays ON HOLD.
 - WP-060C verifies the shared-lock transaction foundation with MySQL concurrent worker tests. **Future privileged mutation endpoints do not yet exist and are not yet integrated with that service.**
@@ -109,7 +117,7 @@ These work packages are evidenced by merged PRs and commits on `main`. Their mer
 ## Outstanding decisions and blockers
 
 1. Browser visual and accessibility acceptance remains pending.
-2. First System Admin operator, bootstrap authorization and emergency handling remain unapproved (`UM-DEC-003`).
+2. Production first System Admin operator, bootstrap authorization and emergency handling remain unapproved (`UM-DEC-003`); the local-only bootstrap does not resolve these decisions.
 3. Organizational role catalogue, permission matrix and grant boundaries remain unapproved (`UM-DEC-004`).
 4. Recovery channel, MFA/recovery, session timeout and revocation policies remain unresolved (`UM-DEC-005`, `UM-DEC-006`, `UM-DEC-011`).
 5. Audit access, retention and privacy approvals remain unresolved (`UM-DEC-012`, `Q-010`, `Q-011`).
@@ -122,7 +130,7 @@ These work packages are evidenced by merged PRs and commits on `main`. Their mer
 
 1. Review and resolve the minimum organizational decisions for first-admin bootstrap and role permissions.
 2. Perform browser visual, accessibility and security acceptance when a suitable browser environment is available.
-3. Implement controlled first System Admin bootstrap only after required approvals.
+3. Implement controlled production first System Admin bootstrap only after required approvals.
 4. Implement approved User Management and Role Assignment workflows.
 5. Connect every protected privileged mutation to reviewed authorization, transaction and audit services.
 6. Perform integrated security and UAT verification.
