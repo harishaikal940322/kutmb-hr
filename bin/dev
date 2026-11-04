@@ -10,38 +10,132 @@ ensure_env() {
         cp .env.example .env
         sed -i "s|^APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32 | tr -d '\n')|" .env
         sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -hex 32)|" .env
-        sed -i "s|^MYSQL_ROOT_PASSWORD=.*|MYSQL_ROOT_PASSWORD=$(openssl rand -hex 32)|" .env
         sed -i "s|^DEV_UID=.*|DEV_UID=$(id -u)|" .env
         sed -i "s|^DEV_GID=.*|DEV_GID=$(id -g)|" .env
         chmod 600 .env
     fi
 }
 
-compose() {
-    docker compose --project-name kutmb-hr "$@"
+env_value() {
+    local key="$1"
+
+    sed -n "s/^${key}=//p" .env | tail -n 1 | sed -e 's/^"//' -e 's/"$//'
 }
 
-install_frontend() {
-    if [[ -f package-lock.json ]]; then
-        compose run --rm --no-deps frontend npm ci
-    else
-        compose run --rm --no-deps frontend npm install
+shared_proxy_network() {
+    local network
+    network="$(env_value KUTMB_PROXY_NETWORK)"
+    printf '%s\n' "${network:-docker_proxy}"
+}
+
+shared_data_network() {
+    local network
+    network="$(env_value KUTMB_DATA_NETWORK)"
+    printf '%s\n' "${network:-docker_data}"
+}
+
+ensure_shared_networks() {
+    local network
+
+    for network in "$(shared_proxy_network)" "$(shared_data_network)"; do
+        if ! docker network inspect "$network" >/dev/null 2>&1; then
+            printf 'Required shared Docker network is missing: %s\n' "$network" >&2
+            printf 'Start the standalone Docker stack that owns this network, then retry.\n' >&2
+            return 1
+        fi
+    done
+}
+
+wait_for_shared_mysql() {
+    if ! docker inspect mysql >/dev/null 2>&1; then
+        printf 'The shared MySQL container "mysql" is not available.\n' >&2
+        return 1
     fi
-    compose run --rm --no-deps frontend sh -lc 'native="@voidzero-dev/vite-plus-$(node -p '\''`${process.platform}-${process.arch}-gnu`'\'')@1.4.0"; npm install --no-save --package-lock=false "$native"'
+
+    for attempt in $(seq 1 30); do
+        if docker exec mysql sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqladmin ping -h 127.0.0.1 --silent' >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 2
+    done
+
+    printf 'The shared MySQL container did not become ready.\n' >&2
+    return 1
+}
+
+ensure_dev_database() {
+    local database username password database_exists user_exists
+    database="$(env_value DB_DATABASE)"
+    username="$(env_value DB_USERNAME)"
+    password="$(env_value DB_PASSWORD)"
+
+    if [[ ! "$database" =~ ^[A-Za-z0-9_]+$ || ! "$username" =~ ^[A-Za-z0-9_]+$ ]]; then
+        printf 'DB_DATABASE and DB_USERNAME must contain only letters, numbers, and underscores.\n' >&2
+        return 1
+    fi
+    if [[ ! "$password" =~ ^[A-Fa-f0-9]{32,}$ ]]; then
+        printf 'DB_PASSWORD must be a 32-character-or-longer hexadecimal development password.\n' >&2
+        printf 'Set it in the private .env file; it will not be written to Git.\n' >&2
+        return 1
+    fi
+
+    database_exists="$(printf "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name = '%s';\\n" "$database" | docker exec -i mysql sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --protocol=socket -uroot --batch --skip-column-names')"
+    user_exists="$(printf "SELECT COUNT(*) FROM mysql.user WHERE User = '%s' AND Host = '%%';\\n" "$username" | docker exec -i mysql sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --protocol=socket -uroot --batch --skip-column-names')"
+
+    if [[ "$user_exists" == '1' ]]; then
+        if [[ "$database_exists" != '1' ]] || ! docker exec \
+            --env KUTMB_DB_PASSWORD="$password" \
+            --env KUTMB_DB_USERNAME="$username" \
+            --env KUTMB_DB_DATABASE="$database" \
+            mysql sh -lc 'MYSQL_PWD="$KUTMB_DB_PASSWORD" mysql --protocol=TCP -h127.0.0.1 -u"$KUTMB_DB_USERNAME" "$KUTMB_DB_DATABASE" -e "SELECT 1" >/dev/null 2>&1'; then
+            printf 'The shared MySQL account already exists but its credentials do not match .env. No password was changed.\n' >&2
+            return 1
+        fi
+        return 0
+    fi
+
+    {
+        if [[ "$database_exists" != '1' ]]; then
+            printf 'CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;\n' "$database"
+        fi
+        printf "CREATE USER IF NOT EXISTS '%s'@'%%' IDENTIFIED BY '%s';\n" "$username" "$password"
+        printf "GRANT ALL PRIVILEGES ON \`%s\`.* TO '%s'@'%%';\n" "$database" "$username"
+    } | docker exec -i mysql sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --protocol=socket -uroot --batch --skip-column-names'
+
+    docker exec \
+        --env KUTMB_DB_PASSWORD="$password" \
+        --env KUTMB_DB_USERNAME="$username" \
+        --env KUTMB_DB_DATABASE="$database" \
+        mysql sh -lc 'MYSQL_PWD="$KUTMB_DB_PASSWORD" mysql --protocol=TCP -h127.0.0.1 -u"$KUTMB_DB_USERNAME" "$KUTMB_DB_DATABASE" -e "SELECT 1" >/dev/null'
+}
+
+compose() {
+    docker compose -f "$ROOT_DIR/docker-compose.dev.yml" --project-name kutmb-hr "$@"
+}
+
+install_node_dependencies() {
+    if [[ -f package-lock.json ]]; then
+        compose run --rm --no-deps app npm ci
+    else
+        compose run --rm --no-deps app npm install
+    fi
+    compose run --rm --no-deps app sh -lc 'native="@voidzero-dev/vite-plus-$(node -p '\''`${process.platform}-${process.arch}-gnu`'\'')@1.4.0"; npm install --no-save --package-lock=false "$native"'
 }
 
 tooling() {
     ensure_env
-    compose build app frontend
+    compose build app
     compose run --rm --no-deps --user root app sh -lc 'chown -R "$DEV_UID:$DEV_GID" /var/www/html/vendor'
-    compose run --rm --no-deps --user root frontend sh -lc 'chown -R "$DEV_UID:$DEV_GID" /var/www/html/node_modules'
+    compose run --rm --no-deps --user root app sh -lc 'chown -R "$DEV_UID:$DEV_GID" /var/www/html/node_modules'
     compose run --rm --no-deps app composer install --no-interaction --prefer-dist
-    install_frontend
+    install_node_dependencies
 }
 
 setup() {
     tooling
-    compose up -d --wait db
+    ensure_shared_networks
+    wait_for_shared_mysql
+    ensure_dev_database
     compose run --rm app php artisan migrate --force
 }
 
@@ -51,22 +145,23 @@ case "${1:-help}" in
         ;;
     up)
         setup
-        compose up -d app frontend
+        compose up -d --remove-orphans app
         vite_port="$(sed -n 's/^VITE_PORT=//p' .env | tail -n 1)"
-        printf 'App: http://127.0.0.1:8000\nVite: http://127.0.0.1:%s\n' "${vite_port:-5173}"
+        app_url="$(env_value KUTMB_APP_URL)"
+        printf 'App: %s\nVite HMR: http://127.0.0.1:%s\n' "${app_url:-http://kutmb-hr.localhost:8080}" "${vite_port:-5173}"
         ;;
     down)
-        compose down
+        compose down --remove-orphans
         ;;
     test)
         exec "$ROOT_DIR/bin/dev" mysql-test
         ;;
     mysql-test)
         tooling
-        compose run --rm frontend npm run build
-        test_network="kutmb-hr_default"
+        ensure_shared_networks
+        compose run --rm --no-deps app npm run build
+        test_network="$(shared_data_network)"
         test_container="kutmb-hr-wp040-mysql-test-$$"
-        docker network inspect "$test_network" >/dev/null 2>&1 || docker network create "$test_network" >/dev/null
         docker run --detach --rm --name "$test_container" --network "$test_network" \
             --network-alias wp040-mysql-test \
             --env MYSQL_ROOT_PASSWORD=wp040-test-root \
@@ -92,34 +187,36 @@ case "${1:-help}" in
             -e DB_USERNAME=root \
             -e DB_PASSWORD=wp040-test-root \
             -e DB_URL= \
-            frontend sh -lc 'php artisan migrate:fresh --force && php artisan migrate:status && php artisan migrate:rollback --force && php artisan migrate --force && php artisan migrate:status && php bin/verify-database.php && composer ci:check'
+            app sh -lc 'php artisan migrate:fresh --force && php artisan migrate:status && php artisan migrate:rollback --force && php artisan migrate --force && php artisan migrate:status && php bin/verify-database.php && composer ci:check'
         ;;
     build)
         tooling
-        compose run --rm frontend npm run build
+        compose run --rm --no-deps app npm run build
         ;;
     types)
         tooling
-        compose run --rm frontend npm run types:check
+        compose run --rm --no-deps app npm run types:check
         ;;
     routes)
         tooling
-        compose run --rm app php artisan route:list --except-vendor
+        compose run --rm --no-deps app php artisan route:list --except-vendor
         ;;
     migrate)
         tooling
-        compose up -d --wait db
+        ensure_shared_networks
+        wait_for_shared_mysql
+        ensure_dev_database
         compose run --rm app php artisan migrate --force
         ;;
     audit)
         tooling
-        compose run --rm app composer audit
-        compose run --rm frontend npm audit
+        compose run --rm --no-deps app composer audit
+        compose run --rm --no-deps app npm audit
         ;;
     check)
         "$ROOT_DIR/bin/dev" mysql-test
         compose run --rm --no-deps app composer audit
-        compose run --rm frontend npm audit
+        compose run --rm --no-deps app npm audit
         ;;
     *)
         printf 'Usage: %s {setup|up|down|test|mysql-test|check|build|types|routes|migrate|audit}\n' "$0"

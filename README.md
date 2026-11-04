@@ -30,12 +30,12 @@ Docker and Docker Compose are the only host dependencies. From the repository ro
 ./bin/dev up
 ```
 
-This creates a private `.env` with random local-only credentials, starts the app on PHP 8.5.12 and MySQL 26.10.0 containers, applies the starter's baseline migrations and launches Vite. The app and Vite ports bind to localhost; MySQL has no host port. No privileged user is seeded. Use `./bin/dev down` to stop the containers. The development database persists in a new named Docker volume, `kutmb-hr_mysql_data_php8512_mysql26100`; the prior MySQL 8.4 volume is retained and must not be mounted by MySQL 26.10.0. Removing the active volume is an explicit destructive action (`docker compose --project-name kutmb-hr down --volumes`).
+This creates a private `.env` with random local-only credentials, builds the app image with PHP 8.5.12, Node.js 24 and Composer, and starts only the Laravel/Vite `app` service from [`docker-compose.dev.yml`](docker-compose.dev.yml). The app joins the existing `docker_proxy` and `docker_data` networks and uses the standalone `nginx`, `mysql`, and `redis` containers; it does not start or recreate those shared services. Nginx serves the app at `http://kutmb-hr.localhost:8080`; Vite hot reload is available on the localhost-only port in `VITE_PORT` (5173 by default). `./bin/dev setup` creates the dedicated `kutmb_hr_dev` schema and least-scoped account if absent, then applies development migrations. It does not change an existing database account password or seed a privileged user. Use `./bin/dev down` to stop the app; the shared services and their data remain running. The previous project-local MySQL volume is left untouched.
 
 To create an unassigned local developer account, explicitly add `IAM_LOCAL_ACCOUNT_BOOTSTRAP_ENABLED=true` to the private `.env`, then run:
 
 ```sh
-docker compose --project-name kutmb-hr exec app php artisan iam:bootstrap-local-account
+docker compose -f docker-compose.dev.yml --project-name kutmb-hr exec app php artisan iam:bootstrap-local-account
 ```
 
 The command prompts for username, display name, and a hidden password with confirmation. It creates an ACTIVE account with no roles or permissions. Remove the opt-in setting after use. This command is denied outside `local`/`testing` and is not a production System Admin bootstrap or public registration flow.
