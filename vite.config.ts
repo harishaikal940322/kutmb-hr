@@ -33,6 +33,9 @@ export default defineConfig({
     ]),
     server: {
         origin: `http://127.0.0.1:${process.env.VITE_PORT ?? 5173}`,
+        cors: {
+            origin: process.env.APP_URL ?? 'http://127.0.0.1:8000',
+        },
         watch: {
             ignored: [
                 '**/.agents/**',

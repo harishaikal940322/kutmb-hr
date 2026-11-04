@@ -39,22 +39,22 @@ The owner replaced the former branch-per-task/planning-heavy method with the con
 
 ### Next development-ready scope
 
-Complete browser visual and accessibility acceptance of the existing profile/User Directory UI when the current local UI work is ready for review. For feature implementation, the next coherent System Core slice is approved account lifecycle and role assignment, but it is **not ready** until the operator/role matrix and relevant security/recovery decisions are resolved. Do not start MFA or lower the effective single-factor password minimum as a substitute for those decisions.
+Login UI browser review is complete. Profile/User Directory visual review still needs an authorized local account and preview permission. The next feature slice is account lifecycle and role assignment, but it is **not ready** until the operator/role matrix and related security/recovery requirements are resolved. Continue into requirements review for those open decisions; do not start MFA or lower the single-factor password minimum as a substitute.
 
 ### Browser review follow-up — 4 November 2026
 
 - Started the existing local stack with `./bin/dev up`; it reported **Nothing to migrate**. The existing MySQL volume was preserved. The script removed the stopped orphan `kutmb-hr-frontend-1` container while reconciling services.
-- Login page visual check: all primary content and controls fit at the available 1280×720 and 368×886 browser viewports; labels are exposed in the accessibility tree. The password visibility control did not change the input type/label after browser mouse or keyboard activation. Client-side interactivity remains unverified in this browser session; no console errors were reported, so do not treat the whole UI phase as accepted.
-- Direct `/users` access correctly returns to `/login` on port 8000 after changing the current local Nginx proxy host from `$host` to `$http_host` in `docker/nginx/default.conf`. This file and the current development Compose files are local, uncommitted work.
+- Initial login page visual check found that the password visibility control did not change input type/label; a later browser test identified Vite CORS preventing client hydration and this was corrected below.
+- `/users` now redirects to `/login` through `http://kutmb-hr.localhost:8080`. Protected profile and directory screens remain unreviewed: no local account was created, no credentials were changed, and no preview permission was granted. Local bootstrap remains opt-in and granting a preview permission requires authorization.
 - Profile and directory content remain unreviewed: no local account was created, no credentials were changed, and no preview permission was granted. Local bootstrap is not enabled; an authorized local account/permission is required for full authenticated UI review.
 - No application tests were run. Browser visual/accessibility acceptance remains **INCOMPLETE** pending an interactive client session and authorized access to the protected views.
 
 ### Shared Docker development setup — 4 November 2026
 
 - Reworked `docker-compose.dev.yml` and `bin/dev` to run only the KUTMB app, attaching it to the standalone `docker_proxy` and `docker_data` networks. App DB and Redis hosts are `mysql` and `redis`; browser URL is `http://kutmb-hr.localhost:8080` through the standalone Nginx container.
-- Updated the local standalone Nginx route and recreated only its container so its actual bind mounts load the configuration. Shared MySQL and Redis stayed running. `./bin/dev up` created/used the dedicated `kutmb_hr_dev` schema and initially provisioned a project-specific MySQL account; the account was later removed per the owner’s clarification below. It removed the former project-local app/Nginx/MySQL containers but did not remove their persistent volume.
+- Added `/home/haris/docker/nginx/conf.d/kutmb-hr.conf` for the KUTMB route and recreated only the Nginx container so its configured bind mounts load. Shared MySQL and Redis stayed running. `./bin/dev up` created/used the dedicated `kutmb_hr_dev` schema and initially provisioned a project-specific MySQL account; the account was later removed per the owner’s clarification below. It removed the former project-local app/Nginx/MySQL containers but did not remove their persistent volume.
 - Checks: `bash -n bin/dev`; Compose config validation; `nginx -t`; `/login` returned HTTP 200 through port 8080; app DNS resolution for MySQL and Redis succeeded. No application test suite was run.
-- Files changed in the repository for this setup: `.env.example`, `README.md`, `bin/dev`, `docker-compose.dev.yml` (replacing the old all-in-one development Compose file), and this handoff. Local `.env` and `/home/haris/docker/nginx/conf.d/default.conf` are not tracked.
+- Files changed in the repository for this setup: `.env.example`, `README.md`, `bin/dev`, `docker-compose.dev.yml` (replacing the old all-in-one development Compose file), and this handoff. Local `.env` and Nginx files under `/home/haris/docker/nginx/conf.d/` are not tracked.
 - Next: continue the approved System Core scope after the browser UI review follow-up; HR Core remains on hold and the account-management/security decisions listed above remain unresolved.
 
 ### Shared MySQL account clarification — 4 November 2026
@@ -62,6 +62,14 @@ Complete browser visual and accessibility acceptance of the existing profile/Use
 - The owner requested one shared local MySQL account for projects. KUTMB now uses the existing shared `dev` account, while retaining the isolated `kutmb_hr_dev` schema. `bin/dev` creates the schema through the configured shared account and never creates or changes MySQL users; `.env.example` and the local private `.env` use `DB_USERNAME=dev`.
 - Removed the previously created `kutmb_hr_dev` MySQL account after switching the app to `dev`; the `kutmb_hr_dev` schema and its data were retained. No application data was dropped.
 - Verification: `./bin/dev setup` completed with “Nothing to migrate”; `php artisan migrate:status` showed all seven migrations applied under the shared account. No application test suite was run.
+
+### Login UI and Vite integration review — 4 November 2026
+
+- Fixed the Vite development CORS origin to match `APP_URL`, allowing Vue/Inertia to mount when the app is served through shared Nginx at `kutmb-hr.localhost:8080`.
+- Made the password visibility control keyboard reachable and removed positive `tabindex` overrides so the natural login order is username → password → show/hide → submit. Mouse and keyboard activation both changed the field type and accessible button label.
+- Browser review at 1280×720 and 368×886: login content fits with no horizontal overflow; username/password labels and button names are available in the accessibility tree. Empty submit triggered required-field validation. `/login` returned HTTP 200; unauthenticated `/users` redirected to `/login`.
+- Checks: Vite CORS response matched the app origin; `npm run types:check` passed; `npm run build` passed; `git diff --check` passed. No authentication credentials were submitted and no full app test suite was run.
+- Still pending: authenticated profile and User Directory visual review. That requires an authorized local account and preview permission. Account lifecycle and role assignment remain blocked on open HR/IT requirements and security decisions; HR Core stays on hold.
 
 ## Completed implementation
 
