@@ -41,6 +41,14 @@ The owner replaced the former branch-per-task/planning-heavy method with the con
 
 Complete browser visual and accessibility acceptance of the existing profile/User Directory UI when the current local UI work is ready for review. For feature implementation, the next coherent System Core slice is approved account lifecycle and role assignment, but it is **not ready** until the operator/role matrix and relevant security/recovery decisions are resolved. Do not start MFA or lower the effective single-factor password minimum as a substitute for those decisions.
 
+### Browser review follow-up — 4 November 2026
+
+- Started the existing local stack with `./bin/dev up`; it reported **Nothing to migrate**. The existing MySQL volume was preserved. The script removed the stopped orphan `kutmb-hr-frontend-1` container while reconciling services.
+- Login page visual check: all primary content and controls fit at the available 1280×720 and 368×886 browser viewports; labels are exposed in the accessibility tree. The password visibility control did not change the input type/label after browser mouse or keyboard activation. Client-side interactivity remains unverified in this browser session; no console errors were reported, so do not treat the whole UI phase as accepted.
+- Direct `/users` access correctly returns to `/login` on port 8000 after changing the current local Nginx proxy host from `$host` to `$http_host` in `docker/nginx/default.conf`. This file and the current development Compose files are local, uncommitted work.
+- Profile and directory content remain unreviewed: no local account was created, no credentials were changed, and no preview permission was granted. Local bootstrap is not enabled; an authorized local account/permission is required for full authenticated UI review.
+- No application tests were run. Browser visual/accessibility acceptance remains **INCOMPLETE** pending an interactive client session and authorized access to the protected views.
+
 ## Completed implementation
 
 These work packages are evidenced by merged PRs and commits on `main`. Their merges and CI are technical evidence only; they do not approve HR/IT policy.
