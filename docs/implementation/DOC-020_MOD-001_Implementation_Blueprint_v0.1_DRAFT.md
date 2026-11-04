@@ -2,7 +2,7 @@
 
 > **Version:** v0.1 DRAFT · **Date:** 29 October 2026
 >
-> **STATE:** IMPLEMENTATION PLAN PREPARED; **NO SOURCE-CODE IMPLEMENTATION AUTHORIZED OR EXECUTED**.
+> **STATE:** Historical v0.1 planning blueprint. Its package sequence and gates are retained as design history; current delivery status and operating method are in [CURRENT_HANDOFF](CURRENT_HANDOFF.md) and §11 below.
 >
 > **Scope:** System Core `MOD-001` User Management & Identity Access with concurrent security/audit responsibilities from `MOD-003`; minimum `MOD-002` only if specifically approved. **HR Core `MOD-004..011` remains HOLD** until approved HR requirements.
 >
@@ -25,12 +25,12 @@
 |---|---|---|
 | PLANNING | Documents, mapping, review and proposed work packages | **YES**, within non-sensitive source of truth |
 | REVIEWED | Technical decisions backed by owner/reviewer, date, impact and references | **NOT YET** |
-| DEV AUTHORIZED | Explicit implementation approval for named work package after mandatory gates | **NO** |
+| DEV AUTHORIZED | Owner request plus an implementation-ready, requirements-backed scope; unresolved decisions still gate dependent behavior | **Evaluate per current task** |
 | IMPLEMENTED | Code/migrations committed and peer-reviewed; **tests recorded**, not inferred | **NO** |
 | UAT ACCEPTED | Stakeholder sign-off on the specified behavior | **NO** |
 | PRODUCTION APPROVED | Release/security/backup gates and accountable approval | **NO** |
 
-**Never** promote a planning status merely because a GitHub PR was opened/merged or an agent reported SUCCESS. A draft work package is *not* a Codex command to run.
+**Never** infer business approval, UAT or production readiness from a GitHub PR or agent report. Use the current handoff and owner request to determine whether the particular implementation slice is ready; historical package labels are not a requirement to create more planning artifacts.
 
 ## 3. Work-package ledger
 
@@ -89,7 +89,7 @@ Authorized work package: WP-<ID> [provide exact ID, accepted requirements and re
 Base branch and expected SHA: <exact Git refs>.
 Read first: AGENTS.md, SCOPE-001, DOC-005, DOC-008, DOC-013..020,
 SEC-001, DOC-019, the accepted decision set, RTM, and any approved DOC-011.
-Execute ONLY the named work package, using a short-lived feature branch within the ONE canonical checkout. Do not create new worktrees or project clones.
+Execute only the current requirements-backed scope in `/home/haris/www/kutmb-hr`, on `main`, after inspecting the latest remote and preserving the working tree. Do not create a worktree, clone or feature branch.
 No HR Core entities, requirements, sample personal data or unapproved routes.
 Backend authorization and validation are authoritative; Vue never controls access.
 No default administrator password, secret logging or public self-registration.
@@ -149,6 +149,17 @@ Do not merge, deploy, create production credentials or modify real infrastructur
 
 [DOC-022](DOC-022_P1.1_First_Codex_Handoff_v0.1_DRAFT.md) contains the historical **first coding assignment WP-020**, now implemented. The owner subsequently authorized WP-040B schema implementation with synthetic data; its integration remains subject to normal code review and CI. Do not start real account-management features until the applicable security, identity and operator decisions are accepted.
 
-## 10. Git integration policy update (29 October 2026)
+## 10. Git integration policy (superseded)
 
-The owner now requires one canonical source directory (`/home/haris/www/kutmb-hr`) and a **main-first integration cycle**. Each completed WP must be committed, pushed, tested/reviewed, merged to main and verified before the next WP. A failed check or mandated review remains a merge blocker, not permission to bypass. Former worktree-per-task examples are superseded. WP-020 has a locally audited commit `0ccae0bd25711705f58dec3c5e222d475d20b778`, **not yet pushed or merged**; reported 13 PHPUnit tests/74 assertions are local evidence, not GitHub Actions evidence. Planning documents do not record business approval.
+The 29 October historical instruction required a feature branch for each task. The owner replaced it on 4 November 2026 with the simpler workflow in §11: one canonical checkout, ordinary implementation on `main`, commit and push verified work to `origin/main`, and preserve any unrelated local changes. Do not apply the former branch/worktree examples to new work.
+
+## 11. Simplified development method (owner direction, 4 November 2026)
+
+This section and [AGENTS.md](../../AGENTS.md) govern future ordinary development. Keep this blueprint for its historical requirement mapping and security context; do not create a new plan or work package merely to begin a ready implementation.
+
+1. **Inspect first.** In the canonical checkout, fetch `origin`, inspect latest `main` and the working tree, read AGENTS.md and CURRENT_HANDOFF.md, and review only the SRS, RTM, decisions and implementation records relevant to the current scope. Never overwrite or discard unrelated local work.
+2. **Plan the smallest useful slice.** Reuse the current requirements and architecture. Record material decisions in existing documents. Update SRS, RTM and traceability artifacts together only when approved requirements change. Do not duplicate plans, checklists or package descriptions, or reopen accepted technical decisions without a concrete reason.
+3. **Implement one coherent feature.** Prefer working software, use existing Laravel/Vue/Inertia patterns and components, and avoid unnecessary abstraction, packages and infrastructure. Do not invent requirements or cross unresolved HR/IT approval gates. System Core comes first; HR Core remains on hold.
+4. **Check proportionately.** Run focused tests and checks for changed behavior. Keep essential security, authorization, validation and integrity coverage. Avoid repeatedly running the entire suite for minor changes. Consolidate requirement, error-handling, UI/UX and dependency checks at the appropriate phase exit. Use the existing development environment and database; do not run destructive database operations without explicit authorization.
+5. **Integrate on main.** Use the single canonical checkout and `main` for ordinary development. Do not create branches, worktrees or clones, alter/disable CI, or add PR gates without owner approval. Commit completed, verified work and push to `origin/main`; do not bypass an enforced check or review. Then verify the remote head and report any remaining local changes without disturbing them.
+6. **Keep the handoff current.** Update CURRENT_HANDOFF.md with delivered scope, files changed, executed checks and results, pending decisions/limitations and the next development-ready scope. Keep chronological records accurate and concise. A technical merge is not HR/IT approval, UAT or production authorization.

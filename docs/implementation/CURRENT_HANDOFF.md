@@ -1,7 +1,7 @@
 # Current Development Handoff
 
-> **Checkpoint:** 30 October 2026 · **Verified `main`:** `143e3e163fd8ab1339d1d94bfb9b5b05c99c33f5`
-> **Status:** WP-070D1 merged; development paused for planning and technical review. This checkpoint records technical state, not organizational approval.
+> **Checkpoint:** 4 November 2026 · **Starting `main` sync:** `c7f22426e6958a3ef12c5101056d207d46119cd8`
+> **Status:** System Core baseline through WP-070D1; simplified owner-directed development workflow adopted. This records technical state, not organizational approval.
 
 ## Project identity and scope
 
@@ -13,6 +13,33 @@
 ## 2 November 2026 authentication planning addendum
 
 The technical owner selected **planning for enforced MFA** and a **conditional 8-character minimum password length**. The transition design and required gates are recorded in [SEC-002 MFA/Password Policy Plan](../security/SEC-002_MFA_Password_Policy_Implementation_Plan_2026-11-02.md), [DOC-013](../decisions/DOC-013_MOD-001_IAM_Technical_Decisions_v0.1_DRAFT.md) and [SEC-001](../security/SEC-001_System_Core_Security_Baseline_v0.1_DRAFT.md). The old **15-character minimum remains applicable to any single-factor login**. No MFA or 8-character runtime change has been implemented or tested from this documentation decision. UM-DEC-011, normative SRS/RTM/Excel alignment, recovery/security approval and production release gates remain open. This addendum does not alter the historical 30 October verified implementation checkpoint recorded above.
+
+## 4 November 2026 development resume
+
+The owner replaced the former branch-per-task/planning-heavy method with the concise operating method in [AGENTS.md](../../AGENTS.md) and §11 of [DOC-020](DOC-020_MOD-001_Implementation_Blueprint_v0.1_DRAFT.md): one canonical checkout, ordinary work on `main`, focused planning/checks, preserve existing changes, update this handoff, commit and push verified work to `origin/main`. Historical work-package records remain context, not a reason to create another plan.
+
+### Current feature status
+
+| Area | Implemented state | Boundary / next dependency |
+|---|---|---|
+| Identity and account management | Username/password authentication, active-account enforcement, self display-name update, read-only profile and local/testing-only User Directory preview | Production account creation, activation/deactivation and first-admin bootstrap are not implemented; bootstrap/operator decisions remain open |
+| Roles and permissions | RBAC schema and server-side authorization foundation; local directory preview checks `iam.users.view`; MySQL last-admin transaction foundation | No role-grant UI/API or approved organizational role/permission matrix; do not grant access by inference |
+| Authentication and authorization | Fortify username login, session authentication, active status rechecked on protected requests, server authorization | Public signup and unsupported recovery remain disabled/gated; role-change/session revocation policy and privileged production access remain gated |
+| Password policy | No 8-character policy is implemented. Local bootstrap enforces at least 15 characters. `Password::defaults()` currently applies a 12-character minimum plus composition rules in production when used | SEC-002's 8-character target is conditional on complete enforced MFA; UM-DEC-011 and policy/security approval remain open. Review the existing 12-character default against the documented single-factor 15-character direction before enabling any production password-setting flow |
+| MFA | Not implemented; MFA routes are disabled and have regression coverage | Enrollment, challenge, recovery and rollout decisions/approval must precede implementation or any 8-character minimum |
+| System Core dependencies | Browser visual/accessibility acceptance remains outstanding; release gates remain 0/8 | Resolve only the security/operator decisions needed for the next account-management slice; HR Core `MOD-004..011` stays HOLD |
+
+### This resume's work and checks
+
+- Synchronized the checkout to `origin/main` at `c7f2242` before edits. Existing local Docker, login/dashboard, and UI changes were preserved and left out of this documentation commit.
+- Updated `AGENTS.md` and DOC-020 to adopt the simplified workflow and remove the old branch-per-task instruction from current operating guidance.
+- Files changed: `AGENTS.md`, `docs/implementation/DOC-020_MOD-001_Implementation_Blueprint_v0.1_DRAFT.md`, and this handoff.
+- No application code was changed: the immediate remaining account-management features depend on open first-admin, role, recovery and security decisions; implementing MFA or enabling eight-character passwords now would violate SEC-002's explicit conditions.
+- Checks: `git diff --check` (run before commit); no application tests were needed for these documentation-only edits.
+
+### Next development-ready scope
+
+Complete browser visual and accessibility acceptance of the existing profile/User Directory UI when the current local UI work is ready for review. For feature implementation, the next coherent System Core slice is approved account lifecycle and role assignment, but it is **not ready** until the operator/role matrix and relevant security/recovery decisions are resolved. Do not start MFA or lower the effective single-factor password minimum as a substitute for those decisions.
 
 ## Completed implementation
 
