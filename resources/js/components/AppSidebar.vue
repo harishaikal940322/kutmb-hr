@@ -58,6 +58,22 @@ const menuCatalog: Record<string, NavItem> = {
     },
 };
 const page = usePage<{ visibleMenuKeys: string[] }>();
+const visibleMenus = page.props.visibleMenuKeys
+    .map((key) => menuCatalog[key])
+    .filter((item): item is NavItem => item !== undefined);
+const systemAdministrationKeys = new Set([
+    'iam.roles.index',
+    'iam.permissions.index',
+    'iam.menus.index',
+]);
+const systemAdministrationItems = page.props.visibleMenuKeys
+    .filter((key) => systemAdministrationKeys.has(key))
+    .map((key) => menuCatalog[key])
+    .filter((item): item is NavItem => item !== undefined);
+const workspaceItems = [
+    ...mainNavItems,
+    ...visibleMenus.filter((item) => !systemAdministrationItems.includes(item)),
+];
 </script>
 
 <template>
@@ -76,12 +92,8 @@ const page = usePage<{ visibleMenuKeys: string[] }>();
 
         <SidebarContent>
             <NavMain
-                :items="[
-                    ...mainNavItems,
-                    ...page.props.visibleMenuKeys
-                        .map((key) => menuCatalog[key])
-                        .filter((item): item is NavItem => item !== undefined),
-                ]"
+                :items="workspaceItems"
+                :admin-items="systemAdministrationItems"
             />
         </SidebarContent>
 
