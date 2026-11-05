@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditEvent;
 use App\Models\User;
+use App\Services\Identity\AuthenticatorQrCode;
 use App\Services\Identity\RecoveryCodeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Laravel\Fortify\Fortify;
 use PragmaRX\Google2FA\Google2FA;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class MfaController extends Controller
 {
@@ -20,16 +22,30 @@ class MfaController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        $pendingSecret = $user->two_factor_secret !== null && $user->two_factor_confirmed_at === null
-            ? Fortify::currentEncrypter()->decrypt($user->two_factor_secret)
-            : null;
 
         return Inertia::render('auth/MfaSetup', [
             'enabled' => $user->hasEnabledTwoFactorAuthentication(),
-            'pendingSecret' => $pendingSecret,
+            'pendingSetup' => $user->two_factor_secret !== null && $user->two_factor_confirmed_at === null,
             'recoveryCodes' => $request->session()->pull('iam.recovery_codes'),
             'status' => $request->session()->get('status'),
         ]);
+    }
+
+    public function qrCode(Request $request, AuthenticatorQrCode $qrCode): HttpResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        abort_if(
+            $user->two_factor_secret === null || $user->two_factor_confirmed_at !== null,
+            404,
+        );
+
+        $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
+        $issuer = (string) config('app.name');
+        $account = (string) $user->username;
+
+        return $qrCode->response($issuer, $account, $secret);
     }
 
     public function start(Request $request): RedirectResponse
@@ -47,7 +63,7 @@ class MfaController extends Controller
             'two_factor_confirmed_at' => null,
         ])->save();
 
-        return to_route('mfa.setup')->with('status', 'Scan or manually enter the authenticator key, then verify a code.');
+        return to_route('mfa.setup')->with('status', 'Scan the QR code with your authenticator app, then verify a code.');
     }
 
     public function confirm(Request $request, RecoveryCodeService $recoveryCodes): RedirectResponse

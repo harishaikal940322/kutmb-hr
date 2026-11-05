@@ -20,6 +20,7 @@ class LocalSystemAdminBootstrapTest extends TestCase
     {
         config(['iam.local_account_bootstrap_enabled' => false]);
         $this->get(route('register'))->assertNotFound();
+        $this->get(route('register.mfa.qr-code'))->assertNotFound();
 
         config(['iam.local_account_bootstrap_enabled' => true]);
         $this->get(route('register'))
@@ -36,6 +37,30 @@ class LocalSystemAdminBootstrapTest extends TestCase
 
         $this->assertDatabaseCount('users', 1);
         $this->assertDatabaseCount('user_roles', 0);
+    }
+
+    public function test_bootstrap_qr_is_private_session_bound_and_removed_after_first_account_creation(): void
+    {
+        config(['iam.local_account_bootstrap_enabled' => true]);
+        $page = $this->get(route('register'))->assertOk();
+        $secret = decrypt(session('iam.bootstrap_mfa_secret'));
+
+        $page->assertDontSee($secret);
+
+        $qrCode = $this->get(route('register.mfa.qr-code'))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/svg+xml; charset=UTF-8')
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertSee('<svg', false);
+
+        $this->assertStringContainsString('no-store', (string) $qrCode->headers->get('Cache-Control'));
+        $this->assertStringContainsString('private', (string) $qrCode->headers->get('Cache-Control'));
+        $this->assertStringNotContainsString($secret, $qrCode->getContent());
+        $this->assertStringNotContainsString('otpauth://', $qrCode->getContent());
+
+        User::factory()->create();
+
+        $this->get(route('register.mfa.qr-code'))->assertNotFound();
     }
 
     public function test_first_registration_creates_an_active_system_admin_and_audit_event(): void
@@ -90,6 +115,7 @@ class LocalSystemAdminBootstrapTest extends TestCase
         config(['iam.local_account_bootstrap_enabled' => true]);
 
         $this->get(route('register'))->assertNotFound();
+        $this->get(route('register.mfa.qr-code'))->assertNotFound();
 
         $this->assertDatabaseCount('users', 0);
         $this->assertDatabaseCount('roles', 0);

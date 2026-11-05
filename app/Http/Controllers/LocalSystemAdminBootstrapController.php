@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditEvent;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Identity\AuthenticatorQrCode;
 use App\Services\Identity\RecoveryCodeService;
 use App\Support\Identity\Username;
 use Illuminate\Http\RedirectResponse;
@@ -17,6 +18,7 @@ use InvalidArgumentException;
 use Laravel\Fortify\Fortify;
 use PragmaRX\Google2FA\Google2FA;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class LocalSystemAdminBootstrapController extends Controller
 {
@@ -35,10 +37,22 @@ class LocalSystemAdminBootstrapController extends Controller
             $request->session()->put('iam.bootstrap_mfa_secret', $encryptedSecret);
         }
 
-        return Inertia::render('auth/Register', [
-            'mfaSecret' => decrypt($encryptedSecret),
-            'mfaIssuer' => config('app.name'),
-        ]);
+        return Inertia::render('auth/Register');
+    }
+
+    public function qrCode(Request $request, AuthenticatorQrCode $qrCode): HttpResponse
+    {
+        $this->ensureBootstrapEnvironment();
+        abort_if(User::query()->exists(), 404);
+
+        $encryptedSecret = $request->session()->get('iam.bootstrap_mfa_secret');
+        abort_unless(is_string($encryptedSecret), 404);
+
+        return $qrCode->response(
+            (string) config('app.name'),
+            'first-system-admin',
+            decrypt($encryptedSecret),
+        );
     }
 
     public function store(Request $request, Google2FA $google2fa, RecoveryCodeService $recoveryCodes): RedirectResponse

@@ -124,6 +124,7 @@ class MfaAuthenticationTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('auth/MfaSetup')
                 ->where('enabled', false)
+                ->where('pendingSetup', false)
             );
 
         $this->actingAs($user)->withSession(['url.intended' => route('mfa.setup')])
@@ -133,6 +134,24 @@ class MfaAuthenticationTest extends TestCase
         $this->post(route('mfa.setup.start'))->assertRedirect(route('mfa.setup'));
         $user->refresh();
         $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
+        $this->get(route('mfa.setup'))
+            ->assertOk()
+            ->assertDontSee($secret)
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('auth/MfaSetup')
+                ->where('pendingSetup', true)
+            );
+
+        $qrCode = $this->get(route('mfa.setup.qr-code'))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/svg+xml; charset=UTF-8')
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertSee('<svg', false);
+        $this->assertStringContainsString('no-store', (string) $qrCode->headers->get('Cache-Control'));
+        $this->assertStringContainsString('private', (string) $qrCode->headers->get('Cache-Control'));
+        $this->assertStringNotContainsString($secret, $qrCode->getContent());
+        $this->assertStringNotContainsString('otpauth://', $qrCode->getContent());
+
         $code = app(Google2FA::class)->getCurrentOtp($secret);
 
         $this->post(route('mfa.setup.confirm'), ['code' => $code])
@@ -140,6 +159,7 @@ class MfaAuthenticationTest extends TestCase
             ->assertSessionHas('iam.recovery_codes');
 
         $this->assertTrue($user->fresh()->hasEnabledTwoFactorAuthentication());
+        $this->get(route('mfa.setup.qr-code'))->assertNotFound();
         $this->get(route('dashboard'))->assertOk();
         $this->assertDatabaseHas('audit_events', [
             'actor_id' => $user->getKey(),

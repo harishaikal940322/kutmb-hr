@@ -8,7 +8,7 @@ import { Spinner } from '@/components/ui/spinner';
 
 defineProps<{
     enabled: boolean;
-    pendingSecret: string | null;
+    pendingSetup: boolean;
     recoveryCodes?: string[] | null;
     status?: string | null;
 }>();
@@ -62,22 +62,31 @@ defineOptions({
 
     <div v-else class="space-y-5">
         <div
-            v-if="pendingSecret"
+            v-if="pendingSetup"
             class="space-y-3 rounded-md border border-border p-4"
         >
-            <h2 class="font-semibold">Add this key to your authenticator</h2>
+            <h2 class="font-semibold">Scan with your authenticator app</h2>
             <p class="text-sm leading-5 text-muted-foreground">
-                Use a time-based one-time password (TOTP) account. Enter this
-                key manually if your app cannot scan a QR code.
+                Open your authenticator app, add an account, and scan this QR
+                code. Then enter the six-digit code shown in the app.
             </p>
-            <code
-                class="block rounded bg-muted p-3 text-sm font-semibold tracking-wider break-all"
-                >{{ pendingSecret }}</code
-            >
+            <div class="flex justify-center rounded-md bg-white p-3">
+                <img
+                    src="/security/mfa/qr-code"
+                    alt="Authenticator setup QR code. Scan it with your authenticator app."
+                    width="256"
+                    height="256"
+                    class="h-64 w-64 max-w-full"
+                    decoding="async"
+                />
+            </div>
+            <p class="text-sm leading-5 text-muted-foreground">
+                This QR code contains your sign-in secret. Keep it private.
+            </p>
         </div>
 
         <Form
-            v-if="!pendingSecret"
+            v-if="!pendingSetup"
             action="/security/mfa/setup"
             method="post"
             v-slot="{ processing }"

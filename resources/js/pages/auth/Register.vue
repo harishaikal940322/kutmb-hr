@@ -9,11 +9,6 @@ import { Spinner } from '@/components/ui/spinner';
 import { store } from '@/routes/register';
 import { login } from '@/routes';
 
-defineProps<{
-    mfaSecret: string;
-    mfaIssuer: string;
-}>();
-
 defineOptions({
     layout: {
         title: 'Set up the first System Administrator',
@@ -42,14 +37,22 @@ defineOptions({
             Set up an authenticator
         </h2>
         <p class="text-sm leading-5 text-muted-foreground">
-            In an authenticator app, add a time-based account for
-            {{ mfaIssuer }}
-            and enter this setup key. Confirm with the current six-digit code.
+            Open your authenticator app, add an account, and scan this QR code.
+            Confirm with the current six-digit code from the app.
         </p>
-        <code
-            class="block rounded bg-muted p-3 text-sm font-semibold tracking-wider break-all"
-            >{{ mfaSecret }}</code
-        >
+        <div class="flex justify-center rounded-md bg-white p-3">
+            <img
+                src="/register/mfa-qr-code"
+                alt="First System Administrator authenticator QR code. Scan it with your authenticator app."
+                width="256"
+                height="256"
+                class="h-64 w-64 max-w-full"
+                decoding="async"
+            />
+        </div>
+        <p class="text-sm leading-5 text-muted-foreground">
+            This QR code contains the sign-in secret. Keep it private.
+        </p>
     </section>
 
     <Form

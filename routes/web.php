@@ -10,6 +10,9 @@ Route::inertia('/', 'Welcome')->name('home');
 
 Route::get('register', [LocalSystemAdminBootstrapController::class, 'create'])
     ->name('register');
+Route::get('register/mfa-qr-code', [LocalSystemAdminBootstrapController::class, 'qrCode'])
+    ->middleware('throttle:10,1')
+    ->name('register.mfa.qr-code');
 Route::post('register', [LocalSystemAdminBootstrapController::class, 'store'])
     ->middleware('throttle:5,1')
     ->name('register.store');
@@ -17,6 +20,9 @@ Route::post('register', [LocalSystemAdminBootstrapController::class, 'store'])
 Route::middleware(['auth', 'active-account'])->group(function () {
     Route::get('security/mfa/setup', [MfaController::class, 'show'])
         ->name('mfa.setup');
+    Route::get('security/mfa/qr-code', [MfaController::class, 'qrCode'])
+        ->middleware('password.confirm')
+        ->name('mfa.setup.qr-code');
     Route::post('security/mfa/setup', [MfaController::class, 'start'])
         ->middleware('password.confirm')
         ->name('mfa.setup.start');

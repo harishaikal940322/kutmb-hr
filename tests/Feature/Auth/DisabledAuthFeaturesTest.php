@@ -48,6 +48,7 @@ class DisabledAuthFeaturesTest extends TestCase
         $this->assertTrue(Route::has('two-factor.recovery-codes'));
         $this->assertTrue(Route::has('register'));
         $this->assertTrue(Route::has('register.store'));
+        $this->assertTrue(Route::has('register.mfa.qr-code'));
 
         foreach ([
             ['POST', '/user/two-factor-authentication'],
