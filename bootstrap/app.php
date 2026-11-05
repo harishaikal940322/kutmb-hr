@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Middleware\BlockFortifyTwoFactorManagement;
 use App\Http\Middleware\DisableRememberMe;
 use App\Http\Middleware\EnsureActiveAccount;
 use App\Http\Middleware\EnsureLocalUserDirectoryPreview;
+use App\Http\Middleware\EnsureMfaEnrolled;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -24,9 +26,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->group('protected', [
             'auth',
             EnsureActiveAccount::class,
+            EnsureMfaEnrolled::class,
         ]);
 
         $middleware->alias([
+            'active-account' => EnsureActiveAccount::class,
             'permission' => EnsurePermission::class,
             'user-directory-preview' => EnsureLocalUserDirectoryPreview::class,
         ]);
@@ -36,6 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
             DisableRememberMe::class,
+            BlockFortifyTwoFactorManagement::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

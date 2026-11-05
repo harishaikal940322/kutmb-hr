@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Laravel\Fortify\TwoFactorAuthenticatable;
 
 /**
  * @property int $id
@@ -20,16 +21,20 @@ use Illuminate\Support\Carbon;
  * @property string|null $username_canonical
  * @property string $status
  * @property string $password
+ * @property string|null $two_factor_secret
+ * @property string|null $two_factor_recovery_codes
+ * @property Carbon|null $two_factor_confirmed_at
+ * @property int|null $two_factor_last_used_at
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
 #[Fillable(['name', 'email', 'password', 'username', 'status'])]
-#[Hidden(['password', 'remember_token'])]
+#[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     public function setUsernameAttribute(?string $value): void
     {
@@ -48,6 +53,26 @@ class User extends Authenticatable
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class, 'user_roles');
+    }
+
+    /**
+     * Recovery codes are kept in the user_recovery_codes table as one-way hashes.
+     * Fortify's default encrypted-code storage is intentionally not used.
+     *
+     * @return list<string>
+     */
+    public function recoveryCodes(): array
+    {
+        return [];
+    }
+
+    /**
+     * The custom challenge request consumes recovery codes atomically before
+     * Fortify establishes the authenticated session.
+     */
+    public function replaceRecoveryCode(string $code): void
+    {
+        // Consumption is handled by RecoveryCodeService from the Fortify request.
     }
 
     /**

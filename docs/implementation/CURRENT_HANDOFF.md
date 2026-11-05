@@ -25,8 +25,8 @@ The owner replaced the former branch-per-task/planning-heavy method with the con
 | Identity and account management | Username/password authentication, active-account enforcement, self display-name update, read-only profile and local/testing-only User Directory preview; one-time local/testing first-System-Admin registration | Production account creation, activation/deactivation and bootstrap remain unavailable; bootstrap/operator decisions remain open |
 | Roles and permissions | RBAC schema and server-side authorization foundation; local directory preview checks `iam.users.view`; MySQL last-admin transaction foundation | No role-grant UI/API or approved organizational role/permission matrix; do not grant access by inference |
 | Authentication and authorization | Fortify username login, session authentication, active status rechecked on protected requests, server authorization | Public signup and unsupported recovery remain disabled/gated; role-change/session revocation policy and privileged production access remain gated |
-| Password policy | No 8-character policy is implemented. Local bootstrap enforces at least 15 characters. `Password::defaults()` currently applies a 12-character minimum plus composition rules in production when used | SEC-002's 8-character target is conditional on complete enforced MFA; UM-DEC-011 and policy/security approval remain open. Review the existing 12-character default against the documented single-factor 15-character direction before enabling any production password-setting flow |
-| MFA | Not implemented; MFA routes are disabled and have regression coverage | Enrollment, challenge, recovery and rollout decisions/approval must precede implementation or any 8-character minimum |
+| Password policy | Local/testing-only first-System-Admin bootstrap accepts 8+ characters only with a TOTP proof; application password defaults and CLI bootstrap retain a 15-character minimum | 8-character use is only a technical local bootstrap path. UM-DEC-011, security/policy approval and production rollout remain open |
+| MFA | TOTP enrollment, Fortify login challenge, hashed single-use recovery codes, throttling, and mandatory-route gate are implemented; global enforcement remains off by default | Production enforcement requires approved recovery and rollout policies, review, and release gates; no weak fallback or public bootstrap is enabled |
 | System Core dependencies | Browser visual/accessibility acceptance remains outstanding; release gates remain 0/8 | Resolve only the security/operator decisions needed for the next account-management slice; HR Core `MOD-004..011` stays HOLD |
 
 ### This resume's work and checks
@@ -39,7 +39,7 @@ The owner replaced the former branch-per-task/planning-heavy method with the con
 
 ### Next development-ready scope
 
-Login UI browser review is complete. Profile/User Directory visual review still needs an authorized local account and preview permission. The next feature slice is account lifecycle and role assignment, but it is **not ready** until the operator/role matrix and related security/recovery requirements are resolved. Continue into requirements review for those open decisions; do not start MFA or lower the single-factor password minimum as a substitute.
+Login UI browser review is complete. Profile/User Directory visual review still needs an authorized local account and preview permission. Account lifecycle and role assignment are **not ready** until the operator/role matrix and related security requirements are resolved. Continue into requirements review for those open decisions; keep the 15-character floor on every password-only path.
 
 ### Local first-System-Admin registration — 4 November 2026
 
@@ -78,6 +78,15 @@ Login UI browser review is complete. Profile/User Directory visual review still 
 - Browser review at 1280×720 and 368×886: login content fits with no horizontal overflow; username/password labels and button names are available in the accessibility tree. Empty submit triggered required-field validation. `/login` returned HTTP 200; unauthenticated `/users` redirected to `/login`.
 - Checks: Vite CORS response matched the app origin; `npm run types:check` passed; `npm run build` passed; `git diff --check` passed. No authentication credentials were submitted and no full app test suite was run.
 - Still pending: authenticated profile and User Directory visual review. That requires an authorized local account and preview permission. Account lifecycle and role assignment remain blocked on open HR/IT requirements and security decisions; HR Core stays on hold.
+
+### MFA and local System Admin password path — 5 November 2026
+
+- Implemented TOTP enrollment, login challenge, encrypted factor secret, server-side enforced-route middleware, challenge throttling, audit events, hashed one-time recovery codes, and blocking of Fortify's unreviewed factor-management endpoints. TOTP time steps are stored and consumed under a database row lock to reject replay, including the code used during enrollment/bootstrap.
+- The local/testing-only first-System-Admin bootstrap now accepts passwords from 8 characters only after verifying the authenticator code before account creation. The new account must complete a TOTP challenge to log in. `Password::defaults()` and CLI bootstrap remain at 15 characters; no 8-character password-only path was introduced.
+- `IAM_MFA_ENFORCED` defaults to `false`; a gated code path forces unenrolled accounts into enrollment when enabled. Production remains blocked for local bootstrap, and this technical delivery does not resolve UM-DEC-011 or approve production enforcement. Recovery process, rollout, security/organizational approval and release gates remain outstanding.
+- Files changed for this slice: MFA controller/request/middleware/service/model, migration, Fortify/provider/config/routes, local bootstrap, Vue auth pages, MFA/bootstrap/disabled-route tests, the security plan, dependency lockfile, and this handoff. Existing Dashboard, MyProfile, User Directory, and `docker/` local changes were preserved.
+- Verification: after updating the affected Symfony packages to patched releases, `./bin/dev mysql-test` passed against disposable MySQL 26.10.0 with 109 tests and 736 assertions; migration up/rollback/up, Pint, PHPStan, frontend lint/format, TypeScript, and production asset build passed. Composer audit reported no advisories; npm audit reported 0 vulnerabilities. No persistent development database was used for suite tests.
+- Follow-up: complete browser/accessibility review of MFA enrollment, challenge and recovery screens; obtain required IT/security decisions; keep production enforcement disabled until those gates are recorded. Do not change the normative SRS/RTM/XLSX while requirements remain unapproved.
 
 ## Completed implementation
 

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
@@ -22,15 +23,6 @@ class DisabledAuthFeaturesTest extends TestCase
             ['GET', '/email/verify'],
             ['GET', '/email/verify/1/example-hash'],
             ['POST', '/email/verification-notification'],
-            ['GET', '/two-factor-challenge'],
-            ['POST', '/two-factor-challenge'],
-            ['POST', '/user/two-factor-authentication'],
-            ['POST', '/user/confirmed-two-factor-authentication'],
-            ['DELETE', '/user/two-factor-authentication'],
-            ['GET', '/user/two-factor-qr-code'],
-            ['GET', '/user/two-factor-secret-key'],
-            ['GET', '/user/two-factor-recovery-codes'],
-            ['POST', '/user/two-factor-recovery-codes'],
             ['GET', '/passkeys/login/options'],
             ['POST', '/passkeys/login'],
             ['GET', '/passkeys/confirm/options'],
@@ -44,8 +36,34 @@ class DisabledAuthFeaturesTest extends TestCase
             $this->call($method, $path)->assertNotFound();
         }
 
+        $this->get('/two-factor-challenge')->assertRedirect(route('login'));
+
+        $this->assertTrue(Route::has('two-factor.login'));
+        $this->assertTrue(Route::has('two-factor.login.store'));
+        $this->assertTrue(Route::has('two-factor.enable'));
+        $this->assertTrue(Route::has('two-factor.confirm'));
+        $this->assertTrue(Route::has('two-factor.disable'));
+        $this->assertTrue(Route::has('two-factor.qr-code'));
+        $this->assertTrue(Route::has('two-factor.secret-key'));
+        $this->assertTrue(Route::has('two-factor.recovery-codes'));
+        $this->assertTrue(Route::has('register'));
+        $this->assertTrue(Route::has('register.store'));
+
         foreach ([
-            'register',
+            ['POST', '/user/two-factor-authentication'],
+            ['POST', '/user/confirmed-two-factor-authentication'],
+            ['DELETE', '/user/two-factor-authentication'],
+            ['GET', '/user/two-factor-qr-code'],
+            ['GET', '/user/two-factor-secret-key'],
+            ['GET', '/user/two-factor-recovery-codes'],
+            ['POST', '/user/two-factor-recovery-codes'],
+        ] as [$method, $path]) {
+            $this->actingAs(User::factory()->create())
+                ->call($method, $path)
+                ->assertNotFound();
+        }
+
+        foreach ([
             'password.request',
             'password.email',
             'password.reset',
@@ -53,13 +71,6 @@ class DisabledAuthFeaturesTest extends TestCase
             'verification.notice',
             'verification.verify',
             'verification.send',
-            'two-factor.login',
-            'two-factor.enable',
-            'two-factor.confirm',
-            'two-factor.disable',
-            'two-factor.qr-code',
-            'two-factor.secret-key',
-            'two-factor.recovery-codes',
             'passkey.login-options',
             'passkey.login',
             'passkey.confirm-options',
@@ -99,7 +110,20 @@ class DisabledAuthFeaturesTest extends TestCase
     {
         // Fortify's password confirmation only re-authenticates the current
         // session; it does not provision accounts or grant privileges.
-        $allowedMutations = ['login.store', 'logout', 'password.confirm.store', 'profile.update'];
+        $allowedMutations = [
+            'login.store',
+            'logout',
+            'password.confirm.store',
+            'profile.update',
+            'register.store',
+            'mfa.setup.start',
+            'mfa.setup.confirm',
+            'two-factor.login.store',
+            'two-factor.enable',
+            'two-factor.confirm',
+            'two-factor.disable',
+            'two-factor.regenerate-recovery-codes',
+        ];
 
         foreach (Route::getRoutes() as $route) {
             $mutatingMethods = array_intersect($route->methods(), ['POST', 'PUT', 'PATCH', 'DELETE']);

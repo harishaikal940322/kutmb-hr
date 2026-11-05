@@ -5,9 +5,11 @@ namespace Tests\Feature\Auth;
 use App\Models\AuditEvent;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRecoveryCode;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
+use PragmaRX\Google2FA\Google2FA;
 use Tests\TestCase;
 
 class LocalSystemAdminBootstrapTest extends TestCase
@@ -39,17 +41,26 @@ class LocalSystemAdminBootstrapTest extends TestCase
     public function test_first_registration_creates_an_active_system_admin_and_audit_event(): void
     {
         config(['iam.local_account_bootstrap_enabled' => true]);
-        $password = 'synthetic initial administrator password';
+        $this->get(route('register'))->assertOk();
+        $secret = decrypt(session('iam.bootstrap_mfa_secret'));
+        $password = 'Abc12345';
 
-        $this->post(route('register.store'), $this->validAccountPayload($password))
+        $this->post(route('register.store'), [
+            ...$this->validAccountPayload($password),
+            'mfa_code' => app(Google2FA::class)->getCurrentOtp($secret),
+        ])
             ->assertRedirect(route('login'))
-            ->assertSessionHas('status', 'System Administrator account created. You can now log in.');
+            ->assertSessionHas('status', 'System Administrator account created with multi-factor authentication. Save the one-time recovery codes below.')
+            ->assertSessionHas('iam.recovery_codes');
 
         $user = User::query()->where('username_canonical', 'first.admin')->sole();
         $role = Role::query()->where('code', 'system-admin')->sole();
 
         $this->assertSame('ACTIVE', $user->status);
         $this->assertTrue(Hash::check($password, $user->password));
+        $this->assertTrue($user->hasEnabledTwoFactorAuthentication());
+        $this->assertNotNull($user->two_factor_secret);
+        $this->assertSame(10, UserRecoveryCode::query()->where('user_id', $user->getKey())->count());
         $this->assertTrue($user->roles()->whereKey($role->getKey())->exists());
         $this->assertDatabaseCount('user_roles', 1);
         $this->assertDatabaseCount('role_permissions', 0);
@@ -60,8 +71,17 @@ class LocalSystemAdminBootstrapTest extends TestCase
             'outcome' => 'SUCCESS',
         ]);
 
-        $event = AuditEvent::query()->where('target_ref', 'user:'.$user->getKey())->sole();
+        $event = AuditEvent::query()
+            ->where('target_ref', 'user:'.$user->getKey())
+            ->where('action_code', 'iam.local_system_admin_bootstrap')
+            ->sole();
         $this->assertSame(['source' => 'local_web'], (array) $event->metadata);
+
+        $this->post(route('login.store'), [
+            'username' => $user->username,
+            'password' => $password,
+        ])->assertRedirect(route('two-factor.login'));
+        $this->assertGuest();
     }
 
     public function test_bootstrap_route_is_unavailable_in_production_even_when_opted_in(): void
@@ -80,15 +100,21 @@ class LocalSystemAdminBootstrapTest extends TestCase
     {
         config(['iam.local_account_bootstrap_enabled' => true]);
         $valid = $this->validAccountPayload();
+        $this->get(route('register'));
+        $secret = decrypt(session('iam.bootstrap_mfa_secret'));
+        $validMfa = ['mfa_code' => app(Google2FA::class)->getCurrentOtp($secret)];
 
-        $this->post(route('register.store'), [...$valid, 'username' => 'not valid'])
+        $this->post(route('register.store'), [...$valid, ...$validMfa, 'username' => 'not valid'])
             ->assertSessionHasErrors('username');
 
-        $this->post(route('register.store'), [...$valid, 'password' => 'short-password', 'password_confirmation' => 'short-password'])
+        $this->post(route('register.store'), [...$valid, ...$validMfa, 'password' => 'short-7', 'password_confirmation' => 'short-7'])
             ->assertSessionHasErrors('password');
 
-        $this->post(route('register.store'), [...$valid, 'password_confirmation' => 'different confirmation password'])
+        $this->post(route('register.store'), [...$valid, ...$validMfa, 'password_confirmation' => 'different confirmation password'])
             ->assertSessionHasErrors('password');
+
+        $this->post(route('register.store'), [...$valid, ...$validMfa, 'mfa_code' => '000000'])
+            ->assertSessionHasErrors('mfa_code');
 
         $this->assertDatabaseCount('users', 0);
         $this->assertDatabaseCount('roles', 0);

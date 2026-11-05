@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditEvent;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Identity\RecoveryCodeService;
 use App\Support\Identity\Username;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,11 +14,13 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use InvalidArgumentException;
+use Laravel\Fortify\Fortify;
+use PragmaRX\Google2FA\Google2FA;
 use RuntimeException;
 
 class LocalSystemAdminBootstrapController extends Controller
 {
-    public function create(): Response|RedirectResponse
+    public function create(Request $request): Response|RedirectResponse
     {
         $this->ensureBootstrapEnvironment();
 
@@ -25,10 +28,20 @@ class LocalSystemAdminBootstrapController extends Controller
             return to_route('login');
         }
 
-        return Inertia::render('auth/Register');
+        $encryptedSecret = $request->session()->get('iam.bootstrap_mfa_secret');
+
+        if (! is_string($encryptedSecret)) {
+            $encryptedSecret = encrypt(app(Google2FA::class)->generateSecretKey(32));
+            $request->session()->put('iam.bootstrap_mfa_secret', $encryptedSecret);
+        }
+
+        return Inertia::render('auth/Register', [
+            'mfaSecret' => decrypt($encryptedSecret),
+            'mfaIssuer' => config('app.name'),
+        ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, Google2FA $google2fa, RecoveryCodeService $recoveryCodes): RedirectResponse
     {
         $this->ensureBootstrapEnvironment();
 
@@ -39,7 +52,8 @@ class LocalSystemAdminBootstrapController extends Controller
         $validated = $request->validate([
             'username' => ['required', 'string', 'max:64'],
             'name' => ['required', 'string', 'max:255'],
-            'password' => ['required', 'string', 'min:15', 'confirmed'],
+            'password' => ['required', 'string', 'min:8', 'max:255', 'confirmed'],
+            'mfa_code' => ['required', 'string', 'digits:6'],
         ]);
 
         $name = trim($validated['name']);
@@ -58,7 +72,25 @@ class LocalSystemAdminBootstrapController extends Controller
             ]);
         }
 
-        $created = DB::transaction(function () use ($validated, $name): bool {
+        $encryptedBootstrapSecret = $request->session()->get('iam.bootstrap_mfa_secret');
+
+        if (! is_string($encryptedBootstrapSecret)) {
+            throw ValidationException::withMessages([
+                'mfa_code' => 'Authenticator setup expired. Reload the page and try again.',
+            ]);
+        }
+
+        $mfaSecret = decrypt($encryptedBootstrapSecret);
+
+        $matchedTimestamp = $google2fa->verifyKeyNewer($mfaSecret, $validated['mfa_code'], 0, 1);
+
+        if ($matchedTimestamp === false) {
+            throw ValidationException::withMessages([
+                'mfa_code' => 'The authenticator code is invalid. Try the current code from your app.',
+            ]);
+        }
+
+        $created = DB::transaction(function () use ($validated, $name, $mfaSecret, $matchedTimestamp, $recoveryCodes): ?array {
             $guard = DB::table('iam_guard')->where('id', 1)->lockForUpdate()->first();
 
             if ($guard === null) {
@@ -66,7 +98,7 @@ class LocalSystemAdminBootstrapController extends Controller
             }
 
             if (User::query()->exists()) {
-                return false;
+                return null;
             }
 
             $role = Role::query()->firstOrCreate(
@@ -80,7 +112,13 @@ class LocalSystemAdminBootstrapController extends Controller
                 'status' => 'ACTIVE',
                 'password' => $validated['password'],
             ]);
+            $user->forceFill([
+                'two_factor_secret' => Fortify::currentEncrypter()->encrypt($mfaSecret),
+                'two_factor_confirmed_at' => now(),
+                'two_factor_last_used_at' => $matchedTimestamp,
+            ])->save();
             $user->roles()->attach($role->getKey());
+            $codes = $recoveryCodes->issue($user);
 
             AuditEvent::query()->create([
                 'occurred_at' => now(),
@@ -91,14 +129,18 @@ class LocalSystemAdminBootstrapController extends Controller
                 'metadata' => ['source' => 'local_web'],
             ]);
 
-            return true;
+            return $codes;
         }, 3);
 
-        if (! $created) {
+        if ($created === null) {
             return to_route('login');
         }
 
-        return to_route('login')->with('status', 'System Administrator account created. You can now log in.');
+        $request->session()->forget('iam.bootstrap_mfa_secret');
+
+        return to_route('login')
+            ->with('status', 'System Administrator account created with multi-factor authentication. Save the one-time recovery codes below.')
+            ->with('iam.recovery_codes', $created);
     }
 
     private function ensureBootstrapEnvironment(): void

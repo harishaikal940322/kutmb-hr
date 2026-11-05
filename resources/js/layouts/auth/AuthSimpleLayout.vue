@@ -19,7 +19,7 @@ const appName = usePage().props.name;
             <div class="mb-6 flex justify-center">
                 <Link
                     :href="home()"
-                    class="inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    class="inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
                 >
                     <span
                         class="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground"
@@ -37,7 +37,10 @@ const appName = usePage().props.name;
                 aria-labelledby="auth-title"
             >
                 <header class="mb-7 space-y-2">
-                    <h1 id="auth-title" class="text-2xl font-semibold tracking-tight">
+                    <h1
+                        id="auth-title"
+                        class="text-2xl font-semibold tracking-tight"
+                    >
                         {{ title }}
                     </h1>
                     <p class="text-sm leading-6 text-muted-foreground">

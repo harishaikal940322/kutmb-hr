@@ -17,6 +17,7 @@ defineOptions({
 
 defineProps<{
     status?: string;
+    recoveryCodes?: string[] | null;
 }>();
 </script>
 
@@ -31,6 +32,24 @@ defineProps<{
     >
         {{ status }}
     </div>
+
+    <section
+        v-if="recoveryCodes?.length"
+        aria-labelledby="recovery-codes-heading"
+        class="mb-5 space-y-3 rounded-md border border-border bg-muted/30 p-4"
+        role="alert"
+    >
+        <h2 id="recovery-codes-heading" class="font-semibold">
+            Save your one-time recovery codes
+        </h2>
+        <p class="text-sm leading-5 text-muted-foreground">
+            Store these codes somewhere secure. Each code works once if you
+            cannot access your authenticator.
+        </p>
+        <ul class="grid grid-cols-2 gap-2 font-mono text-sm">
+            <li v-for="code in recoveryCodes" :key="code">{{ code }}</li>
+        </ul>
+    </section>
 
     <Form
         v-bind="store.form()"
@@ -49,7 +68,9 @@ defineProps<{
                     v-focus
                     autocomplete="username"
                     :aria-invalid="Boolean(errors.username)"
-                    :aria-describedby="errors.username ? 'username-error' : undefined"
+                    :aria-describedby="
+                        errors.username ? 'username-error' : undefined
+                    "
                 />
                 <InputError id="username-error" :message="errors.username" />
             </div>
@@ -64,7 +85,9 @@ defineProps<{
                     required
                     autocomplete="current-password"
                     :aria-invalid="Boolean(errors.password)"
-                    :aria-describedby="errors.password ? 'password-error' : undefined"
+                    :aria-describedby="
+                        errors.password ? 'password-error' : undefined
+                    "
                 />
                 <InputError id="password-error" :message="errors.password" />
             </div>

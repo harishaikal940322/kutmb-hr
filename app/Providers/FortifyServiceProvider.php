@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Http\Requests\TwoFactorLoginRequest;
 use App\Models\User;
 use App\Support\Identity\Username;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -13,6 +14,7 @@ use Illuminate\Support\Str;
 use Inertia\Inertia;
 use InvalidArgumentException;
 use Laravel\Fortify\Fortify;
+use Laravel\Fortify\Http\Requests\TwoFactorLoginRequest as FortifyTwoFactorLoginRequest;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -21,7 +23,7 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(FortifyTwoFactorLoginRequest::class, TwoFactorLoginRequest::class);
     }
 
     /**
@@ -54,7 +56,11 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::loginView(fn (Request $request) => Inertia::render('auth/Login', [
             'status' => $request->session()->get('status'),
+            'recoveryCodes' => $request->session()->pull('iam.recovery_codes'),
         ]));
+
+        Fortify::twoFactorChallengeView(fn () => Inertia::render('auth/TwoFactorChallenge'));
+        Fortify::confirmPasswordView(fn () => Inertia::render('auth/ConfirmPassword'));
 
         $this->configureRateLimiting();
     }
@@ -68,6 +74,13 @@ class FortifyServiceProvider extends ServiceProvider
             $submittedUsername = $request->input(Fortify::username());
             $throttleIdentity = is_string($submittedUsername) ? Str::lower($submittedUsername) : '';
             $throttleKey = $throttleIdentity.'|'.$request->ip();
+
+            return Limit::perMinute(5)->by($throttleKey);
+        });
+
+        RateLimiter::for('two-factor', function (Request $request) {
+            $challengedUser = $request->session()->get('login.id', 'unknown');
+            $throttleKey = $challengedUser.'|'.$request->ip();
 
             return Limit::perMinute(5)->by($throttleKey);
         });

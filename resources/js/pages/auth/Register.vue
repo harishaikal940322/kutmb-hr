@@ -9,6 +9,11 @@ import { Spinner } from '@/components/ui/spinner';
 import { store } from '@/routes/register';
 import { login } from '@/routes';
 
+defineProps<{
+    mfaSecret: string;
+    mfaIssuer: string;
+}>();
+
 defineOptions({
     layout: {
         title: 'Set up the first System Administrator',
@@ -21,14 +26,35 @@ defineOptions({
 <template>
     <Head title="Set up administrator" />
 
-    <p class="mb-5 rounded-md border border-border bg-muted/40 px-4 py-3 text-sm leading-5 text-muted-foreground">
+    <p
+        class="mb-5 rounded-md border border-border bg-muted/40 px-4 py-3 text-sm leading-5 text-muted-foreground"
+    >
         This one-time setup is available only while the system has no accounts.
-        The first account receives the System Admin role.
+        The first account receives the System Admin role and must enroll an
+        authenticator before it is created.
     </p>
+
+    <section
+        class="mb-5 space-y-2 rounded-md border border-border px-4 py-3"
+        aria-labelledby="mfa-setup-heading"
+    >
+        <h2 id="mfa-setup-heading" class="font-semibold">
+            Set up an authenticator
+        </h2>
+        <p class="text-sm leading-5 text-muted-foreground">
+            In an authenticator app, add a time-based account for
+            {{ mfaIssuer }}
+            and enter this setup key. Confirm with the current six-digit code.
+        </p>
+        <code
+            class="block rounded bg-muted p-3 text-sm font-semibold tracking-wider break-all"
+            >{{ mfaSecret }}</code
+        >
+    </section>
 
     <Form
         v-bind="store.form()"
-        :reset-on-success="['password', 'password_confirmation']"
+        :reset-on-success="['password', 'password_confirmation', 'mfa_code']"
         v-slot="{ errors, processing }"
         class="flex flex-col gap-5"
     >
@@ -59,7 +85,9 @@ defineOptions({
                     maxlength="64"
                     autocomplete="username"
                     :aria-invalid="Boolean(errors.username)"
-                    :aria-describedby="errors.username ? 'username-error' : undefined"
+                    :aria-describedby="
+                        errors.username ? 'username-error' : undefined
+                    "
                 />
                 <InputError id="username-error" :message="errors.username" />
             </div>
@@ -70,10 +98,12 @@ defineOptions({
                     id="password"
                     name="password"
                     required
-                    minlength="15"
+                    minlength="8"
                     autocomplete="new-password"
                     :aria-invalid="Boolean(errors.password)"
-                    :aria-describedby="errors.password ? 'password-error' : undefined"
+                    :aria-describedby="
+                        errors.password ? 'password-error' : undefined
+                    "
                 />
                 <InputError id="password-error" :message="errors.password" />
             </div>
@@ -84,9 +114,28 @@ defineOptions({
                     id="password_confirmation"
                     name="password_confirmation"
                     required
-                    minlength="15"
+                    minlength="8"
                     autocomplete="new-password"
                 />
+            </div>
+
+            <div class="grid gap-2">
+                <Label for="mfa_code">Authenticator code</Label>
+                <Input
+                    id="mfa_code"
+                    name="mfa_code"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    minlength="6"
+                    maxlength="6"
+                    required
+                    :aria-invalid="Boolean(errors.mfa_code)"
+                    :aria-describedby="
+                        errors.mfa_code ? 'mfa-code-error' : undefined
+                    "
+                />
+                <InputError id="mfa-code-error" :message="errors.mfa_code" />
             </div>
 
             <Button
@@ -103,7 +152,10 @@ defineOptions({
 
     <p class="mt-5 text-center text-sm text-muted-foreground">
         Already set up?
-        <Link :href="login()" class="font-medium text-foreground underline underline-offset-4">
+        <Link
+            :href="login()"
+            class="font-medium text-foreground underline underline-offset-4"
+        >
             Log in
         </Link>
     </p>

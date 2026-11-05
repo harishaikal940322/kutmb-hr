@@ -1,7 +1,7 @@
 # SEC-002 | MFA and Password Policy Transition Plan
 
 > **Date:** 2 November 2026  
-> **Status:** OWNER-SELECTED PLANNING DIRECTION / NOT YET IMPLEMENTED / ORGANIZATIONAL APPROVAL OPEN  
+> **Status:** OWNER-SELECTED PLANNING DIRECTION / LOCAL TECHNICAL SLICE IMPLEMENTED / ORGANIZATIONAL APPROVAL OPEN
 > **Project:** KUTMB HR System, MOD-001 Identity & Access with MOD-003 security/audit  
 > **Linked decisions:** TD-013, TD-015, UM-DEC-005/006/011; requirements IAM-FR-003/004/009, SYS-SEC-001/002  
 > **Scope boundary:** System Core only. HR Core remains ON HOLD.
@@ -59,3 +59,9 @@ This file records the **technical owner's requested planning direction**, not a 
 - `docs/implementation/CURRENT_HANDOFF.md` and relevant release gates
 
 Keep existing requirement and test IDs; record reviewer, date, impact and evidence. Do not mark UM-DEC-011 or production security gates approved merely from a source commit. No implementation or production rollout is authorized by this plan.
+
+## 5 November 2026 implementation status
+
+The local/testing implementation now covers TOTP enrollment and challenge, encrypted secrets, replay prevention, throttling, server-side enforcement behind `IAM_MFA_ENFORCED=false` by default, and hashed single-use recovery codes. The local first-System-Admin bootstrap accepts an 8-character password only after successful TOTP proof and the resulting account still requires TOTP at login. Other password defaults and CLI bootstrap retain the 15-character minimum.
+
+Automated technical checks passed against disposable MySQL, including negative replay/recovery cases and migration rollback. This completes the bounded local implementation slice only; it does not complete the approved P2/P3/P4 rollout conditions. Organizational approval, production enrollment/recovery operations, browser/accessibility acceptance, security review and release gates remain open. Keep global enforcement off until those conditions are resolved, and do not interpret this implementation note as normative requirement approval.
