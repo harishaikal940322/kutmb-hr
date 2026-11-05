@@ -17,7 +17,7 @@
 | Q-011 | Data & privacy | Klasifikasi data, pemisahan akses dan penilaian PDPA yang terpakai? | Critical | Compliance/HR | BLOCKED |
 | Q-012 | Hosting/operasi | Production on-prem/VPS, saluran backup, RPO/RTO dan tanggungjawab restore? | High | IT | OPEN |
 | Q-013 | Performance | Bilangan pengguna, sesi serentak, sasaran prestasi dan SLA? | Medium | IT/HR | OPEN |
-| Q-014 | UI/bahasa | Bahasa Melayu sahaja atau dwibahasa? Peranti utama pengguna? | Medium | HR | OPEN |
+| Q-014 | UI/bahasa | Bahasa Melayu sahaja atau dwibahasa? Peranti utama pengguna? | Medium | HR | PARTIALLY RESOLVED — requestor selected Bahasa Melayu sahaja; primary devices remain open |
 
 ## Resolution protocol
 

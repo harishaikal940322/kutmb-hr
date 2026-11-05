@@ -9,11 +9,11 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Dashboard',
+                title: 'Papan Pemuka',
                 href: dashboard(),
             },
             {
-                title: 'My Profile',
+                title: 'Profil Saya',
                 href: '/profile',
             },
         ],
@@ -40,7 +40,7 @@ function updateDisplayName() {
 </script>
 
 <template>
-    <Head title="My Profile" />
+    <Head title="Profil Saya" />
 
     <section
         aria-labelledby="profile-heading"
@@ -93,7 +93,7 @@ function updateDisplayName() {
                     class="flex items-center gap-2 border-t border-primary-foreground/15 pt-5 text-sm"
                 >
                     <ShieldCheck class="size-4" aria-hidden="true" />
-                    <span>Account status</span>
+                    <span>Status Akaun</span>
                     <span
                         class="ml-auto rounded-full bg-primary-foreground/10 px-2.5 py-1 text-xs font-semibold"
                     >
@@ -193,7 +193,7 @@ function updateDisplayName() {
                         <button
                             type="submit"
                             :disabled="form.processing"
-                            class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                            class="inline-flex h-12 items-center justify-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
                         >
                             {{
                                 form.processing
@@ -219,7 +219,7 @@ function updateDisplayName() {
             class="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-7"
         >
             <div class="space-y-1">
-                <h2 id="my-access-heading" class="font-semibold">My Access</h2>
+                <h2 id="my-access-heading" class="font-semibold">Akses Saya</h2>
                 <p class="text-sm text-muted-foreground">
                     Current role names assigned to your account. Role names are
                     shown for reference and do not define permissions here.
@@ -227,7 +227,7 @@ function updateDisplayName() {
             </div>
 
             <div v-if="myAccess.roleNames.length > 0" class="mt-5">
-                <h3 class="text-sm font-medium">Assigned roles</h3>
+                <h3 class="text-sm font-medium">Peranan Ditugaskan</h3>
                 <ul class="mt-2 flex flex-wrap gap-2">
                     <li
                         v-for="roleName in myAccess.roleNames"

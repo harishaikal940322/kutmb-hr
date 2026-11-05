@@ -40,7 +40,7 @@ watch(
 
 <template>
     <SidebarGroup class="px-2 py-0">
-        <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+        <SidebarGroupLabel>Ruang Kerja</SidebarGroupLabel>
         <SidebarMenu>
             <SidebarMenuItem v-for="item in items" :key="item.title">
                 <SidebarMenuButton
@@ -67,11 +67,11 @@ watch(
                                     isCurrentUrl(item.href),
                                 )
                             "
-                            tooltip="System Administration"
-                            aria-label="Toggle System Administration menu"
+                            tooltip="Pentadbiran Sistem"
+                            aria-label="Buka atau tutup menu Pentadbiran Sistem"
                         >
                             <Settings2 />
-                            <span>System Administration</span>
+                            <span>Pentadbiran Sistem</span>
                             <ChevronDown
                                 class="ml-auto transition-transform"
                                 :class="isAdminOpen ? 'rotate-180' : ''"

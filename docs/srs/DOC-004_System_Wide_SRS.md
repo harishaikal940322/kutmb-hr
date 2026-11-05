@@ -82,6 +82,8 @@ Sistem tidak dianggap DEV READY atau production ready selagi GATE-01 hingga GATE
 
 **Requirement:** Skrin foundation hendaklah boleh digunakan dengan papan kekunci dan pada lebar paparan 360px serta 1280px tanpa menyembunyikan fungsi kritikal.
 
+**Language direction (requestor clarification, 5 November 2026):** Semua paparan dan mesej yang dikawal aplikasi hendaklah menggunakan Bahasa Melayu sahaja. Tiada pilihan dwibahasa. Requirement baseline kekal DRAFT sementara pengesahan dokumen rasmi dibuat.
+
 **Acceptance criterion (AC-SYS-NFR-001):** Fungsi log masuk, pengguna dan tetapan dapat dicapai di dua saiz viewport serta melalui papan kekunci.
 
 **Test case (T-SYS-NFR-001):** UI: keyboard/responsive

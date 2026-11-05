@@ -25,34 +25,34 @@ import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
     {
-        title: 'Dashboard',
+        title: 'Papan Pemuka',
         href: dashboard(),
         icon: LayoutGrid,
     },
     {
-        title: 'My Profile',
+        title: 'Profil Saya',
         href: profile(),
         icon: UserRound,
     },
 ];
 const menuCatalog: Record<string, NavItem> = {
     'users.index': {
-        title: 'User Directory',
+        title: 'Direktori Pengguna',
         href: '/users',
         icon: UsersRound,
     },
     'iam.roles.index': {
-        title: 'Roles',
+        title: 'Peranan',
         href: '/administration/access/roles',
         icon: ShieldCheck,
     },
     'iam.permissions.index': {
-        title: 'Permissions',
+        title: 'Kebenaran',
         href: '/administration/access/permissions',
         icon: KeyRound,
     },
     'iam.menus.index': {
-        title: 'Menu access',
+        title: 'Akses Menu',
         href: '/administration/access/menus',
         icon: MenuIcon,
     },

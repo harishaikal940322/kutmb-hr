@@ -8,7 +8,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Dashboard',
+                title: 'Papan Pemuka',
                 href: dashboard(),
             },
         ],
@@ -20,7 +20,7 @@ const displayName = computed(() => page.props.auth.user?.name ?? 'there');
 </script>
 
 <template>
-    <Head title="Dashboard" />
+    <Head title="Papan Pemuka" />
 
     <section
         class="mx-auto w-full max-w-6xl space-y-7 px-4 py-7 sm:px-6 lg:px-8"
@@ -35,7 +35,7 @@ const displayName = computed(() => page.props.auth.user?.name ?? 'there');
                     System Core
                 </p>
                 <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">
-                    Welcome back, {{ displayName }}
+                    Selamat kembali, {{ displayName }}
                 </h1>
                 <p
                     class="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base"
@@ -69,19 +69,18 @@ const displayName = computed(() => page.props.auth.user?.name ?? 'there');
                 >
                     <div class="space-y-3">
                         <p class="text-sm font-medium text-muted-foreground">
-                            Your workspace
+                            My Profile
                         </p>
                         <h2
                             class="max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl"
                         >
-                            A clear view of your account
+                            Your account details
                         </h2>
                         <p
                             class="max-w-xl text-sm leading-6 text-muted-foreground"
                         >
-                            Your profile shows the identity details currently
-                            associated with your sign-in. Profile information is
-                            read-only in this release.
+                            Review your username and assigned roles, and update
+                            the display name shown on your account.
                         </p>
                     </div>
 
@@ -89,7 +88,7 @@ const displayName = computed(() => page.props.auth.user?.name ?? 'there');
                         :href="profile()"
                         class="group inline-flex min-h-11 w-fit items-center gap-2 rounded-md text-sm font-semibold underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 motion-reduce:transition-none"
                     >
-                        Open My Profile
+                        View or edit profile
                         <ArrowUpRight
                             class="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none"
                             aria-hidden="true"
@@ -107,10 +106,10 @@ const displayName = computed(() => page.props.auth.user?.name ?? 'there');
                     >
                         <CircleCheck class="size-5" aria-hidden="true" />
                     </div>
-                    <h2 class="text-base font-semibold">Account access</h2>
+                    <h2 class="text-base font-semibold">Akses Akaun</h2>
                     <p class="text-sm leading-6 text-muted-foreground">
-                        Your current session is active. Protected pages verify
-                        your account status on the server.
+                        You are signed in to your KUTMB account. Your account
+                        status is checked when you open protected pages.
                     </p>
                 </div>
                 <div
@@ -124,33 +123,5 @@ const displayName = computed(() => page.props.auth.user?.name ?? 'there');
                 </div>
             </aside>
         </div>
-
-        <section
-            aria-labelledby="profile-card-heading"
-            class="rounded-2xl border border-border bg-card p-6 shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-8 sm:p-7"
-        >
-            <div class="flex items-start gap-4">
-                <div
-                    class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"
-                >
-                    <UserRound class="size-5" aria-hidden="true" />
-                </div>
-                <div class="space-y-1">
-                    <h2 id="profile-card-heading" class="font-semibold">
-                        My Profile
-                    </h2>
-                    <p class="max-w-xl text-sm leading-6 text-muted-foreground">
-                        Review your display name, username, email address, and
-                        account status.
-                    </p>
-                </div>
-            </div>
-            <Link
-                :href="profile()"
-                class="mt-5 inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-background px-4 py-2 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none sm:mt-0 sm:shrink-0"
-            >
-                View profile
-            </Link>
-        </section>
     </section>
 </template>

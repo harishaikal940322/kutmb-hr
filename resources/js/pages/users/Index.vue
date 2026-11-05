@@ -59,7 +59,7 @@ function visitPage(page: number) {
 </script>
 
 <template>
-    <Head title="User Directory" />
+    <Head title="Direktori Pengguna" />
 
     <main
         class="mx-auto w-full max-w-6xl space-y-7 px-4 py-7 sm:px-6 lg:px-8"
@@ -75,7 +75,7 @@ function visitPage(page: number) {
                 id="users-heading"
                 class="text-3xl font-semibold tracking-tight sm:text-4xl"
             >
-                User Directory
+                Direktori Pengguna
             </h1>
             <p
                 class="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base"
@@ -85,27 +85,29 @@ function visitPage(page: number) {
         </header>
 
         <form
-            class="flex w-full max-w-2xl flex-col gap-3 sm:flex-row"
+            class="flex w-full max-w-3xl flex-col gap-3 sm:flex-row sm:items-end"
             role="search"
             @submit.prevent="submitSearch"
         >
-            <label for="user-search" class="sr-only"
-                >Search display name or username</label
-            >
-            <input
-                id="user-search"
-                v-model="search"
-                type="search"
-                name="search"
-                maxlength="100"
-                autocomplete="off"
-                placeholder="Search display name or username"
-                class="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 motion-reduce:transition-none"
-            />
+            <div class="min-w-0 flex-1 space-y-2">
+                <label for="user-search" class="text-sm font-medium">
+                    Search accounts
+                </label>
+                <input
+                    id="user-search"
+                    v-model="search"
+                    type="search"
+                    name="search"
+                    maxlength="100"
+                    autocomplete="off"
+                    placeholder="Name or username"
+                    class="h-12 w-full min-w-0 rounded-md border border-input bg-background px-3 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 motion-reduce:transition-none md:text-sm"
+                />
+            </div>
             <button
                 type="submit"
                 :disabled="loading"
-                class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs transition-colors outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60 motion-reduce:transition-none"
+                class="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow-xs transition-colors outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60 motion-reduce:transition-none"
             >
                 <Search class="size-4" aria-hidden="true" />
                 Search
@@ -121,7 +123,7 @@ function visitPage(page: number) {
                 class="flex items-center justify-between border-b border-border px-5 py-4 sm:px-6"
             >
                 <div>
-                    <h2 class="font-semibold">Accounts</h2>
+                    <h2 class="font-semibold">Akaun</h2>
                     <p
                         class="mt-1 text-sm text-muted-foreground"
                         aria-live="polite"
@@ -143,6 +145,14 @@ function visitPage(page: number) {
             </div>
 
             <div v-if="users.length" class="divide-y divide-border">
+                <div
+                    class="hidden grid-cols-[minmax(0,1fr)_minmax(12rem,0.7fr)_auto] items-center gap-3 bg-muted/40 px-5 py-3 text-xs font-semibold text-muted-foreground sm:grid sm:px-6"
+                    aria-hidden="true"
+                >
+                    <span>Nama Paparan</span>
+                    <span>Nama Pengguna</span>
+                    <span>Status</span>
+                </div>
                 <article
                     v-for="user in users"
                     :key="user.username"
@@ -176,13 +186,13 @@ function visitPage(page: number) {
             </div>
 
             <div v-else-if="filters.search" class="px-6 py-14 text-center">
-                <h3 class="font-semibold">No users found</h3>
+                <h3 class="font-semibold">Tiada pengguna ditemui</h3>
                 <p class="mt-2 text-sm text-muted-foreground">
                     Try another display name or username.
                 </p>
             </div>
             <div v-else class="px-6 py-14 text-center">
-                <h3 class="font-semibold">No users yet</h3>
+                <h3 class="font-semibold">Belum ada pengguna</h3>
                 <p class="mt-2 text-sm text-muted-foreground">
                     There are no directory accounts to show.
                 </p>
@@ -196,7 +206,7 @@ function visitPage(page: number) {
                 <button
                     type="button"
                     :disabled="pagination.currentPage <= 1 || loading"
-                    class="rounded-md border border-input px-3 py-2 text-sm font-medium outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                    class="min-h-11 rounded-md border border-input px-4 py-2 text-sm font-medium outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
                     @click="visitPage(pagination.currentPage - 1)"
                 >
                     Previous
@@ -210,7 +220,7 @@ function visitPage(page: number) {
                     :disabled="
                         pagination.currentPage >= pagination.lastPage || loading
                     "
-                    class="rounded-md border border-input px-3 py-2 text-sm font-medium outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                    class="min-h-11 rounded-md border border-input px-4 py-2 text-sm font-medium outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
                     @click="visitPage(pagination.currentPage + 1)"
                 >
                     Next
