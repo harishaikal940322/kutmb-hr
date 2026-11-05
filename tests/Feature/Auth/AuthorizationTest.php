@@ -67,8 +67,8 @@ class AuthorizationTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $this->assertFalse(Gate::forUser($user)->allows('permission', 'permission.does.not.exist'));
-        $this->assertFalse(Gate::allows('permission', 'synthetic.resource.view'));
+        $this->assertFalse($user->can('permission.does.not.exist'));
+        $this->assertFalse(Gate::allows('synthetic.resource.view'));
     }
 
     public function test_user_without_a_role_is_denied(): void
@@ -76,7 +76,7 @@ class AuthorizationTest extends TestCase
         $user = User::factory()->create();
         Permission::create(['code' => 'synthetic.resource.view', 'name' => 'Synthetic view']);
 
-        $this->assertFalse(Gate::forUser($user)->allows('permission', 'synthetic.resource.view'));
+        $this->assertFalse($user->can('synthetic.resource.view'));
     }
 
     public function test_user_without_the_requested_permission_is_denied(): void
@@ -85,7 +85,7 @@ class AuthorizationTest extends TestCase
         $role = Role::create(['code' => 'SYNTHETIC_READER', 'name' => 'Synthetic reader']);
         $user->roles()->attach($role);
 
-        $this->assertFalse(Gate::forUser($user)->allows('permission', 'synthetic.resource.view'));
+        $this->assertFalse($user->can('synthetic.resource.view'));
     }
 
     public function test_synthetic_role_permission_grants_the_gate_and_http_route(): void
@@ -96,7 +96,7 @@ class AuthorizationTest extends TestCase
         $user->roles()->attach($role);
         $role->permissions()->attach($permission);
 
-        $this->assertTrue(Gate::forUser($user)->allows('permission', 'synthetic.resource.view'));
+        $this->assertTrue($user->can('synthetic.resource.view'));
         $this->actingAs($user)->get('/_tests/authorization-probe')->assertOk()->assertSeeText('authorized');
     }
 
@@ -109,7 +109,7 @@ class AuthorizationTest extends TestCase
         $role->permissions()->attach($permission);
 
         $this->actingAs($user)->get('/_tests/authorization-probe')->assertOk();
-        $role->permissions()->detach($permission);
+        $role->revokePermissionTo($permission);
 
         $this->get('/_tests/authorization-probe')->assertForbidden();
         $this->assertAuthenticatedAs($user);
@@ -119,7 +119,7 @@ class AuthorizationTest extends TestCase
     {
         $user = User::factory()->create(['status' => 'INACTIVE']);
 
-        $this->assertFalse(Gate::forUser($user)->allows('permission', 'synthetic.resource.view'));
+        $this->assertFalse($user->can('synthetic.resource.view'));
     }
 
     public function test_null_username_user_is_denied_by_the_gate(): void
@@ -130,7 +130,7 @@ class AuthorizationTest extends TestCase
             'username_canonical' => null,
         ]);
 
-        $this->assertFalse(Gate::forUser($user)->allows('permission', 'synthetic.resource.view'));
+        $this->assertFalse($user->can('synthetic.resource.view'));
     }
 
     public function test_explicit_policy_denial_cannot_be_overridden_by_matching_rbac_permission(): void
@@ -139,7 +139,7 @@ class AuthorizationTest extends TestCase
         $target = new SyntheticTarget(['name' => 'Forbidden target']);
         $this->grantTargetPermission($user);
 
-        $this->assertTrue(Gate::forUser($user)->allows('permission', 'synthetic.target.view'));
+        $this->assertTrue($user->can('synthetic.target.view'));
         $this->assertFalse(Gate::forUser($user)->allows('view', $target));
     }
 
@@ -179,7 +179,7 @@ class SyntheticTargetPolicy
 {
     public function view(User $user, SyntheticTarget $target): bool
     {
-        return Gate::forUser($user)->allows('permission', 'synthetic.target.view')
+        return $user->can('synthetic.target.view')
             && $target->name === 'Allowed target';
     }
 }

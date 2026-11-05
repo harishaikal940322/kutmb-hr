@@ -22,8 +22,8 @@ class ProfileController extends Controller
         }
 
         $roleNames = $user->roles()
-            ->orderBy('roles.name')
-            ->pluck('roles.name')
+            ->orderBy('roles.label')
+            ->pluck('roles.label')
             ->all();
 
         return Inertia::render('MyProfile', [

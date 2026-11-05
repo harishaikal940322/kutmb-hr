@@ -2,8 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Identity\NavigationMenuService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -45,7 +45,10 @@ class HandleInertiaRequests extends Middleware
             'userDirectoryPreview' => app()->environment(['local', 'testing'])
                 && (bool) config('iam.local_user_directory_preview_enabled')
                 && $request->user() !== null
-                && Gate::forUser($request->user())->allows('permission', 'iam.users.view'),
+                && $request->user()->can('iam.users.view'),
+            'visibleMenuKeys' => $request->user() === null
+                ? []
+                : app(NavigationMenuService::class)->visibleKeys($request->user()),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

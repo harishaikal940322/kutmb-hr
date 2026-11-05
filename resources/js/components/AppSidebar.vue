@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { LayoutGrid, UsersRound, UserRound } from '@lucide/vue';
+import {
+    KeyRound,
+    LayoutGrid,
+    Menu as MenuIcon,
+    ShieldCheck,
+    UsersRound,
+    UserRound,
+} from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -28,7 +35,29 @@ const mainNavItems: NavItem[] = [
         icon: UserRound,
     },
 ];
-const page = usePage<{ userDirectoryPreview: boolean }>();
+const menuCatalog: Record<string, NavItem> = {
+    'users.index': {
+        title: 'User Directory',
+        href: '/users',
+        icon: UsersRound,
+    },
+    'iam.roles.index': {
+        title: 'Roles',
+        href: '/administration/access/roles',
+        icon: ShieldCheck,
+    },
+    'iam.permissions.index': {
+        title: 'Permissions',
+        href: '/administration/access/permissions',
+        icon: KeyRound,
+    },
+    'iam.menus.index': {
+        title: 'Menu access',
+        href: '/administration/access/menus',
+        icon: MenuIcon,
+    },
+};
+const page = usePage<{ visibleMenuKeys: string[] }>();
 </script>
 
 <template>
@@ -49,15 +78,9 @@ const page = usePage<{ userDirectoryPreview: boolean }>();
             <NavMain
                 :items="[
                     ...mainNavItems,
-                    ...(page.props.userDirectoryPreview
-                        ? [
-                              {
-                                  title: 'User Directory',
-                                  href: '/users',
-                                  icon: UsersRound,
-                              },
-                          ]
-                        : []),
+                    ...page.props.visibleMenuKeys
+                        .map((key) => menuCatalog[key])
+                        .filter((item): item is NavItem => item !== undefined),
                 ]"
             />
         </SidebarContent>

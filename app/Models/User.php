@@ -7,11 +7,11 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Spatie\Permission\Traits\HasRoles;
 
 /**
  * @property int $id
@@ -34,7 +34,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, HasRoles, Notifiable, TwoFactorAuthenticatable;
 
     public function setUsernameAttribute(?string $value): void
     {
@@ -47,12 +47,6 @@ class User extends Authenticatable
 
         $this->attributes['username'] = $value;
         $this->attributes['username_canonical'] = UsernameCanonicalizer::canonicalize($value);
-    }
-
-    /** @return BelongsToMany<Role, $this> */
-    public function roles(): BelongsToMany
-    {
-        return $this->belongsToMany(Role::class, 'user_roles');
     }
 
     /**

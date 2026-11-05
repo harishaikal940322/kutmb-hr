@@ -46,9 +46,9 @@ class BootstrapLocalAccountTest extends TestCase
         $this->assertSame('ACTIVE', $user->status);
         $this->assertNotSame($password, $user->password);
         $this->assertTrue(Hash::check($password, $user->password));
-        $this->assertDatabaseCount('user_roles', 0);
+        $this->assertDatabaseCount('legacy_user_roles', 0);
         $this->assertDatabaseCount('roles', 0);
-        $this->assertDatabaseCount('permissions', 0);
+        $this->assertDatabaseCount('permissions', 2);
         $this->assertDatabaseHas('audit_events', [
             'actor_id' => null,
             'action_code' => 'iam.local_account_bootstrap',

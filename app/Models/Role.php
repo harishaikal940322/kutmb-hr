@@ -2,22 +2,34 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Spatie\Permission\Models\Role as SpatieRole;
 
-#[Fillable(['code', 'name'])]
-class Role extends Model
+/**
+ * @property string $code
+ * @property string $name
+ * @property string $label
+ * @property bool $is_system
+ */
+class Role extends SpatieRole
 {
-    /** @return BelongsToMany<User, $this> */
-    public function users(): BelongsToMany
-    {
-        return $this->belongsToMany(User::class, 'user_roles');
-    }
+    protected $fillable = ['code', 'name', 'guard_name', 'label', 'is_system'];
 
-    /** @return BelongsToMany<Permission, $this> */
-    public function permissions(): BelongsToMany
+    /** @param array<string, mixed> $attributes */
+    public static function create(array $attributes = [])
     {
-        return $this->belongsToMany(Permission::class, 'role_permissions');
+        $code = $attributes['code'] ?? $attributes['name'] ?? null;
+        $label = $attributes['label'] ?? (isset($attributes['code']) ? ($attributes['name'] ?? $code) : $code);
+
+        $role = parent::create([
+            ...$attributes,
+            'code' => $code,
+            'name' => $code,
+            'guard_name' => $attributes['guard_name'] ?? 'web',
+            'label' => $label,
+        ]);
+
+        assert($role instanceof static);
+
+        return $role;
     }
 }

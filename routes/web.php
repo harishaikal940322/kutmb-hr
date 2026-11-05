@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\IdentityMenuAccessController;
+use App\Http\Controllers\IdentityPermissionController;
+use App\Http\Controllers\IdentityRoleController;
 use App\Http\Controllers\LocalSystemAdminBootstrapController;
 use App\Http\Controllers\MfaController;
 use App\Http\Controllers\ProfileController;
@@ -30,6 +33,19 @@ Route::middleware(['auth', 'active-account'])->group(function () {
         ->middleware('password.confirm')
         ->name('mfa.setup.confirm');
 });
+
+Route::middleware(['protected', 'can:iam.rbac.manage'])
+    ->prefix('administration/access')
+    ->name('iam.')
+    ->group(function (): void {
+        Route::get('roles', [IdentityRoleController::class, 'index'])->name('roles.index');
+        Route::post('roles', [IdentityRoleController::class, 'store'])->name('roles.store');
+        Route::patch('roles/{role}', [IdentityRoleController::class, 'update'])->name('roles.update');
+        Route::delete('roles/{role}', [IdentityRoleController::class, 'destroy'])->name('roles.destroy');
+        Route::get('permissions', IdentityPermissionController::class)->name('permissions.index');
+        Route::get('menus', [IdentityMenuAccessController::class, 'index'])->name('menus.index');
+        Route::put('menus', [IdentityMenuAccessController::class, 'update'])->name('menus.update');
+    });
 
 Route::middleware('protected')->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');

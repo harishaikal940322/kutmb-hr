@@ -3,6 +3,7 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\AuditEvent;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRecoveryCode;
@@ -36,7 +37,7 @@ class LocalSystemAdminBootstrapTest extends TestCase
             ->assertRedirect(route('login'));
 
         $this->assertDatabaseCount('users', 1);
-        $this->assertDatabaseCount('user_roles', 0);
+        $this->assertDatabaseCount('legacy_user_roles', 0);
     }
 
     public function test_bootstrap_qr_is_private_session_bound_and_removed_after_first_account_creation(): void
@@ -87,8 +88,12 @@ class LocalSystemAdminBootstrapTest extends TestCase
         $this->assertNotNull($user->two_factor_secret);
         $this->assertSame(10, UserRecoveryCode::query()->where('user_id', $user->getKey())->count());
         $this->assertTrue($user->roles()->whereKey($role->getKey())->exists());
-        $this->assertDatabaseCount('user_roles', 1);
-        $this->assertDatabaseCount('role_permissions', 0);
+        $this->assertDatabaseCount('model_has_roles', 1);
+        $this->assertTrue($role->hasPermissionTo('iam.rbac.manage'));
+        $this->assertDatabaseHas('role_has_permissions', [
+            'role_id' => $role->id,
+            'permission_id' => Permission::findByName('iam.rbac.manage', 'web')->id,
+        ]);
         $this->assertDatabaseHas('audit_events', [
             'actor_id' => null,
             'action_code' => 'iam.local_system_admin_bootstrap',

@@ -8,7 +8,6 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -126,18 +125,18 @@ class MyProfileTest extends TestCase
 
         $this->actingAs($user)->get(route('profile'))->assertOk();
 
-        $this->assertDatabaseCount('user_roles', 0);
-        $this->assertFalse(Gate::forUser($user)->allows('permission', 'users.manage'));
-        $this->assertFalse(Gate::forUser($user)->allows('permission', 'roles.manage'));
+        $this->assertDatabaseCount('legacy_user_roles', 0);
+        $this->assertFalse($user->can('users.manage'));
+        $this->assertFalse($user->can('roles.manage'));
     }
 
     public function test_my_access_shows_only_the_current_users_role_names_and_no_permission_graph(): void
     {
         $user = User::factory()->create(['username' => 'access.owner']);
         $other = User::factory()->create(['username' => 'access.other']);
-        $role = Role::query()->create(['code' => 'synthetic-viewer', 'name' => 'Synthetic Viewer']);
-        $otherRole = Role::query()->create(['code' => 'synthetic-operator', 'name' => 'Synthetic Operator']);
-        $permission = Permission::query()->create(['code' => 'synthetic.read', 'name' => 'Synthetic Read']);
+        $role = Role::create(['code' => 'synthetic-viewer', 'name' => 'Synthetic Viewer']);
+        $otherRole = Role::create(['code' => 'synthetic-operator', 'name' => 'Synthetic Operator']);
+        $permission = Permission::create(['code' => 'synthetic.read', 'name' => 'Synthetic Read']);
 
         $user->roles()->attach($role);
         $role->permissions()->attach($permission);
@@ -166,7 +165,7 @@ class MyProfileTest extends TestCase
     public function test_role_assignment_changes_are_reflected_on_the_next_profile_request(): void
     {
         $user = User::factory()->create(['username' => 'access.refresh']);
-        $role = Role::query()->create(['code' => 'synthetic-member', 'name' => 'Synthetic Member']);
+        $role = Role::create(['code' => 'synthetic-member', 'name' => 'Synthetic Member']);
 
         $this->actingAs($user)->get(route('profile'))
             ->assertInertia(fn (Assert $page) => $page

@@ -106,9 +106,10 @@ class ProtectedRoleMutationConcurrencyTest extends TestCase
     {
         $this->assertSame(1, count(array_filter($results, fn (array $result): bool => $result['result'] === 'success')));
         $this->assertSame(1, count(array_filter($results, fn (array $result): bool => $result['result'] === 'failed')));
-        $this->assertSame(1, DB::table('user_roles')
-            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
-            ->join('users', 'users.id', '=', 'user_roles.user_id')
+        $this->assertSame(1, DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->join('users', 'users.id', '=', 'model_has_roles.model_id')
+            ->where('model_has_roles.model_type', User::class)
             ->where('roles.code', 'SYNTHETIC_CONCURRENT_PROTECTED')
             ->where('users.status', 'ACTIVE')
             ->whereNotNull('users.username')

@@ -159,31 +159,47 @@ class IdentityRbacSchemaTest extends TestCase
         Permission::create(['code' => 'test.read', 'name' => 'Test Read']);
 
         try {
-            Role::create(['code' => 'TEST_ROLE', 'name' => 'Duplicate']);
+            DB::table('roles')->insert([
+                'code' => 'TEST_ROLE',
+                'name' => 'duplicate-role-name',
+                'guard_name' => 'web',
+                'label' => 'Duplicate',
+                'is_system' => false,
+            ]);
             $this->fail('Duplicate role code was accepted.');
         } catch (QueryException) {
             $this->assertDatabaseCount('roles', 1);
         }
 
         $this->expectException(QueryException::class);
-        Permission::create(['code' => 'test.read', 'name' => 'Duplicate']);
+        DB::table('permissions')->insert([
+            'code' => 'test.read',
+            'name' => 'duplicate.permission.name',
+            'guard_name' => 'web',
+            'label' => 'Duplicate',
+        ]);
     }
 
     public function test_foreign_keys_reject_missing_related_rows_and_restrict_deletion(): void
     {
         try {
-            DB::table('user_roles')->insert(['user_id' => 987654, 'role_id' => 987654]);
+            DB::table('legacy_user_roles')->insert(['user_id' => 987654, 'role_id' => 987654]);
             $this->fail('Invalid role assignment was accepted.');
         } catch (QueryException) {
-            $this->assertDatabaseCount('user_roles', 0);
+            $this->assertDatabaseCount('legacy_user_roles', 0);
         }
 
         $user = User::factory()->create();
         $role = Role::create(['code' => 'TEST_ROLE', 'name' => 'Test Role']);
         $user->roles()->attach($role);
 
-        $this->expectException(QueryException::class);
+        $this->assertDatabaseHas('model_has_roles', [
+            'role_id' => $role->id,
+            'model_type' => User::class,
+            'model_id' => $user->id,
+        ]);
         $role->delete();
+        $this->assertDatabaseMissing('model_has_roles', ['role_id' => $role->id]);
     }
 
     public function test_duplicate_pivot_relationship_is_rejected_by_composite_key(): void
@@ -277,6 +293,7 @@ class IdentityRbacSchemaTest extends TestCase
         $this->assertFalse(collect($tables)->contains(fn (string $table): bool => str_contains(strtolower($table), 'employee')));
         $this->assertDatabaseCount('users', 0);
         $this->assertDatabaseCount('roles', 0);
-        $this->assertDatabaseCount('permissions', 0);
+        $this->assertDatabaseCount('permissions', 2);
+        $this->assertDatabaseHas('permissions', ['code' => 'iam.rbac.manage']);
     }
 }

@@ -1,5 +1,15 @@
 # Current Development Handoff
 
+## 5 November 2026 — Spatie RBAC administration foundation
+
+- Adopted `spatie/laravel-permission` 8.3.2 using the existing `Role`, `Permission`, and `User` models. Existing role and permission codes are preserved as package permission/role names; existing user-role and role-permission rows are copied into package pivots. Legacy pivot tables are retained for rollback compatibility. Menu access mappings use registered code-owned menu keys.
+- Added protected System Admin screens for role creation/editing, the permission catalog, and menu-to-permission mapping. Backend routes require `iam.rbac.manage`; menu visibility is a server-computed presentation hint. The access-control permission is system-only, the System Admin role is immutable, and assigned roles cannot be deleted. Changes are audited.
+- The local/testing first-System-Admin bootstrap seeds only the access-control grant needed to operate these screens. Role assignment to normal users, invitations, public registration, production bootstrap, account lifecycle administration, and HR Core remain out of scope. The permission catalog and menu labels/routes remain code-owned; the UI maps registered menus to catalog permissions.
+- Permission relations are cleared from the authenticated model before each protected request to ensure changes are effective on the next request, including long-lived workers. Existing active-account, target-policy, and last-admin protections remain in place.
+- Checks completed with `./bin/dev mysql-test`: dependency install/audit (npm audit 0 vulnerabilities), asset build, migrations up/down/up on disposable MySQL 26.10.0, Pint (84 files), PHPStan (no errors), frontend format/lint/type checks, and **118 tests / 858 assertions passed**. `git diff --check` passed. The UI was source-reviewed and compiled; no live browser visual acceptance was performed in this pass.
+- Technical implementation does not approve organizational role policy, production access, or account-invitation requirements. Open decisions and release gates remain open; MFA enforcement and password rules were not changed.
+- Applied both additive RBAC migrations to the current development database with `./bin/dev migrate`; the migration command completed successfully. No destructive database operation was run. Next: commit and push the verified implementation on `main`. Preserve unrelated local Dashboard, My Profile, User Directory, and `docker/` edits.
+
 > **Checkpoint:** 4 November 2026 · **Starting `main` sync:** `c7f22426e6958a3ef12c5101056d207d46119cd8`
 > **Status:** System Core baseline through WP-070D1; simplified owner-directed development workflow adopted. This records technical state, not organizational approval.
 

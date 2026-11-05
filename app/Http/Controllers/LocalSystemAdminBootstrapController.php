@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditEvent;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Identity\AuthenticatorQrCode;
@@ -117,8 +118,23 @@ class LocalSystemAdminBootstrapController extends Controller
 
             $role = Role::query()->firstOrCreate(
                 ['code' => 'system-admin'],
-                ['name' => 'System Admin'],
+                [
+                    'name' => 'system-admin',
+                    'guard_name' => 'web',
+                    'label' => 'System Admin',
+                    'is_system' => true,
+                ],
             );
+            $managementPermission = Permission::query()->firstOrCreate(
+                ['code' => 'iam.rbac.manage'],
+                [
+                    'name' => 'iam.rbac.manage',
+                    'guard_name' => 'web',
+                    'label' => 'Manage access control',
+                    'description' => 'Manage system roles, role permissions, and menu access.',
+                ],
+            );
+            $role->givePermissionTo($managementPermission);
 
             $user = User::query()->create([
                 'name' => $name,
@@ -131,7 +147,7 @@ class LocalSystemAdminBootstrapController extends Controller
                 'two_factor_confirmed_at' => now(),
                 'two_factor_last_used_at' => $matchedTimestamp,
             ])->save();
-            $user->roles()->attach($role->getKey());
+            $user->assignRole($role);
             $codes = $recoveryCodes->issue($user);
 
             AuditEvent::query()->create([

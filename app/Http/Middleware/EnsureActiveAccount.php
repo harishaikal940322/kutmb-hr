@@ -26,6 +26,11 @@ class EnsureActiveAccount
             return redirect()->route('login');
         }
 
+        // Spatie caches these Eloquent relations on the authenticated model.
+        // A long-lived worker or a multi-request test can otherwise retain
+        // permissions revoked by an earlier privileged request.
+        $user?->unsetRelation('roles')->unsetRelation('permissions');
+
         return $next($request);
     }
 }

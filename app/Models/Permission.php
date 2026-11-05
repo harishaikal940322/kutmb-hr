@@ -2,16 +2,34 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Spatie\Permission\Models\Permission as SpatiePermission;
 
-#[Fillable(['code', 'name'])]
-class Permission extends Model
+/**
+ * @property string $code
+ * @property string $name
+ * @property string $label
+ * @property string|null $description
+ */
+class Permission extends SpatiePermission
 {
-    /** @return BelongsToMany<Role, $this> */
-    public function roles(): BelongsToMany
+    protected $fillable = ['code', 'name', 'guard_name', 'label', 'description'];
+
+    /** @param array<string, mixed> $attributes */
+    public static function create(array $attributes = [])
     {
-        return $this->belongsToMany(Role::class, 'role_permissions');
+        $code = $attributes['code'] ?? $attributes['name'] ?? null;
+        $label = $attributes['label'] ?? (isset($attributes['code']) ? ($attributes['name'] ?? $code) : $code);
+
+        $permission = parent::create([
+            ...$attributes,
+            'code' => $code,
+            'name' => $code,
+            'guard_name' => $attributes['guard_name'] ?? 'web',
+            'label' => $label,
+        ]);
+
+        assert($permission instanceof static);
+
+        return $permission;
     }
 }

@@ -193,7 +193,7 @@ class UserDirectoryTest extends TestCase
     private function grantDirectoryPermission(User $user): void
     {
         $role = Role::create(['code' => 'SYNTHETIC_DIRECTORY_READER', 'name' => 'Synthetic directory reader']);
-        $permission = Permission::create(['code' => 'iam.users.view', 'name' => 'Synthetic user directory view']);
+        $permission = Permission::query()->where('code', 'iam.users.view')->firstOrFail();
         $user->roles()->attach($role);
         $role->permissions()->attach($permission);
     }

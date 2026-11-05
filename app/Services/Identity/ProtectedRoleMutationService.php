@@ -4,6 +4,7 @@ namespace App\Services\Identity;
 
 use App\Models\AuditEvent;
 use App\Models\Role;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -44,9 +45,10 @@ class ProtectedRoleMutationService
 
             $mutation();
 
-            $eligibleCount = DB::table('user_roles')
-                ->join('users', 'users.id', '=', 'user_roles.user_id')
-                ->where('user_roles.role_id', $role->id)
+            $eligibleCount = DB::table('model_has_roles')
+                ->join('users', 'users.id', '=', 'model_has_roles.model_id')
+                ->where('model_has_roles.role_id', $role->id)
+                ->where('model_has_roles.model_type', User::class)
                 ->where('users.status', 'ACTIVE')
                 ->whereNotNull('users.username')
                 ->count();

@@ -31,7 +31,7 @@ class ProtectedRoleMutationServiceTest extends TestCase
         }
 
         $this->assertSame('ACTIVE', $user->fresh()->status);
-        $this->assertDatabaseHas('user_roles', ['user_id' => $user->id, 'role_id' => $role->id]);
+        $this->assertDatabaseHas('model_has_roles', ['model_type' => User::class, 'model_id' => $user->id, 'role_id' => $role->id]);
         $this->assertDatabaseCount('audit_events', 0);
     }
 
@@ -123,7 +123,11 @@ class ProtectedRoleMutationServiceTest extends TestCase
             ['source' => 'service_test', 'changed_fields' => [$operation === 'revoke' ? 'role' : 'status']],
             static function () use ($target, $role, $operation): void {
                 if ($operation === 'revoke') {
-                    DB::table('user_roles')->where('user_id', $target->id)->where('role_id', $role->id)->delete();
+                    DB::table('model_has_roles')
+                        ->where('model_type', User::class)
+                        ->where('model_id', $target->id)
+                        ->where('role_id', $role->id)
+                        ->delete();
                 } else {
                     DB::table('users')->where('id', $target->id)->update(['status' => 'INACTIVE']);
                 }

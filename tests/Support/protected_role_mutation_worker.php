@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use App\Services\Identity\ProtectedRoleMutationService;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
@@ -28,7 +29,11 @@ try {
             usleep(2000000);
             if ($operation === 'revoke') {
                 $roleId = DB::table('roles')->where('code', $roleCode)->value('id');
-                DB::table('user_roles')->where('user_id', $targetId)->where('role_id', $roleId)->delete();
+                DB::table('model_has_roles')
+                    ->where('model_type', User::class)
+                    ->where('model_id', $targetId)
+                    ->where('role_id', $roleId)
+                    ->delete();
             } else {
                 DB::table('users')->where('id', $targetId)->update(['status' => 'INACTIVE']);
             }
