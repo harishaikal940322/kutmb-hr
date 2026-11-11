@@ -20,6 +20,8 @@
 |---|---|---|---|---|
 | CT-DEC-001 | Pelulus akhir Cuti Tahunan Pengurus Besar | **Pengerusi ALK** dipilih sebagai pelulus akhir semua permohonan Cuti Tahunan Pengurus Besar, tanpa mengira tempoh cuti. | `docs/requirements/modules/CUTI_TAHUNAN_V1.docx` v0.3: FR-20 dan FR-23 menyatakan Setiausaha ALK; BR-27 menyatakan Pengerusi ALK. | **OWNER DIRECTION / PENDING HR SIGN-OFF.** Apabila dibenarkan, selaraskan percanggahan di FR-20, FR-23, matriks peranan/workflow, RTM dan SRS. Jangan anggap keputusan owner ini sebagai kelulusan HR atau memulakan HR Core implementation. |
 
+| CT-DEC-002 | Permohonan dan kelulusan apabila baki cuti tidak mencukupi | **Benarkan permohonan dan kelulusan yang menghasilkan baki cuti negatif**, tertakluk kepada kawalan authorization dan audit yang akan diperincikan. Tiada had negatif, mekanisme pelarasan, pembawa ke tahun berikutnya, atau kuasa kelulusan pengecualian dianggap diluluskan dalam keputusan ini. | `docs/requirements/modules/CUTI_TAHUNAN_V1.docx` v0.3: FR-08/FR-21 menekankan tempahan baki dan pencegahan melebihi kelayakan; BR-23 membenarkan permohonan apabila baki tidak mencukupi atau negatif dengan amaran. | **OWNER DIRECTION / PENDING HR SIGN-OFF.** Semak semula FR-08, FR-21, BR-23, tempahan pending, status baki negatif, akses pelulus, audit transaksi serta acceptance criteria/RTM melalui kawalan perubahan yang sah. **Bukan** HR approval atau authorization implementation. |
+
 ## ADR lifecycle
 
 `PROPOSED` / `ASSUMPTION` / `OPEN` → reviewed decision with explicit approver/date/rationale → `ACCEPTED` or `REJECTED` → `SUPERSEDED` if replaced. Never equate proposal with business authorization. Later technical ADRs should use separate Markdown files and reference this register.
