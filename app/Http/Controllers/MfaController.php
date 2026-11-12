@@ -20,6 +20,8 @@ class MfaController extends Controller
 {
     public function show(Request $request): Response
     {
+        $this->ensureMfaEnabled();
+
         /** @var User $user */
         $user = $request->user();
 
@@ -33,6 +35,8 @@ class MfaController extends Controller
 
     public function qrCode(Request $request, AuthenticatorQrCode $qrCode): HttpResponse
     {
+        $this->ensureMfaEnabled();
+
         /** @var User $user */
         $user = $request->user();
 
@@ -50,6 +54,8 @@ class MfaController extends Controller
 
     public function start(Request $request): RedirectResponse
     {
+        $this->ensureMfaEnabled();
+
         /** @var User $user */
         $user = $request->user();
 
@@ -68,6 +74,8 @@ class MfaController extends Controller
 
     public function confirm(Request $request, RecoveryCodeService $recoveryCodes): RedirectResponse
     {
+        $this->ensureMfaEnabled();
+
         /** @var User $user */
         $user = $request->user();
         $validated = $request->validate([
@@ -108,5 +116,10 @@ class MfaController extends Controller
         return to_route('mfa.setup')
             ->with('status', 'Multi-factor authentication is enabled. Save these one-time recovery codes in a secure place.')
             ->with('iam.recovery_codes', $codes);
+    }
+
+    private function ensureMfaEnabled(): void
+    {
+        abort_unless(config('iam.mfa_enabled'), 404);
     }
 }

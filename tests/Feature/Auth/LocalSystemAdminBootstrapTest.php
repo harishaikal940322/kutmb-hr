@@ -114,6 +114,41 @@ class LocalSystemAdminBootstrapTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_local_bootstrap_without_mfa_uses_an_eight_character_password_minimum(): void
+    {
+        config([
+            'app.env' => 'local',
+            'iam.local_account_bootstrap_enabled' => true,
+            'iam.mfa_enabled' => false,
+            'iam.mfa_enforced' => false,
+            'iam.single_factor_password_minimum' => 8,
+            'fortify.features' => [],
+        ]);
+
+        $this->get(route('register'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('auth/Register')
+                ->where('mfaEnabled', false)
+                ->where('passwordMinimum', 8)
+            );
+        $this->get(route('register.mfa.qr-code'))->assertNotFound();
+
+        $password = 'dev-pass';
+        $this->post(route('register.store'), $this->validAccountPayload($password))
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('status', 'System Administrator account created for local development.')
+            ->assertSessionMissing('iam.recovery_codes');
+
+        $user = User::query()->where('username_canonical', 'first.admin')->sole();
+        $this->assertFalse($user->hasEnabledTwoFactorAuthentication());
+        $this->post(route('login.store'), [
+            'username' => $user->username,
+            'password' => $password,
+        ])->assertRedirect('/dashboard');
+        $this->assertAuthenticatedAs($user);
+    }
+
     public function test_bootstrap_route_is_unavailable_in_production_even_when_opted_in(): void
     {
         $this->app->detectEnvironment(fn (): string => 'production');

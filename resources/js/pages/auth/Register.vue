@@ -9,6 +9,8 @@ import { Spinner } from '@/components/ui/spinner';
 import { store } from '@/routes/register';
 import { login } from '@/routes';
 
+defineProps<{ mfaEnabled: boolean; passwordMinimum: number }>();
+
 defineOptions({
     layout: {
         title: 'Set up the first System Administrator',
@@ -25,11 +27,16 @@ defineOptions({
         class="mb-5 rounded-md border border-border bg-muted/40 px-4 py-3 text-sm leading-5 text-muted-foreground"
     >
         This one-time setup is available only while the system has no accounts.
-        The first account receives the System Admin role and must enroll an
-        authenticator before it is created.
+        The first account receives the System Admin role.
+        {{
+            mfaEnabled
+                ? 'It must enroll an authenticator before the account is created.'
+                : `Use a password of at least ${passwordMinimum} characters for password-only development sign-in.`
+        }}
     </p>
 
     <section
+        v-if="mfaEnabled"
         class="mb-5 space-y-2 rounded-md border border-border px-4 py-3"
         aria-labelledby="mfa-setup-heading"
     >
@@ -101,7 +108,7 @@ defineOptions({
                     id="password"
                     name="password"
                     required
-                    minlength="8"
+                    :minlength="passwordMinimum"
                     autocomplete="new-password"
                     :aria-invalid="Boolean(errors.password)"
                     :aria-describedby="
@@ -117,12 +124,12 @@ defineOptions({
                     id="password_confirmation"
                     name="password_confirmation"
                     required
-                    minlength="8"
+                    :minlength="passwordMinimum"
                     autocomplete="new-password"
                 />
             </div>
 
-            <div class="grid gap-2">
+            <div v-if="mfaEnabled" class="grid gap-2">
                 <Label for="mfa_code">Authenticator code</Label>
                 <Input
                     id="mfa_code"

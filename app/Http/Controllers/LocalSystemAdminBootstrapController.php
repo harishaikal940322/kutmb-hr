@@ -31,19 +31,30 @@ class LocalSystemAdminBootstrapController extends Controller
             return to_route('login');
         }
 
-        $encryptedSecret = $request->session()->get('iam.bootstrap_mfa_secret');
+        $mfaEnabled = (bool) config('iam.mfa_enabled');
+        $passwordMinimum = $mfaEnabled
+            ? 8
+            : (int) config('iam.single_factor_password_minimum', 15);
 
-        if (! is_string($encryptedSecret)) {
-            $encryptedSecret = encrypt(app(Google2FA::class)->generateSecretKey(32));
-            $request->session()->put('iam.bootstrap_mfa_secret', $encryptedSecret);
+        if ($mfaEnabled) {
+            $encryptedSecret = $request->session()->get('iam.bootstrap_mfa_secret');
+
+            if (! is_string($encryptedSecret)) {
+                $encryptedSecret = encrypt(app(Google2FA::class)->generateSecretKey(32));
+                $request->session()->put('iam.bootstrap_mfa_secret', $encryptedSecret);
+            }
         }
 
-        return Inertia::render('auth/Register');
+        return Inertia::render('auth/Register', [
+            'mfaEnabled' => $mfaEnabled,
+            'passwordMinimum' => $passwordMinimum,
+        ]);
     }
 
     public function qrCode(Request $request, AuthenticatorQrCode $qrCode): HttpResponse
     {
         $this->ensureBootstrapEnvironment();
+        abort_unless(config('iam.mfa_enabled'), 404);
         abort_if(User::query()->exists(), 404);
 
         $encryptedSecret = $request->session()->get('iam.bootstrap_mfa_secret');
@@ -64,11 +75,15 @@ class LocalSystemAdminBootstrapController extends Controller
             return to_route('login');
         }
 
+        $mfaEnabled = (bool) config('iam.mfa_enabled');
+        $passwordMinimum = $mfaEnabled
+            ? 8
+            : (int) config('iam.single_factor_password_minimum', 15);
         $validated = $request->validate([
             'username' => ['required', 'string', 'max:64'],
             'name' => ['required', 'string', 'max:255'],
-            'password' => ['required', 'string', 'min:8', 'max:255', 'confirmed'],
-            'mfa_code' => ['required', 'string', 'digits:6'],
+            'password' => ['required', 'string', 'min:'.$passwordMinimum, 'max:255', 'confirmed'],
+            'mfa_code' => $mfaEnabled ? ['required', 'string', 'digits:6'] : ['prohibited'],
         ]);
 
         $name = trim($validated['name']);
@@ -87,25 +102,29 @@ class LocalSystemAdminBootstrapController extends Controller
             ]);
         }
 
-        $encryptedBootstrapSecret = $request->session()->get('iam.bootstrap_mfa_secret');
+        $mfaSecret = null;
+        $matchedTimestamp = null;
 
-        if (! is_string($encryptedBootstrapSecret)) {
-            throw ValidationException::withMessages([
-                'mfa_code' => 'Authenticator setup expired. Reload the page and try again.',
-            ]);
+        if ($mfaEnabled) {
+            $encryptedBootstrapSecret = $request->session()->get('iam.bootstrap_mfa_secret');
+
+            if (! is_string($encryptedBootstrapSecret)) {
+                throw ValidationException::withMessages([
+                    'mfa_code' => 'Authenticator setup expired. Reload the page and try again.',
+                ]);
+            }
+
+            $mfaSecret = decrypt($encryptedBootstrapSecret);
+            $matchedTimestamp = $google2fa->verifyKeyNewer($mfaSecret, $validated['mfa_code'], 0, 1);
+
+            if ($matchedTimestamp === false) {
+                throw ValidationException::withMessages([
+                    'mfa_code' => 'The authenticator code is invalid. Try the current code from your app.',
+                ]);
+            }
         }
 
-        $mfaSecret = decrypt($encryptedBootstrapSecret);
-
-        $matchedTimestamp = $google2fa->verifyKeyNewer($mfaSecret, $validated['mfa_code'], 0, 1);
-
-        if ($matchedTimestamp === false) {
-            throw ValidationException::withMessages([
-                'mfa_code' => 'The authenticator code is invalid. Try the current code from your app.',
-            ]);
-        }
-
-        $created = DB::transaction(function () use ($validated, $name, $mfaSecret, $matchedTimestamp, $recoveryCodes): ?array {
+        $created = DB::transaction(function () use ($validated, $name, $mfaEnabled, $mfaSecret, $matchedTimestamp, $recoveryCodes): ?array {
             $guard = DB::table('iam_guard')->where('id', 1)->lockForUpdate()->first();
 
             if ($guard === null) {
@@ -142,13 +161,15 @@ class LocalSystemAdminBootstrapController extends Controller
                 'status' => 'ACTIVE',
                 'password' => $validated['password'],
             ]);
-            $user->forceFill([
-                'two_factor_secret' => Fortify::currentEncrypter()->encrypt($mfaSecret),
-                'two_factor_confirmed_at' => now(),
-                'two_factor_last_used_at' => $matchedTimestamp,
-            ])->save();
+            if ($mfaEnabled && is_string($mfaSecret) && is_int($matchedTimestamp)) {
+                $user->forceFill([
+                    'two_factor_secret' => Fortify::currentEncrypter()->encrypt($mfaSecret),
+                    'two_factor_confirmed_at' => now(),
+                    'two_factor_last_used_at' => $matchedTimestamp,
+                ])->save();
+            }
             $user->assignRole($role);
-            $codes = $recoveryCodes->issue($user);
+            $codes = $mfaEnabled ? $recoveryCodes->issue($user) : [];
 
             AuditEvent::query()->create([
                 'occurred_at' => now(),
@@ -159,7 +180,7 @@ class LocalSystemAdminBootstrapController extends Controller
                 'metadata' => ['source' => 'local_web'],
             ]);
 
-            return $codes;
+            return ['codes' => $codes, 'mfa_enabled' => $mfaEnabled];
         }, 3);
 
         if ($created === null) {
@@ -169,8 +190,10 @@ class LocalSystemAdminBootstrapController extends Controller
         $request->session()->forget('iam.bootstrap_mfa_secret');
 
         return to_route('login')
-            ->with('status', 'System Administrator account created with multi-factor authentication. Save the one-time recovery codes below.')
-            ->with('iam.recovery_codes', $created);
+            ->with('status', $created['mfa_enabled']
+                ? 'System Administrator account created with multi-factor authentication. Save the one-time recovery codes below.'
+                : 'System Administrator account created for local development.')
+            ->with('iam.recovery_codes', $created['codes']);
     }
 
     private function ensureBootstrapEnvironment(): void

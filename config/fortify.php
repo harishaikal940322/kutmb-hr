@@ -2,6 +2,11 @@
 
 use Laravel\Fortify\Features;
 
+$appEnvironment = strtolower((string) env('APP_ENV', 'production'));
+$mfaDefault = in_array($appEnvironment, ['production', 'prod'], true) ? 'yes' : 'no';
+$mfaSetting = env('MFA', env('IAM_MFA_ENFORCED', $mfaDefault));
+$mfaEnabled = filter_var($mfaSetting, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === true;
+
 return [
 
     /*
@@ -153,11 +158,13 @@ return [
     |
     */
 
-    'features' => [
-        Features::twoFactorAuthentication([
-            'confirm' => true,
-            'confirmPassword' => true,
-        ]),
-    ],
+    'features' => $mfaEnabled
+        ? [
+            Features::twoFactorAuthentication([
+                'confirm' => true,
+                'confirmPassword' => true,
+            ]),
+        ]
+        : [],
 
 ];

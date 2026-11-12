@@ -10,7 +10,7 @@ class EnsureMfaEnrolled
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (config('iam.mfa_enforced') && ! $request->user()?->hasEnabledTwoFactorAuthentication()) {
+        if (config('iam.mfa_enabled') && ! $request->user()?->hasEnabledTwoFactorAuthentication()) {
             return redirect()->route('mfa.setup');
         }
 

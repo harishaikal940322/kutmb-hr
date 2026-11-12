@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { Link, router } from '@inertiajs/vue3';
-import { LogOut, UserRound } from '@lucide/vue';
+import { LogOut, Moon, Sun, UserRound } from '@lucide/vue';
 import {
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import UserInfo from '@/components/UserInfo.vue';
+import { useAppearance } from '@/composables/useAppearance';
 import { logout, profile } from '@/routes';
 import type { User } from '@/types';
 
@@ -19,6 +20,11 @@ const handleLogout = () => {
 };
 
 defineProps<Props>();
+const { appearance, updateAppearance } = useAppearance();
+
+const toggleAppearance = () => {
+    updateAppearance(appearance.value === 'dark' ? 'light' : 'dark');
+};
 </script>
 
 <template>
@@ -33,6 +39,19 @@ defineProps<Props>();
             <UserRound class="mr-2 h-4 w-4" />
             My Profile
         </Link>
+    </DropdownMenuItem>
+    <DropdownMenuSeparator />
+    <DropdownMenuItem
+        data-test="appearance-toggle"
+        @click="toggleAppearance"
+    >
+        <Sun v-if="appearance === 'dark'" class="mr-2 h-4 w-4" />
+        <Moon v-else class="mr-2 h-4 w-4" />
+        {{
+            appearance === 'dark'
+                ? 'Switch to light mode'
+                : 'Switch to dark mode'
+        }}
     </DropdownMenuItem>
     <DropdownMenuSeparator />
     <DropdownMenuItem :as-child="true">

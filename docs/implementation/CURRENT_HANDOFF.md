@@ -11,6 +11,19 @@
 - Technical implementation does not approve organizational role policy, production access, or account-invitation requirements. Open decisions and release gates remain open; MFA enforcement and password rules were not changed.
 - Applied both additive RBAC migrations to the current development database with `./bin/dev migrate`; the migration command completed successfully. No destructive database operation was run. Next: commit and push the verified implementation on `main`. Preserve unrelated local Dashboard, My Profile, User Directory, and `docker/` edits.
 
+## 12 November 2026 — MFA enforcement environment toggle
+
+- The `MFA` setting now controls the complete MFA feature. Local development defaults to `MFA=no`, which disables TOTP enrollment routes and login challenges without deleting stored factors. `APP_ENV=production` or `APP_ENV=prod` defaults to `MFA=yes` and configuration fails closed if MFA is explicitly set to `no`.
+- For the owner's development workflow, only `APP_ENV=local` with `MFA=no` uses an 8-character password minimum for password-only sign-in and local bootstrap. Testing and production password-only paths retain the 15-character minimum; production cannot start with MFA disabled.
+- `IAM_MFA_ENFORCED` remains a fallback only when `MFA` is absent. `.env.example` is a development template; production must set `MFA=yes` in the deployment environment. This technical switch does not close organizational approval, recovery or release gates in SEC-002.
+- Checks: `git diff --check` passed. PHP lint and feature tests could not run because the host has no `php` executable and Docker access to `/var/run/docker.sock` is denied. Frontend build could not run because `vp` is not installed in the workspace; `vue-tsc` is also unavailable. Fetching `origin` was attempted before edits but the environment denied writing `.git/FETCH_HEAD`; the checked-out `main` and `origin/main` both reported `3577ac8` beforehand.
+
+## 12 November 2026 — Light/dark appearance toggle
+
+- Light mode is now the default regardless of operating-system preference. Existing saved `dark` preferences continue to apply; older `system` values normalize to light. The shared user menu exposes a keyboard-operable light/dark toggle, available in sidebar and header layouts, including the responsive mobile sidebar menu. The choice persists in browser local storage and the appearance cookie.
+- Removed the obsolete system appearance option from the shared appearance selector and aligned the server-rendered default with light mode. Existing CSS theme tokens and component-level light/dark styles are reused.
+- Checks: `git diff --check` passed. The frontend build and type check were not run because the workspace lacks the project build executable and `vue-tsc`. Browser/device visual acceptance remains pending; no authenticated browser session is available in this workspace.
+
 > **Checkpoint:** 4 November 2026 · **Starting `main` sync:** `c7f22426e6958a3ef12c5101056d207d46119cd8`
 > **Status:** System Core baseline through WP-070D1; simplified owner-directed development workflow adopted. This records technical state, not organizational approval.
 

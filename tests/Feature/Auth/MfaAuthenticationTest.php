@@ -43,6 +43,46 @@ class MfaAuthenticationTest extends TestCase
         $this->assertAuthenticatedAs($user);
     }
 
+    public function test_local_dev_can_disable_mfa_and_use_eight_character_passwords(): void
+    {
+        [$user] = $this->createEnrolledUser();
+        config([
+            'app.env' => 'local',
+            'iam.mfa_enabled' => false,
+            'iam.mfa_enforced' => false,
+            'iam.single_factor_password_minimum' => 8,
+            'fortify.features' => [],
+        ]);
+
+        $this->post(route('login.store'), [
+            'username' => $user->username,
+            'password' => 'a sufficiently long password',
+        ])->assertRedirect('/dashboard');
+        $this->assertAuthenticatedAs($user);
+        $this->get('/security/mfa/setup')->assertNotFound();
+
+        auth()->logout();
+        $shortPasswordUser = User::factory()->create([
+            'password' => Hash::make('dev-pass'),
+        ]);
+
+        $this->from(route('login'))->post(route('login.store'), [
+            'username' => $shortPasswordUser->username,
+            'password' => 'dev-pass',
+        ])->assertRedirect('/dashboard');
+        $this->assertAuthenticatedAs($shortPasswordUser);
+
+        auth()->logout();
+        $tooShortPasswordUser = User::factory()->create([
+            'password' => Hash::make('1234567'),
+        ]);
+        $this->from(route('login'))->post(route('login.store'), [
+            'username' => $tooShortPasswordUser->username,
+            'password' => '1234567',
+        ])->assertSessionHasErrors('username');
+        $this->assertGuest();
+    }
+
     public function test_totp_code_cannot_be_reused_after_a_successful_challenge(): void
     {
         [$user, $secret] = $this->createEnrolledUser();

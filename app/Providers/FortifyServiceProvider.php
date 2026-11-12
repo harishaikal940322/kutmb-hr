@@ -51,6 +51,10 @@ class FortifyServiceProvider extends ServiceProvider
                 return null;
             }
 
+            if (! config('iam.mfa_enabled') && Str::length($password) < config('iam.single_factor_password_minimum', 15)) {
+                return null;
+            }
+
             return $user;
         });
 

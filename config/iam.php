@@ -1,9 +1,25 @@
 <?php
 
+$appEnvironment = strtolower((string) env('APP_ENV', 'production'));
+$isProduction = in_array($appEnvironment, ['production', 'prod'], true);
+$mfaDefault = $isProduction ? 'yes' : 'no';
+$mfaSetting = env('MFA', env('IAM_MFA_ENFORCED', $mfaDefault));
+$mfaEnforced = filter_var($mfaSetting, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+
+if ($mfaEnforced === null || (is_string($mfaSetting) && trim($mfaSetting) === '')) {
+    throw new InvalidArgumentException('MFA must be set to yes/no or true/false.');
+}
+
+if ($isProduction && ! $mfaEnforced) {
+    throw new InvalidArgumentException('MFA must be enabled in production.');
+}
+
 return [
     'local_account_bootstrap_enabled' => env('IAM_LOCAL_ACCOUNT_BOOTSTRAP_ENABLED', false),
     'local_user_directory_preview_enabled' => env('IAM_LOCAL_USER_DIRECTORY_PREVIEW_ENABLED', false),
-    'mfa_enforced' => env('IAM_MFA_ENFORCED', false),
+    'mfa_enabled' => $mfaEnforced,
+    'mfa_enforced' => $mfaEnforced,
+    'single_factor_password_minimum' => $appEnvironment === 'local' && ! $mfaEnforced ? 8 : 15,
     'permissions' => [
         'iam.rbac.manage' => [
             'label' => 'Manage access control',
