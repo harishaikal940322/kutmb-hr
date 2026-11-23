@@ -1,5 +1,13 @@
 # Current Development Handoff
 
+## 23 November 2026 — Vue Cuti Tahunan UI/UX review surface
+
+- Added `resources/js/pages/AnnualLeavePreview.vue` and a local preview entry point in the existing Dashboard. The review surface provides responsive, role-specific navigation for Staf, Pengurus Unit, Pengurus Besar, Setiausaha ALK, HR and Pentadbir IT, plus application, request detail/status, support/approval, team calendar, staff profile/entitlement, Johor calendar, AL/Tabung ledger, year-end, prorata, changes/cancellation, reports, notifications, audit and SRS coverage views. Main-system menus and routes were not added.
+- The Vue coverage index maps FR-01–32, BR-01–39, NFR-01–13, RR-01–08, workflow statuses and CT-DEC-001–056. Pending HR details remain configurable/reviewable; GM leave routes to Setiausaha ALK; staff calendar shows approved leave only; role selector is explicitly a design preview, not authorization. Interactions use synthetic data/local messages only, with no API, persistence, submission, real approval, notification or balance transaction.
+- Updated DOC-023 to v0.4 to describe both the static HTML and Vue review surfaces. MOD-005 backend, authorization, API and database implementation remain on hold.
+- Checks passed: targeted `vp check --fix` (format and lint, two Vue files, no warnings), `npm run types:check` (`vue-tsc --noEmit`), `npm run build`, and `git diff --check`. No application tests were run. Visual browser acceptance was unavailable because no active local app session was present; no account was created and no database operation was run.
+- Next: requestor reviews the Vue screens and role scopes. Organize the permanent menu only after that review; keep backend and workflow execution on hold.
+
 ## 23 November 2026 — Role dashboards aligned to FR-07 and FR-29
 
 - Extended the single-file MOD-005 prototype to v0.3 with distinct dashboards/navigation for Staff, Unit Manager, General Manager, Secretary ALK, HR and IT Admin, following the actor responsibilities in FR-07 and dashboard content in FR-29. Secretary ALK sees final-decision items and prior support context, not self-service or personal balance; IT Admin has no leave-request, balance, support or approval access; HR has aggregate monitoring and staff/unit/year/status filters.

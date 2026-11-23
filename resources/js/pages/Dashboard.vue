@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { Head, Link, usePage } from '@inertiajs/vue3';
-import { ArrowUpRight, CircleCheck, UserRound } from '@lucide/vue';
-import { computed } from 'vue';
+import {
+    ArrowUpRight,
+    CalendarDays,
+    CircleCheck,
+    UserRound,
+} from '@lucide/vue';
+import { computed, ref } from 'vue';
 import { dashboard, profile } from '@/routes';
+import AnnualLeavePreview from '@/pages/AnnualLeavePreview.vue';
 
 defineOptions({
     layout: {
@@ -17,12 +23,19 @@ defineOptions({
 
 const page = usePage();
 const displayName = computed(() => page.props.auth.user?.name ?? 'there');
+const showAnnualLeavePreview = ref(false);
 </script>
 
 <template>
     <Head title="Papan Pemuka" />
 
+    <AnnualLeavePreview
+        v-if="showAnnualLeavePreview"
+        @close="showAnnualLeavePreview = false"
+    />
+
     <section
+        v-else
         class="mx-auto w-full max-w-6xl space-y-7 px-4 py-7 sm:px-6 lg:px-8"
     >
         <header
@@ -44,14 +57,24 @@ const displayName = computed(() => page.props.auth.user?.name ?? 'there');
                 </p>
             </div>
 
-            <Link
-                :href="profile()"
-                class="inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none sm:self-auto"
-            >
-                <UserRound class="size-4" aria-hidden="true" />
-                View my profile
-                <ArrowUpRight class="size-4" aria-hidden="true" />
-            </Link>
+            <div class="flex flex-wrap gap-2 self-start sm:self-auto">
+                <button
+                    type="button"
+                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none"
+                    @click="showAnnualLeavePreview = true"
+                >
+                    <CalendarDays class="size-4" aria-hidden="true" />
+                    Pratonton UI/UX Cuti Tahunan
+                </button>
+                <Link
+                    :href="profile()"
+                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none"
+                >
+                    <UserRound class="size-4" aria-hidden="true" />
+                    View my profile
+                    <ArrowUpRight class="size-4" aria-hidden="true" />
+                </Link>
+            </div>
         </header>
 
         <div
