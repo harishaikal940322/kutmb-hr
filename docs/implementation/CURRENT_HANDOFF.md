@@ -1,5 +1,12 @@
 # Current Development Handoff
 
+## 23 November 2026 — Full Cuti Tahunan SRS UI/UX prototype
+
+- The requestor prefers reviewing the full Cuti Tahunan design as one self-contained prototype first; main-system menu organization will be decided later. Backend remains on hold.
+- Expanded the prototype to v0.2 with a Liputan SRS index and role-oriented views for all 32 FRs, NFRs, reports, workflow sections, and the accepted 56 CT-DEC baseline. Added staff profile/entitlement, year-end carry-forward and ledger, prorata, changes/cancellation, re-recording, reports/notifications/audit, and negative-balance cases. Updated DOC-023 to map SRS coverage. All displayed data remains synthetic.
+- Browser review confirmed the SRS index and new staff, application, HR and balance views are reachable. The sample AL/EL reason rules, Johor holiday exclusions, GM route to Setiausaha ALK, role-specific screens, and HR-configurable EL backdate setting with pending policy details were reviewed. No application tests were run and no Vue/backend/data code was changed.
+- Next: requestor review of the full prototype. A Vue-only presentation pass can follow the design review; backend, API, database, and workflow actions remain on hold.
+
 ## 23 November 2026 — Cuti Tahunan UI/UX baseline and precedence clarification
 
 - The requestor considers all 56 Cuti Tahunan decisions final for UI/UX and directed the team to design before functional implementation. MOD-005 UI/UX design is authorized; backend, database, and workflow implementation remain on hold.
