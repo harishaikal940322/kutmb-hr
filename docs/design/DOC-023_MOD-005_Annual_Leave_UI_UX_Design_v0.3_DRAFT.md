@@ -1,6 +1,6 @@
 # DOC-023 | MOD-005 Annual Leave UI/UX Design
 
-> **Version:** v0.2 DRAFT · **Date:** 23 November 2026 · **Review status:** Awaiting requestor review
+> **Version:** v0.3 DRAFT · **Date:** 23 November 2026 · **Review status:** Awaiting requestor review
 >
 > **Baseline:** All 56 Cuti Tahunan decisions are frozen for UI/UX design per requestor direction. Setiausaha ALK is the final approver for all General Manager leave; this resolves the CT-DEC-001/006 conflict under CR-HR-2026-002. No new policy or status is introduced.
 >
@@ -8,14 +8,14 @@
 
 ## Prototype
 
-Open [MOD-005 Annual Leave UI/UX prototype v0.2](MOD-005_Annual_Leave_UI_UX_Prototype_v0.2.html) in a browser. The **Liputan SRS** view acts as the design index and links to the feature views. Its navigation is for review only; the main system menu will be organized later.
+Open [MOD-005 Annual Leave UI/UX prototype v0.3](MOD-005_Annual_Leave_UI_UX_Prototype_v0.3.html) in a browser. The **Liputan SRS** view acts as the design index and links to the feature views. Its navigation is for review only; the main system menu will be organized later.
 
 ## SRS coverage map
 
 | Prototype view | SRS coverage | Main design content |
 |---|---|---|
 | Liputan SRS | FR-01–32; NFR-01–03; RR-01–03; Sections 11–14; CT-DEC-001–056 | Design index, actor roles, feature mapping and implementation boundary |
-| Ringkasan | FR-08, FR-21, FR-29 | Entitlement, used, pending reservation, available balance, Tabung Cuti and upcoming leave |
+| Ringkasan ikut peranan | FR-07–08, FR-19, FR-21, FR-29 | Staff: entitlement, used, pending reservation, available balance, Tabung Cuti, own requests and schedule. Unit Manager: unit-scoped pending support and schedule. GM: support/final approvals, changes/cancellations and unit statistics. Secretary ALK: final queue for >5-day requests and all GM requests, with prior support context where applicable. HR: aggregate entitlement/use, balance, carry-forward and prorata with staff/unit/year/status filters. IT Admin: technical-access boundary, with no leave approval or balance access. |
 | Profil & kelayakan | FR-01–03, FR-06–08; FR-07 role boundary | Staff profile, unit/approver structure, category, yearly entitlement, opening/current/future balance |
 | Kalendar & pelarasan | FR-04–05, FR-28, FR-31–32; CT-DEC-010, CT-DEC-027 | Johor holidays, replacement-day rules, affected requests, HR confirmation, audit history, and configurable EL backdate limits with pending policy details |
 | Mohon cuti | FR-16–18, FR-21–23, FR-28; CT-DEC-009, 027, 055 | AL/EL, dates, half-day sessions, three-workday notice, emergency reason, attachment, balance estimate and route preview |
@@ -28,6 +28,10 @@ Open [MOD-005 Annual Leave UI/UX prototype v0.2](MOD-005_Annual_Leave_UI_UX_Prot
 | Laporan, notifikasi & jejak audit | FR-28–31; NFR-01–03; RR-01–03 | Balance/status/prorata reports, role-specific notices, action history and balance transactions |
 
 The prototype groups requirements into screens for review; the original FR, BR, workflow-status, report and decision IDs remain unchanged. The 56 decisions are a design baseline, not 56 separate pages. Values shown in example rows are synthetic and do not establish new rates or policies.
+
+## Role dashboard and navigation boundary
+
+The role selector is a design-review preview only. It changes the example dashboard and visible navigation for Staff, Unit Manager, General Manager, Secretary ALK, HR and IT Admin. Secretary ALK does not see self-service requests or personal leave balances; IT Admin sees no leave requests, balances, support or approval actions. HR receives staff and entitlement maintenance views, while unit and approval views are scoped to their SRS responsibilities. Actual access remains controlled by server-side permissions and is not implemented in this prototype.
 
 ## Design direction
 

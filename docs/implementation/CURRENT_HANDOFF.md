@@ -1,5 +1,12 @@
 # Current Development Handoff
 
+## 23 November 2026 — Role dashboards aligned to FR-07 and FR-29
+
+- Extended the single-file MOD-005 prototype to v0.3 with distinct dashboards/navigation for Staff, Unit Manager, General Manager, Secretary ALK, HR and IT Admin, following the actor responsibilities in FR-07 and dashboard content in FR-29. Secretary ALK sees final-decision items and prior support context, not self-service or personal balance; IT Admin has no leave-request, balance, support or approval access; HR has aggregate monitoring and staff/unit/year/status filters.
+- Updated DOC-023 SRS coverage and the role-boundary explanation. This is a design-only representation; Vue, backend authorization, APIs, database and workflow remain unchanged/on hold. Data remains synthetic.
+- Browser accessibility review confirmed HR, Secretary ALK and IT Admin views and navigation scopes. `git diff --check` and static structure checks remain to be run before commit.
+- Next: requestor reviews the role dashboards; after design review, a Vue-only presentation pass may be scoped separately.
+
 ## 23 November 2026 — Full Cuti Tahunan SRS UI/UX prototype
 
 - The requestor prefers reviewing the full Cuti Tahunan design as one self-contained prototype first; main-system menu organization will be decided later. Backend remains on hold.
