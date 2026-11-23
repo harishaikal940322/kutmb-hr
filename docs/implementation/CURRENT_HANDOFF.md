@@ -1,5 +1,11 @@
 # Current Development Handoff
 
+## 23 November 2026 — Development server network investigation pending
+
+- Inspected the local Compose, Dockerfile, README and Docker context. The reachable `default` context uses the local Docker socket; its existing proxy/data networks and shared services do not establish the separate development server's topology. The full reported network error and server details were not supplied, so the cause remains unconfirmed and no server Compose or deployment was created.
+- Local Compose syntax passed `docker compose -f docker-compose.dev.yml config --quiet`. Its app uses a source bind mount and external local networks; the Dockerfile does not copy the application or build assets, and `.dockerignore` excludes `public/build`. No image build or server smoke check was run because a server configuration and target were not established. No migration, database or shared-service changes were made.
+- Updated README with read-only discovery steps and the built-asset constraint. Next: obtain the full network error and the development server's Docker networks, existing service host names and proxy routing details, without credentials, before selecting a server configuration.
+
 ## 23 November 2026 — Compose serves built frontend assets
 
 - Updated the development Compose app to run Laravel only. It no longer starts `npm run dev`, uses `concurrently`, or publishes host port 5173. On startup it removes Laravel's stale generated `public/hot` marker so Vite selects the existing `public/build/manifest.json` assets.

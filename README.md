@@ -59,6 +59,14 @@ Useful checks:
 
 Public registration, password recovery, email verification and passkey flows are disabled. The local `.env.example` sets `MFA=no`, which disables TOTP enrollment and login challenges for development; local password-only sign-in and bootstrap accept passwords from 8 characters. Other password-only environments retain the 15-character minimum. Production defaults to `MFA=yes` and refuses to start if MFA is explicitly disabled, whether `APP_ENV` is `production` or `prod`. Use Laravel's canonical `APP_ENV=production` in production and set `MFA=yes` in the runtime environment; this technical guard does not replace outstanding production security and recovery approvals. Login uses username and password with Laravel Fortify sessions, CSRF protection, login throttling, session rotation and logout invalidation. Persistent Remember Me authentication is disabled. Production first-admin bootstrap, recovery, session timeout, role authorization, audit retention and production security remain gated for review.
 
+## Development server investigation
+
+The local Compose file is not yet a deployment configuration for a separate development server. Its external network defaults, `mysql` and `redis` hosts, proxy alias and source bind mount describe the local Docker setup only. The Dockerfile provides tools but does not copy the application or build frontend assets into an image; `.dockerignore` also excludes `public/build`. A server configuration must arrange for built assets without a Vite development server or port 5173.
+
+Before preparing that configuration, capture the complete network error and, on the intended development server, inspect `docker context show`, `docker network ls`, `docker ps --format 'table {{.Names}}\t{{.Networks}}\t{{.Ports}}'`, and `docker network inspect <network>` for the relevant existing networks. Identify the networks and reachable host names for the existing database, Redis if needed, and reverse proxy, together with how the proxy routes to the application. Redact credentials and sensitive infrastructure details before sharing. Do not assume the local network names apply on the server. No server Compose file or deployment has been validated yet.
+
+The local Compose syntax can be checked without starting containers using `docker compose -f docker-compose.dev.yml config --quiet`. Do not run `./bin/dev setup` for this investigation: it can create a schema and apply migrations.
+
 ## Documentation
 
 - [Documentation governance](docs/README.md)
