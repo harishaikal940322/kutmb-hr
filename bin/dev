@@ -122,9 +122,8 @@ case "${1:-help}" in
     up)
         setup
         compose up -d --remove-orphans app
-        vite_port="$(sed -n 's/^VITE_PORT=//p' .env | tail -n 1)"
         app_url="$(env_value KUTMB_APP_URL)"
-        printf 'App: %s\nVite HMR: http://127.0.0.1:%s\n' "${app_url:-http://kutmb-hr.localhost:8080}" "${vite_port:-5173}"
+        printf 'App (built assets): %s\n' "${app_url:-http://kutmb-hr.localhost:8080}"
         ;;
     down)
         compose down --remove-orphans

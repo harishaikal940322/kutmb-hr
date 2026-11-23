@@ -1,5 +1,11 @@
 # Current Development Handoff
 
+## 23 November 2026 — Compose serves built frontend assets
+
+- Updated the development Compose app to run Laravel only. It no longer starts `npm run dev`, uses `concurrently`, or publishes host port 5173. On startup it removes Laravel's stale generated `public/hot` marker so Vite selects the existing `public/build/manifest.json` assets.
+- Updated `bin/dev up` output and local-development instructions to describe the build-then-start flow. The existing separate process listening on ports 5173/5174 was left untouched.
+- Checks passed: `docker compose ... config --quiet`, `bash -n bin/dev`, and `git diff --check`. Started only `app` with `docker compose up -d --no-deps app`; container logs show Laravel serving on port 8000, with no host port bindings. `/login` returned HTTP 200 through Nginx and HTML referenced `build/assets`; `public/hot` is absent. Port 5173 remains occupied by the pre-existing unrelated process and was not touched. No migrations or application tests were run.
+
 ## 23 November 2026 — Vue Cuti Tahunan UI/UX review surface
 
 - Added `resources/js/pages/AnnualLeavePreview.vue` and a local preview entry point in the existing Dashboard. The review surface provides responsive, role-specific navigation for Staf, Pengurus Unit, Pengurus Besar, Setiausaha ALK, HR and Pentadbir IT, plus application, request detail/status, support/approval, team calendar, staff profile/entitlement, Johor calendar, AL/Tabung ledger, year-end, prorata, changes/cancellation, reports, notifications, audit and SRS coverage views. Main-system menus and routes were not added.
