@@ -59,13 +59,21 @@ Useful checks:
 
 Public registration, password recovery, email verification and passkey flows are disabled. The local `.env.example` sets `MFA=no`, which disables TOTP enrollment and login challenges for development; local password-only sign-in and bootstrap accept passwords from 8 characters. Other password-only environments retain the 15-character minimum. Production defaults to `MFA=yes` and refuses to start if MFA is explicitly disabled, whether `APP_ENV` is `production` or `prod`. Use Laravel's canonical `APP_ENV=production` in production and set `MFA=yes` in the runtime environment; this technical guard does not replace outstanding production security and recovery approvals. Login uses username and password with Laravel Fortify sessions, CSRF protection, login throttling, session rotation and logout invalidation. Persistent Remember Me authentication is disabled. Production first-admin bootstrap, recovery, session timeout, role authorization, audit retention and production security remain gated for review.
 
-## Development server investigation
+## Development server
 
-`docker-compose.local.yml` is the local configuration used by `bin/dev`. The existing `docker-compose.dev.yml` remains a legacy copy of that local configuration for now; it is not yet a deployment configuration for a separate development server. Its external network defaults, `mysql` and `redis` hosts, proxy alias and source bind mount describe the local Docker setup only. The Dockerfile provides tools but does not copy the application or build frontend assets into an image; `.dockerignore` also excludes `public/build`. A server configuration must arrange for built assets without a Vite development server or port 5173.
+`docker-compose.local.yml` and `bin/dev` are for the local workstation. `docker-compose.dev.yml` is separate for the development server: it builds application dependencies and frontend assets into the image, runs no Vite server, and joins the existing external `shared-data` network. It does not start MySQL or Redis. The shared MySQL service must be reachable on that network; verify its Docker DNS name before setting `DB_HOST`. Do not use this configuration for production.
 
-Before preparing that configuration, capture the complete network error and, on the intended development server, inspect `docker context show`, `docker network ls`, `docker ps --format 'table {{.Names}}\t{{.Networks}}\t{{.Ports}}'`, and `docker network inspect <network>` for the relevant existing networks. Identify the networks and reachable host names for the existing database, Redis if needed, and reverse proxy, together with how the proxy routes to the application. Redact credentials and sensitive infrastructure details before sharing. Do not assume the local network names apply on the server. No server Compose file or deployment has been validated yet.
+On the development server, copy `server.env.example` to `.env.server` and restrict access (`chmod 600 .env.server`). Set `APP_KEY` to a new Laravel key, `DB_DATABASE` to the existing development schema, and `DB_USERNAME`/`DB_PASSWORD` to the existing development account. Set `DB_HOST` to the verified MySQL service hostname, `KUTMB_DEV_BIND_ADDRESS` to the server's intended IP, `KUTMB_DEV_PORT` to a free port, and `APP_URL` to the corresponding `http://IP:port`. Keep `.env.server` private and never commit it. For a new key, `openssl rand -base64 32` produces the value to prefix with `base64:`; retain the same key across restarts.
 
-The local Compose syntax can be checked without starting containers using `docker compose -f docker-compose.local.yml config --quiet`. Do not run `./bin/dev setup` for this investigation: it can create a schema and apply migrations.
+```sh
+docker network inspect shared-data
+docker compose --env-file .env.server -f docker-compose.dev.yml config --quiet
+docker compose --env-file .env.server -f docker-compose.dev.yml build app
+docker compose --env-file .env.server -f docker-compose.dev.yml up -d --no-deps app
+docker compose --env-file .env.server -f docker-compose.dev.yml logs --tail=50 app
+```
+
+No database or migration is created or run by these commands. The application requires a separately provisioned schema and compatible migrations before database-backed functionality can work; do not apply migrations without authorization. `APP_ENV=development` keeps local-only bootstrap and preview disabled and preserves the 15-character single-factor minimum. The example enables MFA; server account provisioning and recovery remain gated. File sessions/cache and container-local storage do not persist across container recreation. The built-in PHP server and direct HTTP are for bounded development use; no reverse proxy or TLS is configured. The server network, MySQL connectivity and browser access still need verification on the target server.
 
 ## Documentation
 

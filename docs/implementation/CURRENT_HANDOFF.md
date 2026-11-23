@@ -1,5 +1,11 @@
 # Current Development Handoff
 
+## 23 November 2026 — Development server Compose prepared
+
+- Replaced the legacy `docker-compose.dev.yml` with an app-only server configuration, leaving `docker-compose.local.yml` and `bin/dev` unchanged. `Dockerfile.server` builds Composer dependencies and frontend assets into the image; its dedicated ignore file excludes local environment, data, logs and stale build state. The server Compose joins the user-provisioned external `shared-data` network and requires an explicit bind IP and port; no database, Redis, proxy or Vite service is started.
+- `server.env.example` documents private runtime settings. The app uses `APP_ENV=development`, disables local-only bootstrap/preview and defaults to MFA in the example; server account provisioning remains gated. No migration or database creation occurs. Server IP/port, existing schema and credentials must be configured on the target. Direct HTTP has no TLS; file sessions/cache are ephemeral.
+- Checks passed: server image build and frontend build, Compose config validation for both server (synthetic values) and local, image manifest/route checks without network access, and isolated local container `/login` HTTP 200 with built assets and no Vite reference. No server connection, deployment, database operation or migration was performed. Next: configure the server's private environment and verify target connectivity and access; do not run migrations without authorization.
+
 ## 23 November 2026 — Separate local Compose name
 
 - Copied the existing local configuration unchanged to `docker-compose.local.yml` and switched `bin/dev` and current README commands to that file. The legacy `docker-compose.dev.yml` remains unchanged and is not ready for a server; it is reserved for the requested development server configuration once the network error and server topology are known.
