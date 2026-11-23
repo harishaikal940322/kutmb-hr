@@ -1,5 +1,10 @@
 # Current Development Handoff
 
+## 23 November 2026 — General proxy managed outside repository
+
+- At the owner's direction, removed the proxy Compose and Nginx configuration from this repository. General Nginx is to be configured separately on the server; KUTMB HR retains its external `shared-proxy` connection and `kutmb-hr-app` alias alongside `shared-data`, with no published app port. Removed proxy-only variables from the application environment example and updated README.
+- Checks: server and local Compose config validation with a synthetic private env, and `git diff --check` passed. Server access and independent proxy configuration remain to be verified. No server service or data was changed. HTTP has no TLS; account provisioning and database migrations remain gated. Local Compose is unchanged.
+
 ## 23 November 2026 — General development proxy for hr.kutmb.test
 
 - Added a separate Nginx Compose project and `hr.kutmb.test` virtual host. The app now joins external `shared-proxy` with a dedicated alias as well as `shared-data`, and publishes no host port. Nginx alone binds the server IP/port supplied in `.env.server`; no WordPress service, volume or configuration is changed. The owner reported WordPress containers/networks were removed and its volumes retained on the server.
