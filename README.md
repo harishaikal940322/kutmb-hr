@@ -31,14 +31,14 @@ Docker and Docker Compose are the only host dependencies. From the repository ro
 ./bin/dev up
 ```
 
-This creates a private `.env`, builds frontend assets into `public/build`, builds the app image with PHP 8.5.12, Node.js 24 and Composer, and starts only the Laravel `app` service from [`docker-compose.dev.yml`](docker-compose.dev.yml). Compose serves the built assets and does not start Vite or bind port 5173. The app joins the existing `docker_proxy` and `docker_data` networks and uses the standalone `nginx`, `mysql`, and `redis` containers; it does not start or recreate those shared services. Its unique `kutmb-hr-app` proxy alias avoids collisions with other projects that also use a Compose service named `app`. Set `DB_USERNAME` and `DB_PASSWORD` in `.env` to the shared local MySQL account. `./bin/dev setup` creates the dedicated `kutmb_hr_dev` schema if absent using that account, then applies development migrations; it never creates or changes MySQL accounts. Nginx serves the app at `http://kutmb-hr.localhost:8080`. No application account is seeded. Use `./bin/dev down` to stop the app; the shared services and their data remain running. The previous project-local MySQL volume is left untouched.
+This creates a private `.env`, builds frontend assets into `public/build`, builds the app image with PHP 8.5.12, Node.js 24 and Composer, and starts only the Laravel `app` service from [`docker-compose.local.yml`](docker-compose.local.yml). Compose serves the built assets and does not start Vite or bind port 5173. The app joins the existing `docker_proxy` and `docker_data` networks and uses the standalone `nginx`, `mysql`, and `redis` containers; it does not start or recreate those shared services. Its unique `kutmb-hr-app` proxy alias avoids collisions with other projects that also use a Compose service named `app`. Set `DB_USERNAME` and `DB_PASSWORD` in `.env` to the shared local MySQL account. `./bin/dev setup` creates the dedicated `kutmb_hr_dev` schema if absent using that account, then applies development migrations; it never creates or changes MySQL accounts. Nginx serves the app at `http://kutmb-hr.localhost:8080`. No application account is seeded. Use `./bin/dev down` to stop the app; the shared services and their data remain running. The previous project-local MySQL volume is left untouched.
 
 To register the first local System Admin, explicitly add `IAM_LOCAL_ACCOUNT_BOOTSTRAP_ENABLED=true` to the private `.env`, then visit `http://kutmb-hr.localhost:8080/register`. The page is available only in `local`/`testing` and while the users table is empty. It creates one ACTIVE account, assigns the `system-admin` role, writes a bootstrap audit event, and closes after the first account. It does not grant role permissions; the role-permission matrix and account administration features remain unapproved or unimplemented. Do not enable this route in production.
 
 The same opt-in flag also enables the CLI command for creating an unassigned local developer account:
 
 ```sh
-docker compose -f docker-compose.dev.yml --project-name kutmb-hr exec app php artisan iam:bootstrap-local-account
+docker compose -f docker-compose.local.yml --project-name kutmb-hr exec app php artisan iam:bootstrap-local-account
 ```
 
 The command prompts for username, display name, and a hidden password with confirmation. It creates an ACTIVE account with no roles or permissions. Remove the opt-in setting after use. This command is denied outside `local`/`testing` and is not a production System Admin bootstrap or public registration flow.
@@ -61,11 +61,11 @@ Public registration, password recovery, email verification and passkey flows are
 
 ## Development server investigation
 
-The local Compose file is not yet a deployment configuration for a separate development server. Its external network defaults, `mysql` and `redis` hosts, proxy alias and source bind mount describe the local Docker setup only. The Dockerfile provides tools but does not copy the application or build frontend assets into an image; `.dockerignore` also excludes `public/build`. A server configuration must arrange for built assets without a Vite development server or port 5173.
+`docker-compose.local.yml` is the local configuration used by `bin/dev`. The existing `docker-compose.dev.yml` remains a legacy copy of that local configuration for now; it is not yet a deployment configuration for a separate development server. Its external network defaults, `mysql` and `redis` hosts, proxy alias and source bind mount describe the local Docker setup only. The Dockerfile provides tools but does not copy the application or build frontend assets into an image; `.dockerignore` also excludes `public/build`. A server configuration must arrange for built assets without a Vite development server or port 5173.
 
 Before preparing that configuration, capture the complete network error and, on the intended development server, inspect `docker context show`, `docker network ls`, `docker ps --format 'table {{.Names}}\t{{.Networks}}\t{{.Ports}}'`, and `docker network inspect <network>` for the relevant existing networks. Identify the networks and reachable host names for the existing database, Redis if needed, and reverse proxy, together with how the proxy routes to the application. Redact credentials and sensitive infrastructure details before sharing. Do not assume the local network names apply on the server. No server Compose file or deployment has been validated yet.
 
-The local Compose syntax can be checked without starting containers using `docker compose -f docker-compose.dev.yml config --quiet`. Do not run `./bin/dev setup` for this investigation: it can create a schema and apply migrations.
+The local Compose syntax can be checked without starting containers using `docker compose -f docker-compose.local.yml config --quiet`. Do not run `./bin/dev setup` for this investigation: it can create a schema and apply migrations.
 
 ## Documentation
 

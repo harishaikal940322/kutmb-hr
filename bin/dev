@@ -86,7 +86,7 @@ ensure_dev_database() {
 }
 
 compose() {
-    docker compose -f "$ROOT_DIR/docker-compose.dev.yml" --project-name kutmb-hr "$@"
+    docker compose -f "$ROOT_DIR/docker-compose.local.yml" --project-name kutmb-hr "$@"
 }
 
 install_node_dependencies() {

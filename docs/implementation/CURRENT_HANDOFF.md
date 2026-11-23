@@ -1,5 +1,10 @@
 # Current Development Handoff
 
+## 23 November 2026 — Separate local Compose name
+
+- Copied the existing local configuration unchanged to `docker-compose.local.yml` and switched `bin/dev` and current README commands to that file. The legacy `docker-compose.dev.yml` remains unchanged and is not ready for a server; it is reserved for the requested development server configuration once the network error and server topology are known.
+- Checks: both Compose configurations validate and resolve identically with the same project name; `bash -n bin/dev` and `git diff --check` passed. No containers were started or stopped, and no image build, migration or database change was performed. Next: obtain the full server network error and service/proxy network details before preparing or testing server deployment.
+
 ## 23 November 2026 — Development server network investigation pending
 
 - Inspected the local Compose, Dockerfile, README and Docker context. The reachable `default` context uses the local Docker socket; its existing proxy/data networks and shared services do not establish the separate development server's topology. The full reported network error and server details were not supplied, so the cause remains unconfirmed and no server Compose or deployment was created.
