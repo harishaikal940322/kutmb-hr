@@ -16,12 +16,16 @@ services:
             DB_URL: ''
             IAM_LOCAL_ACCOUNT_BOOTSTRAP_ENABLED: 'false'
             IAM_LOCAL_USER_DIRECTORY_PREVIEW_ENABLED: 'false'
-        ports:
-            - '${KUTMB_DEV_BIND_ADDRESS:?Set KUTMB_DEV_BIND_ADDRESS in .env.server}:${KUTMB_DEV_PORT:?Set KUTMB_DEV_PORT in .env.server}:8000'
         networks:
-            - data
+            data: {}
+            proxy:
+                aliases:
+                    - kutmb-hr-app
 
 networks:
     data:
         external: true
         name: shared-data
+    proxy:
+        external: true
+        name: shared-proxy

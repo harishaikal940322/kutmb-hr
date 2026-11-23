@@ -61,19 +61,23 @@ Public registration, password recovery, email verification and passkey flows are
 
 ## Development server
 
-`docker-compose.local.yml` and `bin/dev` are for the local workstation. `docker-compose.dev.yml` is separate for the development server: it builds application dependencies and frontend assets into the image, runs no Vite server, and joins the existing external `shared-data` network. It does not start MySQL or Redis. The shared MySQL service must be reachable on that network; verify its Docker DNS name before setting `DB_HOST`. Do not use this configuration for production.
+`docker-compose.local.yml` and `bin/dev` are for the local workstation. `docker-compose.dev.yml` builds application dependencies and frontend assets into the image, runs no Vite server, and joins external `shared-data` and `shared-proxy` networks. `docker-compose.proxy.yml` runs a separate general Nginx proxy on `shared-proxy`; the app has no published host port. The app Compose does not start MySQL or Redis. The shared MySQL service must be reachable on `shared-data`; verify its Docker DNS name before setting `DB_HOST`. Do not use this configuration for production.
 
-On the development server, copy `server.env.example` to `.env.server` and restrict access (`chmod 600 .env.server`). Set `APP_KEY` to a new Laravel key, `DB_DATABASE` to the existing development schema, and `DB_USERNAME`/`DB_PASSWORD` to the existing development account. Set `DB_HOST` to the verified MySQL service hostname, `KUTMB_DEV_BIND_ADDRESS` to the server's intended IP, `KUTMB_DEV_PORT` to a free port, and `APP_URL` to the corresponding `http://IP:port`. Keep `.env.server` private and never commit it. For a new key, `openssl rand -base64 32` produces the value to prefix with `base64:`; retain the same key across restarts.
+On the development server, copy `server.env.example` to `.env.server` and restrict access (`chmod 600 .env.server`). Set `APP_KEY` to a new Laravel key, `DB_DATABASE` to the existing development schema, and `DB_USERNAME`/`DB_PASSWORD` to the existing development account. Set `DB_HOST` to the verified MySQL service hostname, `KUTMB_PROXY_BIND_ADDRESS` to the server's intended office IP, and `KUTMB_PROXY_PORT` to an available host port. Set `APP_URL` to `http://hr.kutmb.test`, including `:port` when the chosen port is not 80. Keep `.env.server` private and never commit it. For a new key, `openssl rand -base64 32` produces the value to prefix with `base64:`; retain the same key across restarts.
+
+Map `hr.kutmb.test` to the server's office IP in each client computer's hosts file (or internal DNS). If `shared-proxy` does not already exist, create it once with `docker network create shared-proxy`; this external network is shared infrastructure and is not removed by either Compose project. Confirm the chosen bind IP and port are available on the server before starting.
 
 ```sh
 docker network inspect shared-data
-docker compose --env-file .env.server -f docker-compose.dev.yml config --quiet
-docker compose --env-file .env.server -f docker-compose.dev.yml build app
-docker compose --env-file .env.server -f docker-compose.dev.yml up -d --no-deps app
-docker compose --env-file .env.server -f docker-compose.dev.yml logs --tail=50 app
+docker network inspect shared-proxy
+docker compose --env-file .env.server -p kutmb-hr-dev -f docker-compose.dev.yml config --quiet
+docker compose --env-file .env.server -p kutmb-proxy -f docker-compose.proxy.yml config --quiet
+docker compose --env-file .env.server -p kutmb-hr-dev -f docker-compose.dev.yml up -d --build --no-deps app
+docker compose --env-file .env.server -p kutmb-proxy -f docker-compose.proxy.yml up -d
+docker compose --env-file .env.server -p kutmb-proxy -f docker-compose.proxy.yml exec nginx nginx -t
 ```
 
-No database or migration is created or run by these commands. The application requires a separately provisioned schema and compatible migrations before database-backed functionality can work; do not apply migrations without authorization. `APP_ENV=development` keeps local-only bootstrap and preview disabled and preserves the 15-character single-factor minimum. The example enables MFA; server account provisioning and recovery remain gated. File sessions/cache and container-local storage do not persist across container recreation. The built-in PHP server and direct HTTP are for bounded development use; no reverse proxy or TLS is configured. The server network, MySQL connectivity and browser access still need verification on the target server.
+Open `http://hr.kutmb.test` (add `:port` if needed). No database or migration is created or run by these commands. The application requires a separately provisioned schema and compatible migrations before database-backed functionality can work; do not apply migrations without authorization. `APP_ENV=development` keeps local-only bootstrap and preview disabled and preserves the 15-character single-factor minimum. The example enables MFA; server account provisioning and recovery remain gated. File sessions/cache and container-local storage do not persist across container recreation. The HTTP proxy has no TLS: login credentials are not encrypted on the office network. The built-in PHP server is for bounded development use. Server network, MySQL connectivity and browser access still need verification on the target server.
 
 ## Documentation
 

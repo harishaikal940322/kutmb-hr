@@ -1,5 +1,11 @@
 # Current Development Handoff
 
+## 23 November 2026 — General development proxy for hr.kutmb.test
+
+- Added a separate Nginx Compose project and `hr.kutmb.test` virtual host. The app now joins external `shared-proxy` with a dedicated alias as well as `shared-data`, and publishes no host port. Nginx alone binds the server IP/port supplied in `.env.server`; no WordPress service, volume or configuration is changed. The owner reported WordPress containers/networks were removed and its volumes retained on the server.
+- README records network setup, separate project names, hosts/DNS mapping, private environment and startup commands. This is office-only HTTP with no TLS; credentials are not encrypted in transit. The server requires an existing compatible schema and account; no migration, database creation or deployment was performed. Local Compose is unchanged.
+- Checks: Nginx `nginx -t`, both server Compose configurations with synthetic values, local Compose validation, and isolated Nginx-to-app `/login` HTTP 200 with built assets and no Vite reference. No target-server or real MySQL smoke test was possible. Next: choose the server bind IP/port, map the hostname, and verify on the development server.
+
 ## 23 November 2026 — Development server Compose prepared
 
 - Replaced the legacy `docker-compose.dev.yml` with an app-only server configuration, leaving `docker-compose.local.yml` and `bin/dev` unchanged. `Dockerfile.server` builds Composer dependencies and frontend assets into the image; its dedicated ignore file excludes local environment, data, logs and stale build state. The server Compose joins the user-provisioned external `shared-data` network and requires an explicit bind IP and port; no database, Redis, proxy or Vite service is started.
