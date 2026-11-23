@@ -5,6 +5,10 @@
 > **Status:** SCOPE DIRECTION RECORDED; detailed SRS, HR policy and implementation approvals remain pending  
 > **Type:** Clarification of terminology and implementation sequencing, not an ADD/REMOVE of a module.
 
+## 23 November 2026 — Requestor-directed Cuti Tahunan UI/UX scope
+
+The requestor considers all 56 Cuti Tahunan decisions final for UI/UX design and directs the project to proceed with that design first. MOD-005 UI/UX design is authorized as the next design scope. This does not authorize backend, database, workflow execution, or other HR Core implementation. The accepted Cuti Tahunan decision baseline is frozen for design; changes use the existing change-control process. CR-HR-2026-002 records the final General Manager leave approver as Setiausaha ALK, superseding the conflicting Pengerusi ALK approval wording in CT-DEC-006.
+
 ## Definitions
 
 - **KUTMB HR System** is the overall product.

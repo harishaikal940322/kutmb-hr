@@ -1,5 +1,13 @@
 # Current Development Handoff
 
+## 23 November 2026 — Cuti Tahunan UI/UX baseline and precedence clarification
+
+- The requestor considers all 56 Cuti Tahunan decisions final for UI/UX and directed the team to design before functional implementation. MOD-005 UI/UX design is authorized; backend, database, and workflow implementation remain on hold.
+- A conflict between CT-DEC-001 and CT-DEC-006 on the final approver for General Manager leave was raised and resolved by the requestor: Setiausaha ALK is final. CR-HR-2026-002 records that precedence and the conflicting CT-DEC-006 authority is superseded.
+- Created DOC-023 and a self-contained clickable HTML prototype with synthetic data only. It has no app routes, APIs, persistence, actual requests, or approval transactions.
+- Checks: source decision precedence and SRS/RTM/CSV/XLSX references reconciled; browser visual/accessibility-tree review covered the summary, AL/EL form, Pengurus Besar and Setiausaha ALK queues, GM final-approver route, and HR calendar/adjustment review. A stale queue badge was corrected to follow the selected role. No application tests were run; no application code/data changed.
+- Next: requestor review of the prototype and refine any requested UX changes. Functional MOD-005 implementation remains on hold pending separate project authorization.
+
 ## 23 November 2026 — Cuti Tahunan requirements decision update
 
 - The requestor confirmed that responses to the 56 CT-DEC issues were discussed with HR and should be treated as accepted. The four formerly blank response fields (CT-DEC-027/028/048/055) were completed; CT-DEC-010/015/020 were reaffirmed. The decision log records that a named formal HR signatory was not supplied.
@@ -39,7 +47,7 @@
 
 - **Project:** KUTMB HR System · **Repository:** [harishaikal940322/kutmb-hr](https://github.com/harishaikal940322/kutmb-hr) · **Canonical checkout:** `/home/haris/www/kutmb-hr`
 - **Development architecture:** Laravel 13, Vue 3, Inertia 3, TypeScript; PHP 8.5.12; MySQL 26.10.0; Docker development environment.
-- **Current scope:** System Core, primarily MOD-001 Identity & Access. **HR Core MOD-004..011 remains ON HOLD** pending approved HR requirements.
+- **Current scope:** System Core, primarily MOD-001 Identity & Access. **HR Core MOD-004..011 remains ON HOLD** for functional implementation; MOD-005 UI/UX design is proceeding under the requestor direction recorded 23 November 2026.
 - Requirements remain DRAFT. The stack family is selected, while organizational policies and production readiness remain unapproved.
 
 ## 2 November 2026 authentication planning addendum
