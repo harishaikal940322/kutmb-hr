@@ -14,6 +14,9 @@
 
 ## HR Core decision intake | Cuti Tahunan V1
 
+> **Status update — 23 November 2026:** The requestor confirms that responses recorded for all 56 CT-DEC issues were discussed with HR and should be treated as accepted decisions. This current status supersedes the intake-only owner/pending labels below where a recorded response exists, including the CT-DEC-001 response that selects Setiausaha ALK. The four formerly empty response fields CT-DEC-027, 028, 048 and 055 were completed in this review; CT-DEC-010, 015 and 020 were reaffirmed. Formal HR signatory names/signatures were not supplied. The accepted requirements are being aligned under `CR-HR-2026-001`; this is documentation approval only and does not authorize MOD-005 implementation.
+
+
 > **Recorded:** 11 November 2026. **Source:** direct owner decision in the SRS clarification discussion. **Status:** owner direction for documentation reconciliation only; **NOT HR/IT sign-off**, not an approved normative SRS baseline, and not implementation authorization. The original DOCX remains unchanged pending controlled SRS/RTM reconciliation.
 
 | ID | Topic | Owner direction | Source conflict | Status / next action |

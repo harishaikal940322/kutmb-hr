@@ -1,5 +1,13 @@
 # Current Development Handoff
 
+## 23 November 2026 — Cuti Tahunan requirements decision update
+
+- The requestor confirmed that responses to the 56 CT-DEC issues were discussed with HR and should be treated as accepted. The four formerly blank response fields (CT-DEC-027/028/048/055) were completed; CT-DEC-010/015/020 were reaffirmed. The decision log records that a named formal HR signatory was not supplied.
+- Updated the issue decision DOCX, ADR status note, Cuti Tahunan SRS to v0.4, all 56 MOD-005 rows in the RTM and traceability CSV/XLSX, plus CR-HR-2026-001 and impact analysis. Existing CT-DEC, FR and BR IDs were preserved; 56 planned checks are marked NOT TESTED. The SRS addendum restates seven decisions in detail and points to the issue register for all 56 outcomes.
+- No code, schema or database changed. MOD-005 remains on implementation hold pending formal document sign-off and project authorization. The change does not approve payroll deductions by the system; the SRS records HR review and applicable-law conditions only.
+- Checks: issue/SRS DOCX renders reviewed; traceability workbook rendered and reviewed; all 56 issue IDs checked against RTM, CSV and workbook; `git diff --check` passed. No application tests were run for this documentation-only update.
+- Next: obtain formal document sign-off for the HR requirements baseline, then plan implementation only after separate project authorization. MOD-005 remains on hold.
+
 ## 5 November 2026 — Spatie RBAC administration foundation
 
 - Adopted `spatie/laravel-permission` 8.3.2 using the existing `Role`, `Permission`, and `User` models. Existing role and permission codes are preserved as package permission/role names; existing user-role and role-permission rows are copied into package pivots. Legacy pivot tables are retained for rollback compatibility. Menu access mappings use registered code-owned menu keys.
