@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P02 entitlement draft correction history
+
+- Added local corrections to descriptive entitlement proposals, retaining previous category, label, nullable rate and actor in a restricted history table with atomic audit. Version locks, active-category checks, duplicate labels and confirmed-policy denial apply. These drafts remain non-executable; service-band mapping and rates are not inferred or approved, and no ledger or policy activation was added.
+- Applied the additive history migration after target/SQL preview. Draft/history rows remained empty after the rollback-isolated MySQL test (1 test, 27 assertions), including duplicate rollback, prior null preservation, audit, cross-version denial and confirmed lock. Targeted Pint/PHPStan, frontend format/lint, Vue type check, build and `git diff --check` passed. Browser and concurrency acceptance for the new edit form remain untested.
+- Next: review remaining draft cancellation and perform a consolidated security/integrity pass; CT-P03–09 posting and workflows require resolved upstream rules and dependencies. HR/IT and production approval remain pending.
+
 ## 24 November 2026 — CT-P02 non-executable entitlement drafts and verification follow-up
 
 - Added local, audited entitlement-rate proposals tied to a policy draft and active employment category. A free-text band label is descriptive only, and the optional rate is stored as integer half-day units; null remains different from explicit zero. No service-band boundaries, actual rates or category mappings were inferred or seeded. These proposals have no selector, confirmation, ledger or calculation path; additions to confirmed/partially confirmed policies are denied. Editing/cancelling individual proposals remains unavailable.

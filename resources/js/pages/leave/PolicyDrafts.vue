@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
+import EntitlementDraftEditForm from './EntitlementDraftEditForm.vue';
 import EntitlementDraftForm from './EntitlementDraftForm.vue';
 import PolicyEditForm from './PolicyEditForm.vue';
 type Version = {
@@ -29,6 +30,7 @@ type EntitlementDraft = {
     id: number;
     policy_version_id: number;
     category_name: string;
+    category_id: number;
     band_description: string;
     annual_half_day_units: number | null;
 };
@@ -37,6 +39,14 @@ defineProps<{
     history: History[];
     categories: Category[];
     entitlementDrafts: EntitlementDraft[];
+    entitlementHistory: {
+        id: number;
+        entitlement_draft_id: number;
+        previous_category_name: string;
+        previous_band_description: string;
+        previous_annual_half_day_units: number | null;
+        created_at: string;
+    }[];
 }>();
 const weekdays = [
     'Isnin',
@@ -274,6 +284,51 @@ function submit() {
                                     'Belum ditetapkan'
                                 }}
                                 unit separuh hari
+                                <details
+                                    v-if="
+                                        entitlementHistory.some(
+                                            (entry) =>
+                                                entry.entitlement_draft_id ===
+                                                rule.id,
+                                        )
+                                    "
+                                    class="text-muted-foreground"
+                                >
+                                    <summary class="cursor-pointer">
+                                        Sejarah cadangan
+                                    </summary>
+                                    <ul>
+                                        <li
+                                            v-for="entry in entitlementHistory.filter(
+                                                (item) =>
+                                                    item.entitlement_draft_id ===
+                                                    rule.id,
+                                            )"
+                                            :key="entry.id"
+                                        >
+                                            {{ entry.created_at }} ·
+                                            {{ entry.previous_category_name }} ·
+                                            {{
+                                                entry.previous_band_description
+                                            }}
+                                            ·
+                                            {{
+                                                entry.previous_annual_half_day_units ??
+                                                'Belum ditetapkan'
+                                            }}
+                                            unit separuh hari
+                                        </li>
+                                    </ul>
+                                </details>
+                                <EntitlementDraftEditForm
+                                    v-if="
+                                        !version.confirmed_at &&
+                                        !version.confirmed_by
+                                    "
+                                    :version-id="version.id"
+                                    :rule="rule"
+                                    :categories="categories"
+                                />
                             </li>
                         </ul>
                     </div>

@@ -34,7 +34,16 @@ class EntitlementDraftTest extends TestCase
         $this->post($path, $payload)->assertSessionHasErrors('band_description');
         $this->post($path, [...$payload, 'band_description' => 'Synthetic zero', 'annual_half_day_units' => 0])->assertRedirect();
         $this->assertDatabaseHas('leave_entitlement_rule_drafts', ['policy_version_id' => $version, 'band_description' => 'Synthetic zero', 'annual_half_day_units' => 0]);
+        $edit = $path.'/'.$draft->id;
+        $this->patch($edit, [...$payload, 'band_description' => 'Synthetic zero', 'annual_half_day_units' => 0])->assertSessionHasErrors('band_description');
+        $this->assertDatabaseMissing('leave_entitlement_draft_history', ['entitlement_draft_id' => $draft->id]);
+        $this->patch($edit, [...$payload, 'band_description' => 'Synthetic revised', 'annual_half_day_units' => 12])->assertRedirect();
+        $this->assertDatabaseHas('leave_entitlement_draft_history', ['entitlement_draft_id' => $draft->id, 'previous_band_description' => 'Synthetic unspecified band', 'previous_annual_half_day_units' => null, 'actor_id' => $actor->id]);
+        $this->assertDatabaseHas('leave_entitlement_rule_drafts', ['id' => $draft->id, 'band_description' => 'Synthetic revised', 'annual_half_day_units' => 12]);
+        $this->assertDatabaseHas('audit_events', ['action_code' => 'leave.entitlement.draft_updated', 'target_ref' => 'entitlement_draft:'.$draft->id]);
+        $this->patch('/leave/policy-drafts/999999999/entitlements/'.$draft->id, $payload)->assertNotFound();
         DB::table('leave_policy_versions')->where('id', $version)->update(['confirmed_by' => $actor->id, 'confirmed_at' => now()]);
+        $this->patch($edit, $payload)->assertSessionHasErrors('band_description');
         $this->post($path, [...$payload, 'band_description' => 'Denied'])->assertSessionHasErrors('band_description');
         $actor->revokePermissionTo('leave.policy.manage');
         $this->post($path, $payload)->assertForbidden();
