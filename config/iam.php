@@ -29,6 +29,14 @@ return [
             'action' => 'Manage',
             'system_only' => true,
         ],
+        ...(in_array($appEnvironment, ['local', 'testing'], true) ? ['hr.organization.manage' => [
+            'label' => 'Manage organization references',
+            'description' => 'Manage local development units and employment categories.',
+            'group' => 'Employee and organization',
+            'submodule' => 'Organization references',
+            'action' => 'Manage',
+            'system_only' => false,
+        ]] : []),
         'iam.users.view' => [
             'label' => 'View user directory',
             'description' => 'View the local development user directory preview.',
@@ -46,6 +54,13 @@ return [
         ],
     ],
     'menus' => [
+        'organization.references.index' => [
+            'label' => 'Unit dan Kategori',
+            'href' => '/organization/references',
+            'icon' => 'users',
+            'permission' => 'hr.organization.manage',
+            'editable' => false,
+        ],
         'users.index' => [
             'label' => 'User Directory',
             'href' => '/users',

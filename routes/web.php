@@ -6,8 +6,10 @@ use App\Http\Controllers\IdentityRoleController;
 use App\Http\Controllers\KeycloakController;
 use App\Http\Controllers\LocalSystemAdminBootstrapController;
 use App\Http\Controllers\MfaController;
+use App\Http\Controllers\OrganizationReferenceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserDirectoryController;
+use App\Http\Middleware\EnsureLocalHrDevelopment;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
@@ -61,3 +63,10 @@ Route::middleware('protected')->group(function () {
         ->middleware(['user-directory-preview', 'permission:iam.users.view'])
         ->name('users.index');
 });
+
+Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.organization.manage'])
+    ->prefix('organization')->name('organization.')->group(function (): void {
+        Route::get('references', [OrganizationReferenceController::class, 'index'])->name('references.index');
+        Route::post('references/{kind}', [OrganizationReferenceController::class, 'store'])->whereIn('kind', ['units', 'categories'])->name('references.store');
+        Route::patch('references/{kind}/{id}', [OrganizationReferenceController::class, 'update'])->whereIn('kind', ['units', 'categories'])->whereNumber('id')->name('references.update');
+    });

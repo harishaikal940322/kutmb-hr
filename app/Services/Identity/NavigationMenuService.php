@@ -16,6 +16,10 @@ class NavigationMenuService
         $visible = [];
 
         foreach ($menus as $key => $menu) {
+            if ($key === 'organization.references.index' && ! app()->environment(['local', 'testing'])) {
+                continue;
+            }
+
             if ($key === 'users.index' && (! app()->environment(['local', 'testing'])
                 || ! config('iam.local_user_directory_preview_enabled'))) {
                 continue;
