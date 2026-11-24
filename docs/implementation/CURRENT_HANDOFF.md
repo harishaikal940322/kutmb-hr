@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P02 calendar schema foundation
+
+- Reviewed the Cuti Tahunan SRS and current CT-DEC-010/012/043/044/047 source answers. Added separate versioned calendar and date tables with per-version date uniqueness, optional replacement-to-original reference and restricted historical deletion. No holidays, policy values, routes or calendar confirmation were created. This partial CT-P02 schema is independent of the remaining CT-P01 browser/concurrency work, not a usable leave calendar.
+- Verified `local` / `kutmb_hr_dev`, absent target tables and migration SQL before applying the single additive migration. Both tables are InnoDB and remain empty after the rollback-isolated synthetic MySQL test (1 test, 6 assertions: version isolation, unique date and deletion restrictions). Targeted Pint and `git diff --check` passed. Auto-increment counters may advance.
+- Next: validate and audit calendar versions and replacement proposals; enforce version/date/source consistency and confirmation immutability. Do not activate calendar changes affecting requests before CT-P05–06 impact handling. Policy rates, HR confirmation, real holidays and release remain unresolved.
+
 ## 24 November 2026 — CT-P01 menu integration correction and focused regression
 
 - Fixed an integration defect found during CT-P01 review: HR menu definitions and permissions now exist only in local/testing configuration, so production menu editing has no references to unavailable HR permissions. Fixed menu mappings use their code-defined permission in navigation and server-side menu updates reject attempts to replace them; existing editable System Core mappings retain their normal behavior. Restored directory-viewer template ordering for the existing RBAC regression test.
