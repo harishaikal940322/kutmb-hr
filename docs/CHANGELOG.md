@@ -1,3 +1,5 @@
+- 2026-11-24: Added an unexposed integer working-session counter using explicit schedule and holiday inputs. See CURRENT_HANDOFF.
+
 - 2026-11-24: Added reversible audited cancellation for non-executable entitlement drafts. See CURRENT_HANDOFF.
 
 - 2026-11-24: Added auditable correction history for non-executable entitlement drafts. See CURRENT_HANDOFF.

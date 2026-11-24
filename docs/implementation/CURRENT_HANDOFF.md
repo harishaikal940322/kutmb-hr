@@ -1,3 +1,10 @@
+## 24 November 2026 — CT-P02 explicit working-session counter
+
+- Added an unexposed, pure half-day session counter. It accepts explicitly supplied working weekdays and complete holiday dates, counts integer half-day units, rejects missing inputs, invalid dates/sessions and duplicate slots, and has no defaults, database access or route. It does not select a policy/calendar or prove calendar completeness; any future integration must first establish confirmed versions, coverage, cancellation handling and request-impact safety.
+- Unit checks passed (4 tests, 6 assertions) for working/holiday/weekend and half-day examples, missing calendar, duplicate slot and invalid date. Targeted Pint/PHPStan and `git diff --check` passed; no operational calculation or production activation.
+- Consolidated prior to this slice: employee/leave/RBAC rollback-isolated and unit tests passed (17 tests, 948 assertions), calendar guidance Node test passed, production config had zero HR/leave menu and permission definitions, and all new HR/leave business tables and grants were empty after rollback. Formal T-CT acceptance and nine destructive-harness IAM tests remain unexecuted.
+- Next: finish safe calendar/policy selection and impact contracts without asserting unapproved HR data; CT-P03 financial posting and CT-P04–09 require their recorded dependencies. No HR/IT or release approval.
+
 ## 24 November 2026 — CT-P02 entitlement proposal cancellation
 
 - Added audited, reversible cancellation of unconfirmed entitlement proposals; cancelled proposals cannot be edited until restored and retain their reserved label/history. Confirmed or partially confirmed versions stay locked. A future policy selector must exclude cancelled proposals and reject inconsistent cancellation state; no selection, rate application or posting exists yet.
