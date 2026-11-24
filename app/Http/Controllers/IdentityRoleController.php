@@ -33,6 +33,7 @@ class IdentityRoleController extends Controller
                 ])
                 ->all(),
             'permissions' => $catalog->rows(),
+            'templates' => $catalog->templates(),
         ]);
     }
 
@@ -74,11 +75,15 @@ class IdentityRoleController extends Controller
             'permission_codes.*' => ['string', 'distinct', Rule::in($catalog->assignableCodes())],
         ]);
 
-        DB::transaction(function () use ($request, $role, $validated): void {
+        DB::transaction(function () use ($request, $role, $validated, $catalog): void {
             $lockedRole = Role::query()->whereKey($role->getKey())->lockForUpdate()->firstOrFail();
 
             if ($lockedRole->is_system) {
                 throw ValidationException::withMessages(['role' => 'The protected System Admin role cannot be changed here.']);
+            }
+
+            if ($lockedRole->permissions()->whereNotIn('code', $catalog->assignableCodes())->exists()) {
+                throw ValidationException::withMessages(['role' => 'This role has protected or unrecognized permissions. Review them outside this screen before editing.']);
             }
 
             $lockedRole->label = trim($validated['label']);

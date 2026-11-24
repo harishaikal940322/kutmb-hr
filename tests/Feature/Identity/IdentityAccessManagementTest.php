@@ -23,6 +23,8 @@ class IdentityAccessManagementTest extends TestCase
                 ->component('identity/Roles')
                 ->has('roles', 1)
                 ->has('permissions', 2)
+                ->where('templates.0.permissions', ['iam.users.view'])
+                ->where('templates.0.available', true)
                 ->where('roles.0.isSystem', true)
                 ->where('roles.0.permissionCodes', ['iam.rbac.manage'])
             );
@@ -101,6 +103,21 @@ class IdentityAccessManagementTest extends TestCase
         ])->assertSessionHasErrors('permission_codes.0');
 
         $this->assertDatabaseMissing('roles', ['code' => 'delegated-access-admin']);
+    }
+
+    public function test_existing_unrecognized_permission_cannot_be_silently_removed(): void
+    {
+        $role = Role::create(['code' => 'legacy-reader', 'name' => 'legacy-reader', 'guard_name' => 'web', 'label' => 'Legacy reader']);
+        $permission = Permission::create(['code' => 'legacy.unknown', 'name' => 'legacy.unknown', 'guard_name' => 'web', 'label' => 'Legacy']);
+        $role->givePermissionTo($permission);
+
+        $this->actingAs($this->systemAdmin())->patch(route('iam.roles.update', $role), [
+            'label' => 'Changed',
+            'permission_codes' => [],
+        ])->assertSessionHasErrors('role');
+
+        $this->assertSame('Legacy reader', $role->fresh()->label);
+        $this->assertTrue($role->fresh()->hasPermissionTo('legacy.unknown'));
     }
 
     public function test_system_admin_role_cannot_be_changed_deleted_or_delegated(): void

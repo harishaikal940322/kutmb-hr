@@ -25,13 +25,24 @@ return [
             'label' => 'Manage access control',
             'description' => 'Manage system roles, role permissions, and menu access.',
             'group' => 'System administration',
+            'submodule' => 'Access control',
+            'action' => 'Manage',
             'system_only' => true,
         ],
         'iam.users.view' => [
             'label' => 'View user directory',
             'description' => 'View the local development user directory preview.',
             'group' => 'Identity and access',
+            'submodule' => 'User directory',
+            'action' => 'View',
             'system_only' => false,
+        ],
+    ],
+    'role_templates' => [
+        'directory-viewer-v1' => [
+            'label' => 'User directory viewer',
+            'description' => 'View the local development user directory preview.',
+            'permissions' => ['iam.users.view'],
         ],
     ],
     'menus' => [

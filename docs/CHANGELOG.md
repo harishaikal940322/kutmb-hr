@@ -45,3 +45,5 @@ No application features were implemented as part of the initial documentation ba
 | 2026-11-24 | DOC-007 v0.4 | Record requestor compact permission-matrix design acceptance for shared Create/Edit Role selector; update CT-P01 planned UI and checks. No functional changes. | REQUESTOR UI DESIGN ACCEPTED; IMPLEMENTATION HOLD |
 
 | 2026-11-24 | Delegated development direction | Clarify requestor UI/UX authority; select bounded MOD-001 compact role selector/preset mechanism first, HR Core policy gate unchanged; local checkout unavailable remotely. | SYSTEM CORE SLICE AUTHORIZED; LOCAL PREFLIGHT PENDING; HR CORE HOLD |
+
+| 2026-11-24 | MOD-001 RBAC enhancement | Deliver shared permission selector, editable IAM template and accessible confirmation; record rollback-only MySQL and browser evidence with limitations in current handoff. No HR permissions or schema changes. | SYSTEM CORE DEVELOPMENT; NOT BUSINESS OR RELEASE APPROVAL |

@@ -2,6 +2,15 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { KeyRound, Menu as MenuIcon, ShieldCheck } from '@lucide/vue';
 import { reactive, ref } from 'vue';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import PermissionSelector from './components/PermissionSelector.vue';
 
 type Permission = {
     code: string;
@@ -9,6 +18,8 @@ type Permission = {
     description: string;
     group: string;
     systemOnly: boolean;
+    submodule: string;
+    action: string;
 };
 
 type Role = {
@@ -20,7 +31,18 @@ type Role = {
     permissionCodes: string[];
 };
 
-const props = defineProps<{ roles: Role[]; permissions: Permission[] }>();
+type RoleTemplate = {
+    key: string;
+    label: string;
+    description: string;
+    permissions: string[];
+    available: boolean;
+};
+const props = defineProps<{
+    roles: Role[];
+    permissions: Permission[];
+    templates: RoleTemplate[];
+}>();
 const assignablePermissions = props.permissions.filter(
     (permission) => !permission.systemOnly,
 );
@@ -45,6 +67,46 @@ const drafts = reactive(
     >,
 );
 const savingRole = ref<number | null>(null);
+const selectedTemplate = ref('');
+const pendingTemplate = ref<RoleTemplate | null>(null);
+const templateSelect = ref<HTMLSelectElement | null>(null);
+const cancelTemplateButton = ref<HTMLButtonElement | null>(null);
+function closeTemplateDialog() {
+    pendingTemplate.value = null;
+}
+function confirmTemplate() {
+    if (!pendingTemplate.value) return;
+    createForm.permission_codes = [...pendingTemplate.value.permissions];
+    selectedTemplate.value = pendingTemplate.value.key;
+    closeTemplateDialog();
+}
+function applyTemplate(event: Event) {
+    const select = event.target as HTMLSelectElement;
+    if (!select.value) {
+        selectedTemplate.value = '';
+        return;
+    }
+    const template = props.templates.find((item) => item.key === select.value);
+    if (!template || !template.available) {
+        select.value = selectedTemplate.value;
+        return;
+    }
+    if (createForm.permission_codes.length) {
+        select.value = selectedTemplate.value;
+        pendingTemplate.value = template;
+        return;
+    }
+    createForm.permission_codes = [...template.permissions];
+    selectedTemplate.value = template.key;
+}
+function conflicts(role: Role) {
+    return role.permissionCodes.filter(
+        (code) =>
+            !assignablePermissions.some(
+                (permission) => permission.code === code,
+            ),
+    );
+}
 
 function saveRole(role: Role) {
     const draft = drafts[role.id];
@@ -150,7 +212,10 @@ function deleteRole(role: Role) {
                 @submit.prevent="
                     createForm.post('/administration/access/roles', {
                         preserveScroll: true,
-                        onSuccess: () => createForm.reset(),
+                        onSuccess: () => {
+                            createForm.reset();
+                            selectedTemplate = '';
+                        },
                     })
                 "
             >
@@ -197,32 +262,45 @@ function deleteRole(role: Role) {
                         {{ createForm.errors.label }}
                     </p>
                 </div>
-                <fieldset class="space-y-3 rounded-lg border border-border p-4">
-                    <legend class="px-1 text-sm font-medium">
-                        Permissions
-                    </legend>
-                    <label
-                        v-for="permission in assignablePermissions"
-                        :key="permission.code"
-                        class="flex min-h-11 cursor-pointer items-start gap-3 rounded-md px-2 py-2 hover:bg-muted/60"
+                <div class="min-w-0 space-y-3">
+                    <label for="role-template" class="block text-sm font-medium"
+                        >Optional role template</label
                     >
-                        <input
-                            v-model="createForm.permission_codes"
-                            type="checkbox"
-                            name="permission_codes[]"
-                            :value="permission.code"
-                            class="mt-1 size-4 accent-primary focus-visible:ring-2 focus-visible:ring-ring"
-                        />
-                        <span class="min-w-0">
-                            <span class="block text-sm font-medium">{{
-                                permission.label
-                            }}</span>
-                            <span
-                                class="block font-mono text-xs text-muted-foreground"
-                                >{{ permission.code }}</span
-                            >
-                        </span>
-                    </label>
+                    <select
+                        id="role-template"
+                        ref="templateSelect"
+                        :value="selectedTemplate"
+                        class="h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:ring-2 focus-visible:ring-ring"
+                        @change="applyTemplate"
+                    >
+                        <option value="">Choose a template</option>
+                        <option
+                            v-for="template in templates"
+                            :key="template.key"
+                            :value="template.key"
+                            :disabled="!template.available"
+                        >
+                            {{ template.label
+                            }}{{ template.available ? '' : ' (unavailable)' }}
+                        </option>
+                    </select>
+                    <p
+                        v-for="template in templates"
+                        :key="template.key"
+                        class="text-xs text-muted-foreground"
+                    >
+                        {{ template.label }}: {{ template.description }}
+                        <span v-if="!template.available"
+                            >Required permissions are unavailable.</span
+                        ><span v-else
+                            >Includes
+                            {{ template.permissions.join(', ') }}.</span
+                        >
+                    </p>
+                    <PermissionSelector
+                        v-model="createForm.permission_codes"
+                        :permissions="permissions"
+                    />
                     <p
                         v-if="createForm.errors.permission_codes"
                         class="text-sm text-destructive"
@@ -230,7 +308,7 @@ function deleteRole(role: Role) {
                     >
                         {{ createForm.errors.permission_codes }}
                     </p>
-                </fieldset>
+                </div>
                 <div class="lg:col-span-3 lg:flex lg:justify-end">
                     <button
                         type="submit"
@@ -315,40 +393,20 @@ function deleteRole(role: Role) {
                                 class="h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             />
                         </div>
-                        <fieldset
-                            class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3"
+                        <PermissionSelector
+                            v-model="drafts[role.id].permissionCodes"
+                            :permissions="permissions"
+                        />
+                        <p
+                            v-if="conflicts(role).length"
+                            role="alert"
+                            class="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
                         >
-                            <legend class="mb-2 text-sm font-medium">
-                                Role permissions
-                            </legend>
-                            <label
-                                v-for="permission in assignablePermissions"
-                                :key="permission.code"
-                                class="flex min-h-12 cursor-pointer items-start gap-3 rounded-lg border border-border px-3 py-3 hover:bg-muted/50"
-                            >
-                                <input
-                                    v-model="drafts[role.id].permissionCodes"
-                                    type="checkbox"
-                                    :value="permission.code"
-                                    class="mt-1 size-4 accent-primary focus-visible:ring-2 focus-visible:ring-ring"
-                                />
-                                <span class="min-w-0">
-                                    <span class="block text-sm font-medium">{{
-                                        permission.label
-                                    }}</span>
-                                    <span
-                                        class="block font-mono text-xs text-muted-foreground"
-                                        >{{ permission.code }}</span
-                                    >
-                                </span>
-                            </label>
-                            <p
-                                v-if="!assignablePermissions.length"
-                                class="text-sm text-muted-foreground"
-                            >
-                                No assignable permissions are currently defined.
-                            </p>
-                        </fieldset>
+                            This role has protected or unrecognized permissions
+                            that cannot be edited here:
+                            {{ conflicts(role).join(', ') }}. Review them
+                            outside this screen before saving.
+                        </p>
                         <p
                             v-if="drafts[role.id].errors.length"
                             role="alert"
@@ -374,7 +432,10 @@ function deleteRole(role: Role) {
                             </button>
                             <button
                                 type="submit"
-                                :disabled="savingRole === role.id"
+                                :disabled="
+                                    savingRole === role.id ||
+                                    conflicts(role).length > 0
+                                "
                                 class="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60"
                             >
                                 {{
@@ -416,4 +477,54 @@ function deleteRole(role: Role) {
             </div>
         </section>
     </main>
+    <Dialog
+        :open="pendingTemplate !== null"
+        @update:open="
+            (open) => {
+                if (!open) closeTemplateDialog();
+            }
+        "
+    >
+        <DialogContent
+            :show-close-button="false"
+            @open-auto-focus="
+                (event) => {
+                    event.preventDefault();
+                    cancelTemplateButton?.focus();
+                }
+            "
+            @close-auto-focus="
+                (event) => {
+                    event.preventDefault();
+                    templateSelect?.focus();
+                }
+            "
+        >
+            <DialogHeader>
+                <DialogTitle>Replace permission selection?</DialogTitle>
+                <DialogDescription
+                    >Applying {{ pendingTemplate?.label }} replaces the current
+                    permission selection. You can review and edit it before
+                    saving the role.</DialogDescription
+                >
+            </DialogHeader>
+            <DialogFooter>
+                <button
+                    ref="cancelTemplateButton"
+                    type="button"
+                    class="min-h-11 rounded-md border border-input px-4 text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                    @click="closeTemplateDialog"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    class="min-h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring"
+                    @click="confirmTemplate"
+                >
+                    Replace selection
+                </button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>
