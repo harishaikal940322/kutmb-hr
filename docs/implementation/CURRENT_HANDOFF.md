@@ -1,3 +1,9 @@
+## 24 November 2026 — MOD-005 application form UX-R01–R05
+
+- Requestor accepted the revised form design and confirmed SRS approval threshold unchanged. Vue and HTML previews now use AL/EL dropdown, remove manual AL emergency checkbox, show four pre-form balance metrics and projected AL/Tabung separately; ordinary AL reason optional, EL reason required, attachment optional. All values synthetic; pending deducted once. Unit Manager preview aligns to FR-20; five days ends at GM, above five at Secretary ALK; GM own requests go to Secretary.
+- Updated DOC-023 and draft technical plan. FR-18/BR-20/CT-DEC-009 notice policy not repealed by UI change; resolve functional handling before coding. No normative SRS/RTM changes, real records, APIs, backend workflow or database changes. Functional implementation remains on hold.
+- Remote source checks: targeted replacement anchors, removed obsolete checkbox bindings, threshold/source-allocation checks and preview-only boundary reviewed. Local build, lint/type check and browser acceptance not run in this remote session. Next: sync existing local checkout, run focused frontend checks, review UI on PC/tablet/mobile and both themes.
+
 ## 24 November 2026 — local SSO logout
 
 - HR logout now ends the local session and redirects SSO-authenticated browsers to Keycloak RP-initiated logout, using the ID token captured in the server session. Local-password logout retains its existing behavior. The local Keycloak client post-logout redirect is set to `http://kutmb-hr.localhost:8080/login`.

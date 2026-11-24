@@ -44,6 +44,12 @@ The role selector is a design-review preview only. It changes the example dashbo
 - Use the accepted Setiausaha ALK final-approver decision for GM leave in every route preview and queue.
 - Keep all buttons as visual examples. The prototype must not save data or perform an approval, balance or notification action.
 
+## 24 November 2026 — requestor-accepted application form refinement
+
+- UX-R01–R04: use one AL/EL dropdown, remove the manual AL emergency/short-notice checkbox, show AL, Tabung Cuti, pending reservations and total available before the form, and display AL/Tabung projected balances separately. Ordinary AL reason is optional; EL reason is required and attachment optional. Examples are synthetic; a pending hold is subtracted only once.
+- UX-R05: retain the existing SRS FR-19/20/23 and BR-24/25/26 threshold: up to and including five days ends at Pengurus Besar; above five days requires Setiausaha ALK. Unit Manager applies directly to GM for up to five days; above five GM supports, Secretary decides. All GM requests go to Secretary ALK under CR-HR-2026-002.
+- The checkbox removal is a UI decision, not a repeal of FR-18/BR-20/CT-DEC-009. The actual three-working-day notice rule and exception handling remain governed by the SRS; derive notice from dates in a later authorized functional design, or obtain a controlled policy change if removal is intended. No HR policy, backend or production approval is implied.
+
 ## Review boundary
 
 Review the SRS map first, then the staff application path, role queues, HR record maintenance, year-end/prorata and reports/audit views. Changes that alter an accepted HR decision go through the existing change-control process before the design is revised. The Vue presentation is now available for requestor review within the existing Dashboard. The main-system menu, backend, API, database and workflow implementation remain gated.

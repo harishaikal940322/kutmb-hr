@@ -57,7 +57,6 @@ const selectedRequest = ref('AL-2026-052');
 const search = ref('');
 const activeFilter = ref('Semua');
 const leaveType = ref<'AL' | 'EL'>('AL');
-const emergencyAl = ref(false);
 const startDate = ref('2026-12-14');
 const endDate = ref('2026-12-16');
 const leaveLength = ref<'Penuh hari' | 'Separuh hari'>('Penuh hari');
@@ -279,30 +278,47 @@ const displayedRequests = computed(() => {
 });
 
 const dayEstimate = computed(() => {
-    if (leaveLength.value === 'Separuh hari') return '0.5';
     const from = new Date(`${startDate.value}T12:00:00`);
     const to = new Date(`${endDate.value}T12:00:00`);
     if (Number.isNaN(from.valueOf()) || Number.isNaN(to.valueOf()) || to < from)
         return '—';
+    const holidays = new Set(['2026-12-24', '2026-12-25']);
     let days = 0;
     for (
         const day = new Date(from);
         day <= to;
         day.setDate(day.getDate() + 1)
     ) {
-        if (day.getDay() !== 0 && day.getDay() !== 6) days += 1;
+        const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+        if (day.getDay() !== 0 && day.getDay() !== 6 && !holidays.has(key)) days += 1;
     }
-    return String(days);
+    return String(leaveLength.value === 'Separuh hari' ? (days > 0 ? 0.5 : 0) : days);
+});
+
+const previewBalance = { annual: 16.5, tabung: 5, pending: 2 };
+const annualAvailable = previewBalance.annual - previewBalance.pending;
+const totalAvailable = annualAvailable + previewBalance.tabung;
+const projectedBalance = computed(() => {
+    const days = Number(dayEstimate.value);
+    if (!Number.isFinite(days) || days <= 0) return null;
+    const tabungUsed = Math.min(previewBalance.tabung, Math.max(0, days - annualAvailable));
+    return {
+        annual: annualAvailable - (days - tabungUsed),
+        tabung: previewBalance.tabung - tabungUsed,
+        total: totalAvailable - days,
+    };
 });
 
 const routePreview = computed(() => {
+    const days = Number(dayEstimate.value);
+    if (!Number.isFinite(days) || days <= 0) return [];
     if (role.value === 'Pengurus Besar')
         return ['Setiausaha ALK · keputusan akhir'];
     if (role.value === 'Pengurus Unit')
-        return [
-            'Pengurus Besar · laluan permohonan sendiri perlu pengesahan HR (CT-DEC-050)',
-        ];
-    if (Number(dayEstimate.value) > 5)
+        return days > 5
+            ? ['Pengurus Besar · sokongan', 'Setiausaha ALK · keputusan akhir']
+            : ['Pengurus Besar · keputusan akhir'];
+    if (days > 5)
         return [
             'Pengurus Unit · sokongan',
             'Pengurus Besar · sokongan',
@@ -559,7 +575,11 @@ function showPreviewMessage(message: string) {
 }
 
 function previewSubmit() {
-    const requiredReason = leaveType.value === 'EL' || emergencyAl.value;
+    if (!projectedBalance.value) {
+        showPreviewMessage('Pilih tarikh dan tempoh cuti bekerja yang sah.');
+        return;
+    }
+    const requiredReason = leaveType.value === 'EL';
     if (requiredReason && !reason.value.trim()) {
         showPreviewMessage(
             'Isi alasan kecemasan untuk melihat pratonton semakan.',
@@ -1657,6 +1677,18 @@ const CalendarRow = defineComponent({
                     </template>
 
                     <template v-else-if="screen === 'apply'">
+                        <section aria-label="Baki kelayakan cuti" class="mb-5 space-y-3">
+                            <div>
+                                <h2 class="font-semibold">Baki kelayakan cuti</h2>
+                                <p class="text-sm text-muted-foreground">Data contoh · AL dan EL berkongsi baki yang sama.</p>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                                <MetricCard label="Cuti Tahunan (AL)" :value="previewBalance.annual.toFixed(1)" note="hari · sebelum tempahan" icon="wallet" />
+                                <MetricCard label="Tabung Cuti" :value="previewBalance.tabung.toFixed(1)" note="hari · baki berasingan" icon="landmark" />
+                                <MetricCard label="Tempahan pending" :value="previewBalance.pending.toFixed(1)" note="hari · belum ditolak rasmi" icon="clock" />
+                                <MetricCard label="Jumlah baki tersedia" :value="totalAvailable.toFixed(1)" note="hari · selepas tempahan" icon="gauge" />
+                            </div>
+                        </section>
                         <div
                             class="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.75fr)]"
                         >
@@ -1676,74 +1708,19 @@ const CalendarRow = defineComponent({
                                             baki Cuti Tahunan yang sama.
                                         </p>
                                     </div>
-                                    <div class="grid gap-3 sm:grid-cols-2">
-                                        <label
-                                            class="flex cursor-pointer items-start gap-3 rounded-xl border p-4"
-                                            :class="
-                                                leaveType === 'AL'
-                                                    ? 'border-primary bg-primary/[0.035]'
-                                                    : 'border-border'
-                                            "
-                                            ><input
-                                                v-model="leaveType"
-                                                type="radio"
-                                                value="AL"
-                                                class="mt-1 accent-primary"
-                                            /><span
-                                                ><strong class="text-sm"
-                                                    >Cuti Tahunan (AL)</strong
-                                                ><span
-                                                    class="mt-1 block text-xs leading-5 text-muted-foreground"
-                                                    >Alasan AL biasa adalah
-                                                    pilihan. Notis biasa
-                                                    sekurang-kurangnya tiga hari
-                                                    bekerja.</span
-                                                ></span
-                                            ></label
-                                        ><label
-                                            class="flex cursor-pointer items-start gap-3 rounded-xl border p-4"
-                                            :class="
-                                                leaveType === 'EL'
-                                                    ? 'border-primary bg-primary/[0.035]'
-                                                    : 'border-border'
-                                            "
-                                            ><input
-                                                v-model="leaveType"
-                                                type="radio"
-                                                value="EL"
-                                                class="mt-1 accent-primary"
-                                            /><span
-                                                ><strong class="text-sm"
-                                                    >Emergency Leave
-                                                    (EL)</strong
-                                                ><span
-                                                    class="mt-1 block text-xs leading-5 text-muted-foreground"
-                                                    >Alasan kecemasan wajib;
-                                                    dokumen sokongan
-                                                    pilihan.</span
-                                                ></span
-                                            ></label
+                                    <label class="space-y-2 text-sm font-medium">
+                                        Jenis cuti
+                                        <select
+                                            v-model="leaveType"
+                                            class="block min-h-11 w-full rounded-lg border border-input bg-background px-3 text-sm"
                                         >
-                                    </div>
-                                    <label
-                                        v-if="leaveType === 'AL'"
-                                        class="flex items-start gap-3 rounded-xl border border-border p-4 text-sm"
-                                        ><input
-                                            v-model="emergencyAl"
-                                            type="checkbox"
-                                            class="mt-0.5 accent-primary"
-                                        /><span
-                                            ><strong
-                                                >AL kecemasan / notis kurang
-                                                tiga hari bekerja</strong
-                                            ><span
-                                                class="mt-1 block text-xs leading-5 text-muted-foreground"
-                                                >Alasan kecemasan perlu
-                                                dinyatakan. Ini tidak menjadikan
-                                                kelulusan automatik.</span
-                                            ></span
-                                        ></label
-                                    >
+                                            <option value="AL">Cuti Tahunan (AL)</option>
+                                            <option value="EL">Emergency Leave (EL)</option>
+                                        </select>
+                                        <span class="block text-xs font-normal text-muted-foreground">
+                                            {{ leaveType === 'AL' ? 'Permohonan Cuti Tahunan biasa. Alasan pilihan.' : 'Alasan kecemasan wajib; dokumen sokongan pilihan.' }}
+                                        </span>
+                                    </label>
                                 </section>
                                 <section
                                     class="space-y-4 border-t border-border pt-5"
@@ -1843,22 +1820,18 @@ const CalendarRow = defineComponent({
                                         </p>
                                     </div>
                                     <label class="space-y-2 text-sm font-medium"
-                                        >Alasan
+                                        >{{ leaveType === 'EL' ? 'Alasan kecemasan' : 'Alasan' }}
                                         <span
                                             class="font-normal text-muted-foreground"
                                             >{{
-                                                leaveType === 'EL' ||
-                                                emergencyAl
+                                                leaveType === 'EL'
                                                     ? '· wajib'
                                                     : '· pilihan'
                                             }}</span
                                         ><textarea
                                             v-model="reason"
                                             rows="3"
-                                            :required="
-                                                leaveType === 'EL' ||
-                                                emergencyAl
-                                            "
+                                            :required="leaveType === 'EL'"
                                             maxlength="1000"
                                             :placeholder="
                                                 leaveType === 'EL'
@@ -1896,16 +1869,6 @@ const CalendarRow = defineComponent({
                                         Pemakluman awal kepada penyokong dibuat
                                         di luar sistem, contohnya WhatsApp, dan
                                         bukan kepada pelulus (CT-DEC-027/028).
-                                    </p>
-                                    <p
-                                        v-if="role === 'Pengurus Unit'"
-                                        class="rounded-xl border border-amber-500/20 bg-amber-500/[0.07] p-4 text-sm leading-6"
-                                    >
-                                        Laluan permohonan sendiri Pengurus Unit
-                                        belum ditetapkan dalam baseline
-                                        (CT-DEC-050). Paparan laluan di bawah
-                                        ialah ruang semakan reka bentuk dan
-                                        tidak membuat penghantaran.
                                     </p>
                                 </section>
                                 <div
@@ -1954,12 +1917,24 @@ const CalendarRow = defineComponent({
                                         label="Tempoh"
                                         :value="`${dayEstimate} hari${leaveLength === 'Separuh hari' ? ` · sesi ${session.toLowerCase()}` : ''}`"
                                     /><SummaryRow
-                                        label="Baki AL tersedia"
-                                        value="14.5 hari · contoh"
+                                        label="Baki AL selepas tempahan"
+                                        :value="`${annualAvailable.toFixed(1)} hari`"
                                     /><SummaryRow
-                                        label="Tabung Cuti"
-                                        value="5 hari · contoh"
+                                        label="Tabung Cuti tersedia"
+                                        :value="`${previewBalance.tabung.toFixed(1)} hari`"
+                                    /><SummaryRow
+                                        label="Anggaran AL selepas permohonan"
+                                        :value="projectedBalance ? `${projectedBalance.annual.toFixed(1)} hari` : '—'"
+                                    /><SummaryRow
+                                        label="Anggaran Tabung selepas permohonan"
+                                        :value="projectedBalance ? `${projectedBalance.tabung.toFixed(1)} hari` : '—'"
+                                    /><SummaryRow
+                                        label="Jumlah baki unjuran"
+                                        :value="projectedBalance ? `${projectedBalance.total.toFixed(1)} hari` : '—'"
                                     />
+                                    <p v-if="projectedBalance && projectedBalance.total < 0" class="rounded-lg border border-amber-500/20 bg-amber-500/[0.07] p-3 text-sm" role="status">
+                                        Baki unjuran negatif. Permohonan tertakluk kepada semakan dan kelulusan biasa.
+                                    </p>
                                 </div>
                                 <div class="border-t border-border pt-4">
                                     <p
@@ -1967,6 +1942,7 @@ const CalendarRow = defineComponent({
                                     >
                                         Aliran semakan (rujukan)
                                     </p>
+                                    <p v-if="!routePreview.length" class="mt-3 text-sm text-muted-foreground">Pilih tarikh cuti bekerja yang sah.</p>
                                     <ol class="mt-3 space-y-2">
                                         <li
                                             v-for="(
