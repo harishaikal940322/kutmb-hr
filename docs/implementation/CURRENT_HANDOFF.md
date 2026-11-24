@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P02 version-period overlap warnings
+
+- Added server-calculated inclusive effective-period overlap warnings to calendar and policy draft lists, including open-ended periods. Drafts may coexist for review; warnings do not confirm, select or activate a version. Future confirmation must enforce conflict resolution transactionally rather than relying on this display.
+- Checks: focused unit and rollback-isolated MySQL integration tests passed (3 tests, 102 assertions), including adjacent/inclusive dates, open ends and returned warnings; targeted PHPStan/Pint, frontend formatting/lint, Vue type check, build and `git diff --check` passed. No database migration or browser acceptance in this slice.
+- Next: remaining calendar draft cancellation/replacement review and policy entitlement configuration need safe historical contracts; CT-P03 posting and later workflows still require confirmed upstream policy and safeguards. Production and HR approval remain gated.
+
 ## 24 November 2026 — CT-P02 policy draft revision history
 
 - Added edits to unconfirmed working-time policy drafts, with previous settings retained in a restricted history table and an audit event in the same transaction. Confirmed or partially confirmed versions remain locked. Input continues to preserve null/unset values and validate date/time ordering; no confirmation, entitlement values or operational calculations were added.

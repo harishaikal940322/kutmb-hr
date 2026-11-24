@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditEvent;
+use App\Services\Leave\VersionPeriodOverlap;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,10 +15,10 @@ use Inertia\Response;
 
 class LeaveCalendarDraftController extends Controller
 {
-    public function index(): Response
+    public function index(VersionPeriodOverlap $overlap): Response
     {
         return Inertia::render('leave/CalendarDrafts', [
-            'versions' => DB::table('leave_calendar_versions')->orderByDesc('effective_from')->get(['id', 'label', 'effective_from', 'effective_to', 'confirmed_at', 'confirmed_by']),
+            'versions' => $overlap->annotate(DB::table('leave_calendar_versions')->orderByDesc('effective_from')->orderByDesc('id')->get(['id', 'label', 'effective_from', 'effective_to', 'confirmed_at', 'confirmed_by'])),
             'days' => DB::table('leave_calendar_days')->orderBy('date')->get(['id', 'calendar_version_id', 'date', 'name', 'kind', 'original_day_id']),
             'history' => DB::table('leave_calendar_day_history')->orderByDesc('id')->get(['id', 'calendar_day_id', 'previous_date', 'previous_name', 'created_at']),
         ]);

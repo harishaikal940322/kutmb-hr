@@ -37,6 +37,7 @@ class PolicyDraftTest extends TestCase
         $configured = DB::table('leave_policy_versions')->where('label', 'Configured '.$suffix)->sole();
         $this->assertSame([1, 5], json_decode($configured->working_weekdays, true));
         $this->assertNull($configured->confirmed_at);
+        $this->get('/leave/policy-drafts')->assertOk()->assertInertia(fn (Assert $page) => $page->where('versions.0.overlapping_ids', [$draft->id]));
         $this->patch('/leave/policy-drafts/'.$draft->id, [...$base, 'label' => 'Revised '.$suffix, 'working_weekdays' => [1, 2], 'work_start' => '08:00'])->assertRedirect();
         $previous = DB::table('leave_policy_history')->where('policy_version_id', $draft->id)->sole();
         $state = json_decode($previous->previous_state, true);

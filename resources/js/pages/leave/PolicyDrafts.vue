@@ -12,11 +12,15 @@ type Version = {
     work_end: string | null;
     confirmed_at: string | null;
     confirmed_by: number | null;
+    overlapping_ids: number[];
 };
 type History = {
     id: number;
     policy_version_id: number;
-    previous_state: Omit<Version, 'id' | 'confirmed_at' | 'confirmed_by'>;
+    previous_state: Omit<
+        Version,
+        'id' | 'confirmed_at' | 'confirmed_by' | 'overlapping_ids'
+    >;
     created_at: string;
 };
 defineProps<{ versions: Version[]; history: History[] }>();
@@ -164,6 +168,14 @@ function submit() {
                     class="space-y-1 p-4"
                 >
                     <p class="font-semibold">{{ version.label }}</p>
+                    <p
+                        v-if="version.overlapping_ids.length"
+                        class="text-sm text-destructive"
+                    >
+                        Tempoh bertindih dengan
+                        {{ version.overlapping_ids.length }} versi lain. Semak
+                        sebelum sebarang pengesahan.
+                    </p>
                     <p class="text-sm text-muted-foreground">
                         {{ version.effective_from }} —
                         {{ version.effective_to ?? 'terbuka' }} ·

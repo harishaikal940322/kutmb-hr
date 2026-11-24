@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditEvent;
+use App\Services\Leave\VersionPeriodOverlap;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,9 +14,9 @@ use Inertia\Response;
 
 class LeavePolicyDraftController extends Controller
 {
-    public function index(): Response
+    public function index(VersionPeriodOverlap $overlap): Response
     {
-        $versions = DB::table('leave_policy_versions')->orderByDesc('effective_from')->get();
+        $versions = DB::table('leave_policy_versions')->orderByDesc('effective_from')->orderByDesc('id')->get();
         $versions->transform(function ($version) {
             $version->working_weekdays = $version->working_weekdays === null ? null : json_decode($version->working_weekdays, true, 512, JSON_THROW_ON_ERROR);
 
@@ -29,7 +30,7 @@ class LeavePolicyDraftController extends Controller
             return $entry;
         });
 
-        return Inertia::render('leave/PolicyDrafts', ['versions' => $versions, 'history' => $history]);
+        return Inertia::render('leave/PolicyDrafts', ['versions' => $overlap->annotate($versions), 'history' => $history]);
     }
 
     public function store(Request $request): RedirectResponse

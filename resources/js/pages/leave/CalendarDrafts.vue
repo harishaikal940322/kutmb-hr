@@ -9,6 +9,7 @@ type Version = {
     effective_to: string | null;
     confirmed_at: string | null;
     confirmed_by: number | null;
+    overlapping_ids: number[];
 };
 type Day = {
     id: number;
@@ -104,6 +105,14 @@ function submit() {
                 class="space-y-4 rounded-lg border p-4"
             >
                 <h3 class="font-semibold">{{ version.label }}</h3>
+                <p
+                    v-if="version.overlapping_ids.length"
+                    class="text-sm text-destructive"
+                >
+                    Tempoh bertindih dengan
+                    {{ version.overlapping_ids.length }} versi lain. Semak
+                    sebelum sebarang pengesahan.
+                </p>
                 <p class="text-sm text-muted-foreground">
                     {{ version.effective_from }} —
                     {{ version.effective_to ?? 'terbuka' }} ·

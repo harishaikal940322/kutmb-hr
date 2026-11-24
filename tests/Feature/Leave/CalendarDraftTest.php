@@ -39,6 +39,7 @@ class CalendarDraftTest extends TestCase
         $this->post($path, ['date' => '2026-03-02', 'name' => 'Replacement', 'kind' => 'replacement', 'original_day_id' => null])->assertSessionHasErrors('original_day_id');
         $this->post($path, ['date' => '2026-03-02', 'name' => 'Replacement', 'kind' => 'replacement', 'original_day_id' => $day->id])->assertRedirect();
         $other = DB::table('leave_calendar_versions')->insertGetId(['label' => 'Other synthetic '.$suffix, 'effective_from' => '2026-01-01']);
+        $this->get('/leave/calendar-drafts')->assertOk()->assertInertia(fn (Assert $page) => $page->where('versions.0.overlapping_ids', [$version->id]));
         $this->post('/leave/calendar-drafts/'.$other.'/days', ['date' => '2026-03-02', 'name' => 'Invalid', 'kind' => 'replacement', 'original_day_id' => $day->id])->assertSessionHasErrors('original_day_id');
         $editPath = $path.'/'.$day->id;
         $this->patch($editPath, ['date' => '2026-03-02', 'name' => 'Collision'])->assertSessionHasErrors('date');
