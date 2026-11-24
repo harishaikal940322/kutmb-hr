@@ -41,6 +41,10 @@ return [
                 'label' => 'View employees', 'description' => 'View the local development employee directory.',
                 'group' => 'Employee and organization', 'submodule' => 'Employees', 'action' => 'View', 'system_only' => false,
             ],
+            'hr.accounts.link' => [
+                'label' => 'Link employee accounts', 'description' => 'Manage local development employee account associations.',
+                'group' => 'Employee and organization', 'submodule' => 'Account association', 'action' => 'Manage', 'system_only' => false,
+            ],
             'hr.assignments.manage' => [
                 'label' => 'Manage assignments', 'description' => 'Manage local development employee assignments.',
                 'group' => 'Employee and organization', 'submodule' => 'Assignments', 'action' => 'Manage', 'system_only' => false,

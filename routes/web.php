@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\EmployeeAccountLinkController;
 use App\Http\Controllers\EmployeeAssignmentController;
 use App\Http\Controllers\EmployeeFoundationController;
 use App\Http\Controllers\IdentityMenuAccessController;
@@ -78,5 +79,6 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.
         Route::get('/', [EmployeeFoundationController::class, 'index'])->name('index');
         Route::post('/', [EmployeeFoundationController::class, 'store'])->middleware('permission:hr.employees.manage')->name('store');
         Route::patch('/{employeeId}', [EmployeeFoundationController::class, 'update'])->whereNumber('employeeId')->middleware('permission:hr.employees.manage')->name('update');
+        Route::put('/{employeeId}/account', [EmployeeAccountLinkController::class, 'update'])->whereNumber('employeeId')->middleware('permission:hr.accounts.link')->name('account.update');
         Route::post('/{employeeId}/assignments', [EmployeeAssignmentController::class, 'store'])->whereNumber('employeeId')->middleware('permission:hr.assignments.manage')->name('assignments.store');
     });

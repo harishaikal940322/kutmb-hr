@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
+import AccountLinkForm from './AccountLinkForm.vue';
 import AssignmentForm from './AssignmentForm.vue';
 import EmployeeEditForm from './EmployeeEditForm.vue';
 type Reference = { id: number; code: string; name: string };
@@ -10,6 +11,7 @@ type Employee = {
     service_start: string;
     confirmation_date: string | null;
     service_end: string | null;
+    user_id: number | null;
 };
 type Assignment = {
     employee_id: number;
@@ -24,6 +26,8 @@ defineProps<{
     categories: Reference[];
     canCreate: boolean;
     canAssign: boolean;
+    canLink: boolean;
+    accounts: { id: number; username: string }[];
     assignments: Assignment[];
 }>();
 const form = useForm({
@@ -207,6 +211,12 @@ function submit() {
                             {{ assignment.effective_to ?? 'terbuka' }}
                         </li>
                     </ul>
+                    <AccountLinkForm
+                        v-if="canLink"
+                        :employee-id="employee.id"
+                        :linked-user-id="employee.user_id"
+                        :accounts="accounts"
+                    />
                     <EmployeeEditForm v-if="canCreate" :employee="employee" />
                     <AssignmentForm
                         v-if="canAssign"

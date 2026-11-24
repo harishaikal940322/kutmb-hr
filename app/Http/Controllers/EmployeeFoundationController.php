@@ -17,10 +17,15 @@ class EmployeeFoundationController extends Controller
     public function index(Request $request): Response
     {
         return Inertia::render('employees/Index', [
-            'employees' => DB::table('employees')->orderBy('display_name')->get(['id', 'employee_no', 'display_name', 'service_start', 'confirmation_date', 'service_end']),
+            'employees' => DB::table('employees')->orderBy('display_name')->get([
+                'id', 'employee_no', 'display_name', 'service_start', 'confirmation_date', 'service_end',
+                ...($request->user()->can('hr.accounts.link') ? ['user_id'] : []),
+            ]),
             'units' => DB::table('organization_units')->where('active', true)->orderBy('name')->get(['id', 'code', 'name']),
             'categories' => DB::table('employment_categories')->where('active', true)->orderBy('name')->get(['id', 'code', 'name']),
             'assignments' => DB::table('employee_assignments')->join('organization_units', 'organization_units.id', '=', 'employee_assignments.unit_id')->join('employment_categories', 'employment_categories.id', '=', 'employee_assignments.category_id')->orderBy('effective_from')->get(['employee_assignments.employee_id', 'employee_assignments.effective_from', 'employee_assignments.effective_to', 'organization_units.name as unit_name', 'employment_categories.name as category_name']),
+            'canLink' => $request->user()->can('hr.accounts.link'),
+            'accounts' => $request->user()->can('hr.accounts.link') ? DB::table('users')->where('status', 'ACTIVE')->whereNotNull('username')->where('id', '!=', $request->user()->getKey())->orderBy('username')->get(['id', 'username']) : [],
             'canAssign' => $request->user()->can('hr.assignments.manage'),
             'canCreate' => $request->user()->can('hr.employees.manage'),
         ]);

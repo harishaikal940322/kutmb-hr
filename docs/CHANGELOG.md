@@ -1,3 +1,5 @@
+- 2026-11-24: Added local independently authorized employee/account association with restricted reason history and fail-closed leave-history boundary. See CURRENT_HANDOFF.
+
 - 2026-11-24: Added local employee profile edits with assignment-date consistency checks and audit. See CURRENT_HANDOFF.
 
 - 2026-11-24: Added local, audited employee assignment history and forward transfers with transaction-locked overlap checks. See CURRENT_HANDOFF.
