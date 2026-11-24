@@ -1,3 +1,5 @@
+- 2026-11-24: Separated local working-schedule simulation from whole-policy and entitlement confirmation. See CURRENT_HANDOFF.
+
 - 2026-11-24: Added unexposed local technical simulation of confirmed working sessions, failing closed when versions are missing. See CURRENT_HANDOFF.
 
 - 2026-11-24: Added permission-gated employee directory search with assignment props limited to matching results. See CURRENT_HANDOFF.

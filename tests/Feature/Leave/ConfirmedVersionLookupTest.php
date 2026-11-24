@@ -29,13 +29,13 @@ class ConfirmedVersionLookupTest extends TestCase
             }
         };
         $fails(fn () => $service->workingScheduleFor('2099-03-01'));
-        $policy = DB::table('leave_policy_versions')->insertGetId(['label' => 'Synthetic '.$suffix, 'effective_from' => '2099-01-01', 'effective_to' => '2099-12-31', 'confirmed_by' => $actor->id, 'confirmed_at' => now()]);
+        $policy = DB::table('leave_policy_versions')->insertGetId(['label' => 'Synthetic '.$suffix, 'effective_from' => '2099-01-01', 'effective_to' => '2099-12-31', 'schedule_simulated_by' => $actor->id, 'schedule_simulated_at' => now()]);
         $fails(fn () => $service->workingScheduleFor('2099-03-01'));
         DB::table('leave_policy_versions')->where('id', $policy)->update(['working_weekdays' => '[1,2,3,4,5]', 'work_start' => '08:00', 'session_boundary' => '13:00', 'work_end' => '17:00']);
         $this->assertSame([1, 2, 3, 4, 5], $service->workingScheduleFor('2099-03-01')->working_weekdays);
-        $second = DB::table('leave_policy_versions')->insertGetId(['label' => 'Other '.$suffix, 'effective_from' => '2099-01-01', 'effective_to' => '2099-12-31', 'confirmed_by' => $actor->id, 'confirmed_at' => now()]);
+        $second = DB::table('leave_policy_versions')->insertGetId(['label' => 'Other '.$suffix, 'effective_from' => '2099-01-01', 'effective_to' => '2099-12-31', 'schedule_simulated_by' => $actor->id, 'schedule_simulated_at' => now()]);
         $fails(fn () => $service->workingScheduleFor('2099-03-01'));
-        DB::table('leave_policy_versions')->where('id', $second)->update(['confirmed_at' => null, 'confirmed_by' => null, 'cancelled_at' => now(), 'cancelled_by' => $actor->id]);
+        DB::table('leave_policy_versions')->where('id', $second)->update(['schedule_simulated_at' => null, 'schedule_simulated_by' => null, 'cancelled_at' => now(), 'cancelled_by' => $actor->id]);
         $this->assertSame((int) $policy, (int) $service->workingScheduleFor('2099-03-01')->id);
         DB::table('leave_policy_versions')->where('id', $second)->update(['cancelled_by' => null]);
         $fails(fn () => $service->workingScheduleFor('2099-03-01'));

@@ -13,7 +13,7 @@ class ConfirmedVersionLookup
 {
     public function workingScheduleFor(string $date): stdClass
     {
-        $policy = $this->oneFor('leave_policy_versions', $date);
+        $policy = $this->oneFor('leave_policy_versions', $date, 'schedule_simulated_at', 'schedule_simulated_by');
         try {
             $weekdays = $policy->working_weekdays === null ? null : json_decode($policy->working_weekdays, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
@@ -73,7 +73,7 @@ class ConfirmedVersionLookup
         return ['version' => $version, 'holidays' => array_values(array_map(fn ($day): string => $day->date, $active))];
     }
 
-    private function oneFor(string $table, string $date): stdClass
+    private function oneFor(string $table, string $date, string $markerAt = 'confirmed_at', string $markerBy = 'confirmed_by'): stdClass
     {
         if (! app()->environment(['local', 'testing'])) {
             throw new RuntimeException('Technical version lookup is unavailable.');
@@ -86,12 +86,13 @@ class ConfirmedVersionLookup
             ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', $date))->get();
         $confirmed = [];
         foreach ($versions as $version) {
-            if (($version->confirmed_at === null) !== ($version->confirmed_by === null)
+            if (($version->{$markerAt} === null) !== ($version->{$markerBy} === null)
+                || ($table === 'leave_policy_versions' && ((($version->confirmed_at === null) !== ($version->confirmed_by === null)) || ($version->confirmed_at !== null && $version->cancelled_at !== null)))
                 || ($version->cancelled_at === null) !== ($version->cancelled_by === null)
-                || ($version->confirmed_at !== null && $version->cancelled_at !== null)) {
+                || ($version->{$markerAt} !== null && $version->cancelled_at !== null)) {
                 throw new RuntimeException('Version state is inconsistent.');
             }
-            if ($version->confirmed_at !== null) {
+            if ($version->{$markerAt} !== null) {
                 $confirmed[] = $version;
             }
         }

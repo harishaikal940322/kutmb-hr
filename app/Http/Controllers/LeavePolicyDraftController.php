@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditEvent;
+use App\Services\Leave\ConfirmedVersionLookup;
 use App\Services\Leave\VersionPeriodOverlap;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -70,7 +72,7 @@ class LeavePolicyDraftController extends Controller
         DB::transaction(function () use ($request, $versionId, $data): void {
             $version = DB::table('leave_policy_versions')->where('id', $versionId)->lockForUpdate()->first();
             abort_if($version === null, 404);
-            if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null) {
+            if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->schedule_simulated_at !== null || $version->schedule_simulated_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null) {
                 throw ValidationException::withMessages(['label' => 'Dasar yang disahkan tidak boleh diubah.']);
             }
             $previous = [
@@ -110,7 +112,7 @@ class LeavePolicyDraftController extends Controller
             DB::transaction(function () use ($request, $versionId, $data): void {
                 $version = DB::table('leave_policy_versions')->where('id', $versionId)->lockForUpdate()->first();
                 abort_if($version === null, 404);
-                if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null) {
+                if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->schedule_simulated_at !== null || $version->schedule_simulated_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null) {
                     throw ValidationException::withMessages(['band_description' => 'Dasar yang disahkan tidak boleh diubah.']);
                 }
                 $category = DB::table('employment_categories')->where('id', $data['category_id'])->lockForUpdate()->first();
@@ -141,7 +143,7 @@ class LeavePolicyDraftController extends Controller
             DB::transaction(function () use ($request, $versionId, $ruleId, $data): void {
                 $version = DB::table('leave_policy_versions')->where('id', $versionId)->lockForUpdate()->first();
                 abort_if($version === null, 404);
-                if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null) {
+                if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->schedule_simulated_at !== null || $version->schedule_simulated_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null) {
                     throw ValidationException::withMessages(['band_description' => 'Dasar yang disahkan tidak boleh diubah.']);
                 }
                 $rule = DB::table('leave_entitlement_rule_drafts')->where('id', $ruleId)->where('policy_version_id', $versionId)->lockForUpdate()->first();
@@ -182,7 +184,7 @@ class LeavePolicyDraftController extends Controller
         DB::transaction(function () use ($request, $versionId, $ruleId, $cancelled): void {
             $version = DB::table('leave_policy_versions')->where('id', $versionId)->lockForUpdate()->first();
             abort_if($version === null, 404);
-            if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null) {
+            if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->schedule_simulated_at !== null || $version->schedule_simulated_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null) {
                 throw ValidationException::withMessages(['cancelled' => 'Dasar yang disahkan tidak boleh diubah.']);
             }
             $rule = DB::table('leave_entitlement_rule_drafts')->where('id', $ruleId)->where('policy_version_id', $versionId)->lockForUpdate()->first();
@@ -213,7 +215,7 @@ class LeavePolicyDraftController extends Controller
         DB::transaction(function () use ($request, $versionId, $cancelled): void {
             $version = DB::table('leave_policy_versions')->where('id', $versionId)->lockForUpdate()->first();
             abort_if($version === null, 404);
-            if ($version->confirmed_at !== null || $version->confirmed_by !== null) {
+            if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->schedule_simulated_at !== null || $version->schedule_simulated_by !== null) {
                 throw ValidationException::withMessages(['cancelled' => 'Versi yang disahkan tidak boleh diubah.']);
             }
             $isCancelled = $version->cancelled_at !== null || $version->cancelled_by !== null;
@@ -233,6 +235,47 @@ class LeavePolicyDraftController extends Controller
         }, 3);
 
         return to_route('leave.policy.drafts.index')->with('success', 'Status draf dikemas kini.');
+    }
+
+    public function confirmScheduleSimulation(Request $request, int $versionId, ConfirmedVersionLookup $lookup): RedirectResponse
+    {
+        $request->validate(['acknowledge_schedule' => ['accepted']]);
+        if (Schema::hasTable('leave_requests')) {
+            throw ValidationException::withMessages(['acknowledge_schedule' => 'Simulasi ditangguhkan sehingga kesan permohonan disokong.']);
+        }
+        DB::transaction(function () use ($request, $versionId, $lookup): void {
+            abort_if(DB::table('leave_working_schedule_guard')->where('id', 1)->lockForUpdate()->first() === null, 503);
+            $version = DB::table('leave_policy_versions')->where('id', $versionId)->lockForUpdate()->first();
+            abort_if($version === null, 404);
+            if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->schedule_simulated_at !== null || $version->schedule_simulated_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null || $version->effective_to === null || $version->effective_to < $version->effective_from) {
+                throw ValidationException::withMessages(['acknowledge_schedule' => 'Pilih draf aktif dengan tempoh mula dan tamat yang sah.']);
+            }
+            $others = DB::table('leave_policy_versions')->where('id', '!=', $versionId)->where('effective_from', '<=', $version->effective_to)
+                ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', $version->effective_from))->get();
+            foreach ($others as $other) {
+                if (($other->schedule_simulated_at === null) !== ($other->schedule_simulated_by === null)
+                    || ($other->confirmed_at === null) !== ($other->confirmed_by === null)
+                    || ($other->cancelled_at === null) !== ($other->cancelled_by === null)
+                    || $other->schedule_simulated_at !== null || $other->confirmed_at !== null) {
+                    throw ValidationException::withMessages(['acknowledge_schedule' => 'Tempoh bertindih dengan jadual simulasi atau versi tidak konsisten.']);
+                }
+            }
+            DB::table('leave_policy_versions')->where('id', $versionId)->update([
+                'schedule_simulated_by' => $request->user()->getKey(), 'schedule_simulated_at' => now(), 'updated_at' => now(),
+            ]);
+            try {
+                $lookup->workingScheduleFor($version->effective_from);
+            } catch (\RuntimeException) {
+                throw ValidationException::withMessages(['acknowledge_schedule' => 'Hari bekerja dan masa sesi mesti lengkap dan sah.']);
+            }
+            AuditEvent::query()->create([
+                'occurred_at' => now(), 'actor_id' => $request->user()->getKey(), 'action_code' => 'leave.policy.schedule_simulated',
+                'target_ref' => 'policy_version:'.$versionId, 'outcome' => 'SUCCESS',
+                'metadata' => ['source' => 'policy_draft_ui', 'changed_fields' => ['working_schedule']],
+            ]);
+        }, 3);
+
+        return to_route('leave.policy.drafts.index')->with('success', 'Jadual sintetik disahkan untuk simulasi tempatan sahaja.');
     }
 
     /** @return array<string, mixed> */

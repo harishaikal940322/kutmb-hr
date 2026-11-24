@@ -19,7 +19,7 @@ class TechnicalSessionSimulationTest extends TestCase
         $this->assertGreaterThan(0, DB::transactionLevel());
         $suffix = Str::lower(Str::random(16));
         $actor = User::factory()->create(['username' => 'sim'.$suffix, 'email' => null, 'status' => 'ACTIVE']);
-        $policy = ['label' => 'Synthetic '.$suffix, 'effective_from' => '2099-01-01', 'effective_to' => '2099-12-31', 'confirmed_by' => $actor->id, 'confirmed_at' => now(), 'working_weekdays' => '[1,2,3,4,5]', 'work_start' => '08:00', 'session_boundary' => '13:00', 'work_end' => '17:00'];
+        $policy = ['label' => 'Synthetic '.$suffix, 'effective_from' => '2099-01-01', 'effective_to' => '2099-12-31', 'schedule_simulated_by' => $actor->id, 'schedule_simulated_at' => now(), 'working_weekdays' => '[1,2,3,4,5]', 'work_start' => '08:00', 'session_boundary' => '13:00', 'work_end' => '17:00'];
         DB::table('leave_policy_versions')->insert($policy);
         $calendar = DB::table('leave_calendar_versions')->insertGetId(['label' => 'Synthetic '.$suffix, 'effective_from' => '2099-01-01', 'effective_to' => '2099-12-31', 'confirmed_by' => $actor->id, 'confirmed_at' => now()]);
         DB::table('leave_calendar_days')->insert(['calendar_version_id' => $calendar, 'date' => '2099-03-03', 'name' => 'Synthetic holiday', 'kind' => 'holiday']);

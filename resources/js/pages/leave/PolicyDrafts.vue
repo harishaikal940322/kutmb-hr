@@ -5,6 +5,7 @@ import EntitlementCancellationForm from './EntitlementCancellationForm.vue';
 import EntitlementDraftEditForm from './EntitlementDraftEditForm.vue';
 import EntitlementDraftForm from './EntitlementDraftForm.vue';
 import PolicyEditForm from './PolicyEditForm.vue';
+import ScheduleSimulationForm from './ScheduleSimulationForm.vue';
 type Version = {
     id: number;
     label: string;
@@ -16,6 +17,8 @@ type Version = {
     work_end: string | null;
     confirmed_at: string | null;
     confirmed_by: number | null;
+    schedule_simulated_at: string | null;
+    schedule_simulated_by: number | null;
     overlapping_ids: number[];
     cancelled_at: string | null;
     cancelled_by: number | null;
@@ -28,6 +31,8 @@ type History = {
         | 'id'
         | 'confirmed_at'
         | 'confirmed_by'
+        | 'schedule_simulated_at'
+        | 'schedule_simulated_by'
         | 'overlapping_ids'
         | 'cancelled_at'
         | 'cancelled_by'
@@ -211,7 +216,12 @@ function submit() {
                         pertindihan.
                     </p>
                     <VersionCancellationForm
-                        v-if="!version.confirmed_at && !version.confirmed_by"
+                        v-if="
+                            !version.confirmed_at &&
+                            !version.confirmed_by &&
+                            !version.schedule_simulated_at &&
+                            !version.schedule_simulated_by
+                        "
                         kind="policy"
                         :version-id="version.id"
                         :is-cancelled="
@@ -237,6 +247,27 @@ function submit() {
                                 : 'Draf'
                         }}
                     </p>
+                    <p
+                        v-if="
+                            version.schedule_simulated_at ||
+                            version.schedule_simulated_by
+                        "
+                        class="text-sm"
+                    >
+                        Jadual disahkan untuk simulasi sahaja; dasar dan
+                        kelayakan belum diluluskan.
+                    </p>
+                    <ScheduleSimulationForm
+                        v-if="
+                            !version.confirmed_at &&
+                            !version.confirmed_by &&
+                            !version.schedule_simulated_at &&
+                            !version.schedule_simulated_by &&
+                            !version.cancelled_at &&
+                            !version.cancelled_by
+                        "
+                        :version-id="version.id"
+                    />
                     <p class="text-sm">
                         Hari:
                         {{
@@ -361,6 +392,8 @@ function submit() {
                                     v-if="
                                         !version.confirmed_at &&
                                         !version.confirmed_by &&
+                                        !version.schedule_simulated_at &&
+                                        !version.schedule_simulated_by &&
                                         !version.cancelled_at &&
                                         !version.cancelled_by
                                     "
@@ -377,6 +410,8 @@ function submit() {
                                     v-if="
                                         !version.confirmed_at &&
                                         !version.confirmed_by &&
+                                        !version.schedule_simulated_at &&
+                                        !version.schedule_simulated_by &&
                                         !version.cancelled_at &&
                                         !version.cancelled_by &&
                                         !rule.cancelled_at &&
@@ -393,6 +428,8 @@ function submit() {
                         v-if="
                             !version.confirmed_at &&
                             !version.confirmed_by &&
+                            !version.schedule_simulated_at &&
+                            !version.schedule_simulated_by &&
                             !version.cancelled_at &&
                             !version.cancelled_by
                         "
@@ -403,6 +440,8 @@ function submit() {
                         v-if="
                             !version.confirmed_at &&
                             !version.confirmed_by &&
+                            !version.schedule_simulated_at &&
+                            !version.schedule_simulated_by &&
                             !version.cancelled_at &&
                             !version.cancelled_by
                         "

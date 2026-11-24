@@ -113,6 +113,7 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:lea
         Route::get('/', [LeavePolicyDraftController::class, 'index'])->name('index');
         Route::post('/', [LeavePolicyDraftController::class, 'store'])->name('store');
         Route::patch('/{versionId}/cancellation', [LeavePolicyDraftController::class, 'setVersionCancellation'])->whereNumber('versionId')->name('cancellation');
+        Route::post('/{versionId}/simulate-schedule', [LeavePolicyDraftController::class, 'confirmScheduleSimulation'])->whereNumber('versionId')->name('simulate-schedule');
         Route::patch('/{versionId}', [LeavePolicyDraftController::class, 'update'])->whereNumber('versionId')->name('update');
         Route::post('/{versionId}/entitlements', [LeavePolicyDraftController::class, 'storeEntitlementDraft'])->whereNumber('versionId')->name('entitlements.store');
         Route::patch('/{versionId}/entitlements/{ruleId}', [LeavePolicyDraftController::class, 'updateEntitlementDraft'])->whereNumber(['versionId', 'ruleId'])->name('entitlements.update');
