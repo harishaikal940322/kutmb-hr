@@ -37,6 +37,17 @@ class PolicyDraftTest extends TestCase
         $configured = DB::table('leave_policy_versions')->where('label', 'Configured '.$suffix)->sole();
         $this->assertSame([1, 5], json_decode($configured->working_weekdays, true));
         $this->assertNull($configured->confirmed_at);
+        $this->patch('/leave/policy-drafts/'.$draft->id, [...$base, 'label' => 'Revised '.$suffix, 'working_weekdays' => [1, 2], 'work_start' => '08:00'])->assertRedirect();
+        $previous = DB::table('leave_policy_history')->where('policy_version_id', $draft->id)->sole();
+        $state = json_decode($previous->previous_state, true);
+        $this->assertSame($base['label'], $state['label']);
+        $this->assertNull($state['working_weekdays']);
+        $this->assertDatabaseHas('leave_policy_versions', ['id' => $draft->id, 'label' => 'Revised '.$suffix]);
+        $this->assertDatabaseHas('audit_events', ['actor_id' => $actor->id, 'action_code' => 'leave.policy.draft_updated', 'target_ref' => 'policy_version:'.$draft->id]);
+        DB::table('leave_policy_versions')->where('id', $draft->id)->update(['confirmed_by' => $actor->id, 'confirmed_at' => now()]);
+        $this->patch('/leave/policy-drafts/'.$draft->id, $base)->assertSessionHasErrors('label');
+        $this->patch('/leave/policy-drafts/999999999', $base)->assertNotFound();
+
         $this->app['env'] = 'production';
         try {
             $this->get('/leave/policy-drafts')->assertNotFound();

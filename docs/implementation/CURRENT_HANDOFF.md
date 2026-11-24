@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P02 policy draft revision history
+
+- Added edits to unconfirmed working-time policy drafts, with previous settings retained in a restricted history table and an audit event in the same transaction. Confirmed or partially confirmed versions remain locked. Input continues to preserve null/unset values and validate date/time ordering; no confirmation, entitlement values or operational calculations were added.
+- Applied the additive history migration after verifying local target and previewing SQL. Policy and history tables remain empty after rollback testing. Focused MySQL test passed (1 test, 36 assertions) for validation, retained prior settings, audit, confirmed lock, missing target and access; targeted Pint/PHPStan, frontend format/lint, type check, build and `git diff --check` passed. No browser acceptance, concurrent-worker test or production approval.
+- Next: continue unambiguous CT-P02 draft calendar/policy capability, then reassess dependency-ready CT-P03 foundation; confirmation, actual HR rates and leave request impact remain gated.
+
 ## 24 November 2026 — CT-P02 draft working-time policy
 
 - Added local/testing-only draft policy input behind ungranted `leave.policy.manage`. Effective dates, optional explicit weekdays and session times are validated; missing weekdays/times remain null, and supplied session times must be ordered. Drafts are audited and cannot be confirmed, edited, deleted or used for leave calculations. No entitlement rates, automatic defaults, actual HR values or operational policy were introduced.

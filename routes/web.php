@@ -109,4 +109,5 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:lea
     ->prefix('leave/policy-drafts')->name('leave.policy.drafts.')->group(function (): void {
         Route::get('/', [LeavePolicyDraftController::class, 'index'])->name('index');
         Route::post('/', [LeavePolicyDraftController::class, 'store'])->name('store');
+        Route::patch('/{versionId}', [LeavePolicyDraftController::class, 'update'])->whereNumber('versionId')->name('update');
     });

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
+import PolicyEditForm from './PolicyEditForm.vue';
 type Version = {
     id: number;
     label: string;
@@ -12,7 +13,13 @@ type Version = {
     confirmed_at: string | null;
     confirmed_by: number | null;
 };
-defineProps<{ versions: Version[] }>();
+type History = {
+    id: number;
+    policy_version_id: number;
+    previous_state: Omit<Version, 'id' | 'confirmed_at' | 'confirmed_by'>;
+    created_at: string;
+};
+defineProps<{ versions: Version[]; history: History[] }>();
 const weekdays = [
     'Isnin',
     'Selasa',
@@ -179,6 +186,52 @@ function submit() {
                         {{ version.session_boundary ?? '—' }} /
                         {{ version.work_end ?? '—' }}
                     </p>
+                    <details
+                        v-if="
+                            history.some(
+                                (item) => item.policy_version_id === version.id,
+                            )
+                        "
+                        class="text-sm text-muted-foreground"
+                    >
+                        <summary class="cursor-pointer">
+                            Sejarah perubahan
+                        </summary>
+                        <ul class="mt-2 space-y-2">
+                            <li
+                                v-for="change in history.filter(
+                                    (item) =>
+                                        item.policy_version_id === version.id,
+                                )"
+                                :key="change.id"
+                            >
+                                {{ change.created_at }} ·
+                                {{ change.previous_state.label }} ·
+                                {{ change.previous_state.effective_from }} —
+                                {{
+                                    change.previous_state.effective_to ??
+                                    'terbuka'
+                                }}
+                                · Hari:
+                                {{
+                                    change.previous_state.working_weekdays
+                                        ?.map((day) => weekdays[day - 1])
+                                        .join(', ') || 'Belum ditetapkan'
+                                }}
+                                · Masa:
+                                {{ change.previous_state.work_start ?? '—' }} /
+                                {{
+                                    change.previous_state.session_boundary ??
+                                    '—'
+                                }}
+                                / {{ change.previous_state.work_end ?? '—' }}
+                            </li>
+                        </ul>
+                    </details>
+                    <PolicyEditForm
+                        v-if="!version.confirmed_at && !version.confirmed_by"
+                        :version="version"
+                    />
                 </li>
             </ul>
         </section>
