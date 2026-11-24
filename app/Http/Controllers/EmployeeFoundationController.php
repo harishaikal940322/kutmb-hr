@@ -84,4 +84,49 @@ class EmployeeFoundationController extends Controller
 
         return to_route('employees.index')->with('success', 'Pekerja ditambah.');
     }
+
+    public function update(Request $request, int $employeeId): RedirectResponse
+    {
+        $request->merge([
+            'employee_no' => is_string($request->input('employee_no')) ? trim($request->input('employee_no')) : $request->input('employee_no'),
+            'display_name' => is_string($request->input('display_name')) ? trim($request->input('display_name')) : $request->input('display_name'),
+        ]);
+        $data = $request->validate([
+            'employee_no' => ['required', 'string', 'max:64', Rule::unique('employees', 'employee_no')->ignore($employeeId)],
+            'display_name' => ['required', 'string', 'max:255'],
+            'service_start' => ['required', 'date_format:Y-m-d'],
+            'confirmation_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:service_start'],
+            'service_end' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:service_start', Rule::when($request->filled('confirmation_date'), ['after_or_equal:confirmation_date'])],
+        ]);
+        try {
+            DB::transaction(function () use ($request, $employeeId, $data): void {
+                $employee = DB::table('employees')->where('id', $employeeId)->lockForUpdate()->first();
+                abort_if($employee === null, 404);
+                $assignments = DB::table('employee_assignments')->where('employee_id', $employeeId)->lockForUpdate()->get();
+                foreach ($assignments as $assignment) {
+                    if ($assignment->effective_from < $data['service_start']) {
+                        throw ValidationException::withMessages(['service_start' => 'Tarikh mula tidak boleh selepas penempatan sedia ada.']);
+                    }
+                    $end = $data['service_end'] ?? null;
+                    if ($end !== null && ($assignment->effective_from > $end || ($assignment->effective_to !== null && $assignment->effective_to > $end))) {
+                        throw ValidationException::withMessages(['service_end' => 'Tarikh tamat tidak boleh mendahului sejarah penempatan.']);
+                    }
+                }
+                DB::table('employees')->where('id', $employeeId)->update([
+                    'employee_no' => $data['employee_no'], 'display_name' => $data['display_name'],
+                    'service_start' => $data['service_start'], 'confirmation_date' => $data['confirmation_date'] ?? null,
+                    'service_end' => $data['service_end'] ?? null, 'updated_at' => now(),
+                ]);
+                AuditEvent::query()->create([
+                    'occurred_at' => now(), 'actor_id' => $request->user()->getKey(), 'action_code' => 'hr.employee.updated',
+                    'target_ref' => 'employee:'.$employeeId, 'outcome' => 'SUCCESS',
+                    'metadata' => ['source' => 'employee_ui', 'changed_fields' => ['employee']],
+                ]);
+            }, 3);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['employee_no' => 'Nombor pekerja ini telah digunakan.']);
+        }
+
+        return to_route('employees.index')->with('success', 'Rekod pekerja dikemas kini.');
+    }
 }

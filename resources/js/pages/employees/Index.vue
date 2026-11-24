@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
 import AssignmentForm from './AssignmentForm.vue';
+import EmployeeEditForm from './EmployeeEditForm.vue';
 type Reference = { id: number; code: string; name: string };
 type Employee = {
     id: number;
@@ -206,6 +207,7 @@ function submit() {
                             {{ assignment.effective_to ?? 'terbuka' }}
                         </li>
                     </ul>
+                    <EmployeeEditForm v-if="canCreate" :employee="employee" />
                     <AssignmentForm
                         v-if="canAssign"
                         :employee-id="employee.id"

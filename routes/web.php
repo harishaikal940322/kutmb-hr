@@ -77,5 +77,6 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.
     ->prefix('employees')->name('employees.')->group(function (): void {
         Route::get('/', [EmployeeFoundationController::class, 'index'])->name('index');
         Route::post('/', [EmployeeFoundationController::class, 'store'])->middleware('permission:hr.employees.manage')->name('store');
+        Route::patch('/{employeeId}', [EmployeeFoundationController::class, 'update'])->whereNumber('employeeId')->middleware('permission:hr.employees.manage')->name('update');
         Route::post('/{employeeId}/assignments', [EmployeeAssignmentController::class, 'store'])->whereNumber('employeeId')->middleware('permission:hr.assignments.manage')->name('assignments.store');
     });

@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P01 employee profile edits
+
+- Added local/testing-only edits to minimum employee identity and employment dates, guarded by both employee-view and employee-manage permissions. Updates lock the employee and assignment rows, reject dates inconsistent with existing assignment history, ignore account-link input and write an audit event atomically. No employee account, office assignment or leave data is changed.
+- Checks: rollback-isolated MySQL test passed (1 test, 13 assertions), covering missing/revoked permission, invalid dates against assignment history, allowed update, ignored account ID, audit and missing target. Targeted PHPStan/Pint, Vue lint/format, type check, build and `git diff --check` passed. No browser acceptance or concurrency test was run; profile dates must be reconciled with future leave records before those workflows are enabled.
+- Next: separately authorized account association and approval-office appointments, with independent-actor and overlap safeguards; CT-P01 and CT-P02–09 remain incomplete. No operational approval.
+
 ## 24 November 2026 — CT-P01 effective assignment transfers
 
 - Added local/testing-only employee assignment history and forward transfer action. An actor needs employee-view and assignment-manage permissions; the server locks the employee, active references and assignment history, validates dates against employment and existing periods, closes the latest open assignment on the preceding day, and creates the next assignment with an audit event in one transaction. Existing closed periods are retained. Backdated insertion before the latest assignment and overlapping or inconsistent history fail closed; correction of existing history remains unavailable.

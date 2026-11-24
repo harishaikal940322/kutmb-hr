@@ -1,3 +1,5 @@
+- 2026-11-24: Added local employee profile edits with assignment-date consistency checks and audit. See CURRENT_HANDOFF.
+
 - 2026-11-24: Added local, audited employee assignment history and forward transfers with transaction-locked overlap checks. See CURRENT_HANDOFF.
 
 - 2026-11-24: Added local employee directory and atomic employee/initial-assignment creation, with separate ungranted view/manage permissions. See CURRENT_HANDOFF.
