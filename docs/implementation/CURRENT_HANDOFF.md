@@ -1,3 +1,10 @@
+## 24 November 2026 — delegated MOD-005 technical planning baseline v0.3
+
+- Requestor directed autonomous continuation until a genuine interaction gate. Existing plan expanded (no duplicate register): proposed physical data contracts, transaction/status handling, feature-local Laravel/Vue and role permission design, backend/frontend deliverables and planned acceptance evidence for CT-P01–09. Reused existing CT-P00–09 IDs. No new GitHub Issues or permission grants.
+- Remote DOCX extraction verified 56 headings/56 populated HR answer fields, with targeted reconciliation of CT-DEC-010/012/015/018/020–025/029/034/036–040/043–054/056 and prior reviewed answers. Resolved obsolete negative cap assumption (no cap configuration), half-day boundaries, actual-absence and EL rejected adjustment, executive/manager HR adjustment separation, calendar changes, year commitments/close. Flagged real residual policy confirmations instead of reopening resolved answers. Full formal SRS/RTM reconciliation and sign-off remain gated.
+- UX v0.5 stays frozen; technical refinement needed for derived short-notice reason and separate HR adjustment actions in eventual functional pages. No demo/source, schema, data, SRS/RTM, Docker or infrastructure changed. Planned checks not executed.
+- CT-P00 technical planning deliverables prepared, authorization gate open. CT-P01 is first blocked slice: confirm bounded MOD-004 scope/fields, account association, unit/category taxonomy, authorized HR/office role ownership, formal HR requirements and explicit functional authorization; local preflight then required. Later decisions scoped to affected packages; no automatic release or production approval.
+
 ## 24 November 2026 — MOD-005 UX acceptance and technical design review
 
 - Requestor reviewed updated demo, accepted remaining screens and directed proceeding. DOC-023 v0.5 design frozen at source commit `ffdeda34062ae0dd5c9edbd08ec5e7ca44cab6a5` including UX-R01–R05. Existing filenames retained. This is requester acceptance, not independently executed device/build/UAT checks or formal HR approval.
