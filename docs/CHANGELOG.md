@@ -1,3 +1,5 @@
+- 2026-11-24: Added bounded, local-only synthetic calendar confirmation with overlap and future request-impact safeguards. See CURRENT_HANDOFF.
+
 - 2026-11-24: Added an unexposed fail-closed technical lookup for confirmed policy/calendar versions. See CURRENT_HANDOFF.
 
 - 2026-11-24: Added reversible audited cancellation for draft calendar and policy versions. See CURRENT_HANDOFF.

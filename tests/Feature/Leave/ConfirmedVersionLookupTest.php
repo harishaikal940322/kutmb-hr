@@ -54,6 +54,12 @@ class ConfirmedVersionLookupTest extends TestCase
         DB::table('leave_calendar_days')->where('id', $replacement)->update(['cancelled_at' => null, 'cancelled_by' => null]);
         $fails(fn () => $service->calendarFor('2099-03-01'));
         $fails(fn () => $service->calendarFor('2099-02-30'));
+        $this->app['env'] = 'production';
+        try {
+            $fails(fn () => $service->policyFor('2099-03-01'));
+        } finally {
+            $this->app['env'] = 'testing';
+        }
         $this->assertGreaterThan(0, DB::transactionLevel());
     }
 }

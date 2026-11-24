@@ -75,6 +75,9 @@ class ConfirmedVersionLookup
 
     private function oneFor(string $table, string $date): stdClass
     {
+        if (! app()->environment(['local', 'testing'])) {
+            throw new RuntimeException('Technical version lookup is unavailable.');
+        }
         $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date, new DateTimeZone('Asia/Kuala_Lumpur'));
         if ($parsed === false || $parsed->format('Y-m-d') !== $date) {
             throw new RuntimeException('A valid date is required.');

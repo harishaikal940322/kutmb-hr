@@ -4,6 +4,7 @@ import VersionCancellationForm from './VersionCancellationForm.vue';
 import CalendarCancellationForm from './CalendarCancellationForm.vue';
 import CalendarDayEditForm from './CalendarDayEditForm.vue';
 import CalendarDayForm from './CalendarDayForm.vue';
+import CalendarSimulationForm from './CalendarSimulationForm.vue';
 type Version = {
     id: number;
     label: string;
@@ -139,10 +140,19 @@ function submit() {
                     {{ version.effective_to ?? 'terbuka' }} ·
                     {{
                         version.confirmed_at || version.confirmed_by
-                            ? 'Disahkan / terkunci'
+                            ? 'Disahkan untuk simulasi / terkunci'
                             : 'Draf'
                     }}
                 </p>
+                <CalendarSimulationForm
+                    v-if="
+                        !version.confirmed_at &&
+                        !version.confirmed_by &&
+                        !version.cancelled_at &&
+                        !version.cancelled_by
+                    "
+                    :version-id="version.id"
+                />
                 <ul class="space-y-3 text-sm">
                     <li
                         v-for="day in days.filter(

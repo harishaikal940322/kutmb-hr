@@ -102,6 +102,7 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:lea
         Route::get('/', [LeaveCalendarDraftController::class, 'index'])->name('index');
         Route::post('/', [LeaveCalendarDraftController::class, 'storeVersion'])->name('store');
         Route::patch('/{versionId}/cancellation', [LeaveCalendarDraftController::class, 'setVersionCancellation'])->whereNumber('versionId')->name('cancellation');
+        Route::post('/{versionId}/simulate-confirmation', [LeaveCalendarDraftController::class, 'confirmSimulation'])->whereNumber('versionId')->name('simulate-confirmation');
         Route::post('/{versionId}/days', [LeaveCalendarDraftController::class, 'storeDay'])->whereNumber('versionId')->name('days.store');
         Route::patch('/{versionId}/days/{dayId}', [LeaveCalendarDraftController::class, 'updateDay'])->whereNumber(['versionId', 'dayId'])->name('days.update');
         Route::patch('/{versionId}/days/{dayId}/cancellation', [LeaveCalendarDraftController::class, 'setDayCancellation'])->whereNumber(['versionId', 'dayId'])->name('days.cancellation');

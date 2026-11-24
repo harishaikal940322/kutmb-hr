@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditEvent;
+use App\Services\Leave\ConfirmedVersionLookup;
 use App\Services\Leave\VersionPeriodOverlap;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -184,6 +186,45 @@ class LeaveCalendarDraftController extends Controller
         }, 3);
 
         return to_route('leave.calendar.drafts.index')->with('success', 'Status draf dikemas kini.');
+    }
+
+    public function confirmSimulation(Request $request, int $versionId, ConfirmedVersionLookup $lookup): RedirectResponse
+    {
+        $request->validate(['acknowledge_complete' => ['accepted']]);
+        // No calendar confirmation once request data exists until impact handling is integrated.
+        if (Schema::hasTable('leave_requests')) {
+            throw ValidationException::withMessages(['acknowledge_complete' => 'Pengesahan ditangguhkan sehingga kesan permohonan disokong.']);
+        }
+        DB::transaction(function () use ($request, $versionId, $lookup): void {
+            abort_if(DB::table('leave_calendar_confirmation_guard')->where('id', 1)->lockForUpdate()->first() === null, 503);
+            $version = DB::table('leave_calendar_versions')->where('id', $versionId)->lockForUpdate()->first();
+            abort_if($version === null, 404);
+            if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null || $version->effective_to === null || $version->effective_to < $version->effective_from) {
+                throw ValidationException::withMessages(['acknowledge_complete' => 'Pilih draf aktif dengan tempoh mula dan tamat yang sah.']);
+            }
+            $others = DB::table('leave_calendar_versions')->where('id', '!=', $versionId)
+                ->where('effective_from', '<=', $version->effective_to)
+                ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', $version->effective_from))->get();
+            foreach ($others as $other) {
+                if (($other->confirmed_at === null) !== ($other->confirmed_by === null)
+                    || ($other->cancelled_at === null) !== ($other->cancelled_by === null)
+                    || ($other->confirmed_at !== null && $other->cancelled_at !== null)
+                    || $other->confirmed_at !== null) {
+                    throw ValidationException::withMessages(['acknowledge_complete' => 'Tempoh bertindih dengan versi disahkan atau tidak konsisten.']);
+                }
+            }
+            DB::table('leave_calendar_versions')->where('id', $versionId)->update([
+                'confirmed_by' => $request->user()->getKey(), 'confirmed_at' => now(), 'updated_at' => now(),
+            ]);
+            try {
+                $lookup->calendarFor($version->effective_from);
+            } catch (\RuntimeException) {
+                throw ValidationException::withMessages(['acknowledge_complete' => 'Kalendar tidak konsisten dan tidak boleh disahkan.']);
+            }
+            $this->audit($request, 'leave.calendar.simulation_confirmed', 'calendar_version:'.$versionId, ['calendar_version']);
+        }, 3);
+
+        return to_route('leave.calendar.drafts.index')->with('success', 'Kalendar sintetik disahkan untuk simulasi tempatan sahaja.');
     }
 
     /** @param list<string> $fields */
