@@ -1,3 +1,5 @@
+- 2026-11-24: Clarified that the unexposed technical version lookup validates working schedules, not complete entitlement policy. See CURRENT_HANDOFF.
+
 - 2026-11-24: Updated Laravel framework 13.39.0 to 13.40.0 to resolve Composer advisory PKSA-yxbx-3c9s-cjt9. See CURRENT_HANDOFF.
 
 - 2026-11-24: Added bounded, local-only synthetic calendar confirmation with overlap and future request-impact safeguards. See CURRENT_HANDOFF.

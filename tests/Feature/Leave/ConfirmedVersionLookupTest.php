@@ -28,17 +28,17 @@ class ConfirmedVersionLookupTest extends TestCase
                 $this->assertTrue(true);
             }
         };
-        $fails(fn () => $service->policyFor('2099-03-01'));
+        $fails(fn () => $service->workingScheduleFor('2099-03-01'));
         $policy = DB::table('leave_policy_versions')->insertGetId(['label' => 'Synthetic '.$suffix, 'effective_from' => '2099-01-01', 'effective_to' => '2099-12-31', 'confirmed_by' => $actor->id, 'confirmed_at' => now()]);
-        $fails(fn () => $service->policyFor('2099-03-01'));
+        $fails(fn () => $service->workingScheduleFor('2099-03-01'));
         DB::table('leave_policy_versions')->where('id', $policy)->update(['working_weekdays' => '[1,2,3,4,5]', 'work_start' => '08:00', 'session_boundary' => '13:00', 'work_end' => '17:00']);
-        $this->assertSame([1, 2, 3, 4, 5], $service->policyFor('2099-03-01')->working_weekdays);
+        $this->assertSame([1, 2, 3, 4, 5], $service->workingScheduleFor('2099-03-01')->working_weekdays);
         $second = DB::table('leave_policy_versions')->insertGetId(['label' => 'Other '.$suffix, 'effective_from' => '2099-01-01', 'effective_to' => '2099-12-31', 'confirmed_by' => $actor->id, 'confirmed_at' => now()]);
-        $fails(fn () => $service->policyFor('2099-03-01'));
+        $fails(fn () => $service->workingScheduleFor('2099-03-01'));
         DB::table('leave_policy_versions')->where('id', $second)->update(['confirmed_at' => null, 'confirmed_by' => null, 'cancelled_at' => now(), 'cancelled_by' => $actor->id]);
-        $this->assertSame((int) $policy, (int) $service->policyFor('2099-03-01')->id);
+        $this->assertSame((int) $policy, (int) $service->workingScheduleFor('2099-03-01')->id);
         DB::table('leave_policy_versions')->where('id', $second)->update(['cancelled_by' => null]);
-        $fails(fn () => $service->policyFor('2099-03-01'));
+        $fails(fn () => $service->workingScheduleFor('2099-03-01'));
         DB::table('leave_policy_versions')->where('id', $second)->update(['cancelled_by' => $actor->id]);
         $calendar = DB::table('leave_calendar_versions')->insertGetId(['label' => 'Synthetic calendar '.$suffix, 'effective_from' => '2099-01-01', 'effective_to' => '2099-12-31', 'confirmed_by' => $actor->id, 'confirmed_at' => now()]);
         $holiday = DB::table('leave_calendar_days')->insertGetId(['calendar_version_id' => $calendar, 'date' => '2099-03-01', 'name' => 'Synthetic', 'kind' => 'holiday']);
@@ -56,7 +56,7 @@ class ConfirmedVersionLookupTest extends TestCase
         $fails(fn () => $service->calendarFor('2099-02-30'));
         $this->app['env'] = 'production';
         try {
-            $fails(fn () => $service->policyFor('2099-03-01'));
+            $fails(fn () => $service->workingScheduleFor('2099-03-01'));
         } finally {
             $this->app['env'] = 'testing';
         }

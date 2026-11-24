@@ -1,3 +1,9 @@
+## 24 November 2026 — working-schedule lookup naming
+
+- Renamed the unexposed technical policy lookup to `workingScheduleFor` and clarified its incomplete-data error: it validates schedule fields only, not entitlement bands, rates or whole-policy approval. No caller gains authorization or operational behavior from this helper.
+- Focused rollback-isolated MySQL checks passed (2 tests, 32 assertions); targeted Pint/PHPStan and `git diff --check` passed. No schema, data or production action.
+- Next: continue dependency-ready CT-P02 checks; entitlement rule boundaries, formal HR authority and request-impact integration remain open.
+
 ## 24 November 2026 — dependency advisory remediation
 
 - Consolidated dependency check reported low-severity `PKSA-yxbx-3c9s-cjt9` / `GHSA-63hm-g96r-2m2q` affecting Laravel framework before 13.40.0. Updated only the existing framework lock from 13.39.0 to 13.40.0 within the existing `^13.17` constraint; no new package, infrastructure or CI change. Composer audit now reports no advisories and `composer validate --no-check-publish` passes; npm audit reported zero vulnerabilities.

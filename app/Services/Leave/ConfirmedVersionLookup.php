@@ -11,29 +11,29 @@ use stdClass;
 /** Technical lookup only; callers must separately establish authority, completeness and transaction safety. */
 class ConfirmedVersionLookup
 {
-    public function policyFor(string $date): stdClass
+    public function workingScheduleFor(string $date): stdClass
     {
         $policy = $this->oneFor('leave_policy_versions', $date);
         try {
             $weekdays = $policy->working_weekdays === null ? null : json_decode($policy->working_weekdays, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
-            throw new RuntimeException('Confirmed policy is incomplete.');
+            throw new RuntimeException('Confirmed working schedule is incomplete.');
         }
         if (! is_array($weekdays) || ! array_is_list($weekdays) || $weekdays === [] || count(array_unique($weekdays, SORT_REGULAR)) !== count($weekdays)) {
-            throw new RuntimeException('Confirmed policy is incomplete.');
+            throw new RuntimeException('Confirmed working schedule is incomplete.');
         }
         foreach ($weekdays as $day) {
             if (! is_int($day) || $day < 1 || $day > 7) {
-                throw new RuntimeException('Confirmed policy is incomplete.');
+                throw new RuntimeException('Confirmed working schedule is incomplete.');
             }
         }
         foreach (['work_start', 'session_boundary', 'work_end'] as $field) {
             if (! is_string($policy->{$field}) || preg_match('/\A(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\z/D', $policy->{$field}) !== 1) {
-                throw new RuntimeException('Confirmed policy is incomplete.');
+                throw new RuntimeException('Confirmed working schedule is incomplete.');
             }
         }
         if ($policy->work_start >= $policy->session_boundary || $policy->session_boundary >= $policy->work_end) {
-            throw new RuntimeException('Confirmed policy is incomplete.');
+            throw new RuntimeException('Confirmed working schedule is incomplete.');
         }
         $policy->working_weekdays = $weekdays;
 
