@@ -1,3 +1,10 @@
+## 24 November 2026 — delegated implementation direction / first System Core slice
+
+- Requestor clarified HR approval not required for UI/UX and delegated technical sequencing/development decisions. Recorded SCOPE-001 clarification; requestor design acceptance retained, formal HR business requirements/actual authority not inferred.
+- Selected first authorized scope: existing MOD-001 Roles UI shared compact permission selector for create/edit; optional preset mechanism using only currently registered assignable IAM codes. Reuse RoleController, PermissionCatalog, current Inertia form and explicit save; no new grants/roles assigned, HR permissions, employee tables, business workflows, auth/security changes, migrations or infrastructure. HR presets unavailable until corresponding approved/implemented catalogue codes exist. Preserve protected admin and unknown saved permission safety. Focused frontend/build/type/lint and relevant existing RBAC tests, verify actual results and local browser where available.
+- Local preflight blocker: required checkout /home/haris/www/kutmb-hr is absent in this remote runtime (checked). No source code or runtime tests performed. Local Codex should fetch origin, inspect main/worktree, preserve unrelated changes, implement first slice under AGENTS.md, update handoff, commit/push verified work and stop only for actual blockers. Do not create clone/worktree/branch or alter CI. Remote documentation updates only.
+- CT-P01 HR Core functional work still HOLD pending formal HR requirements and actual permission/appointment authority; UI/UX not an HR sign-off gate. Do not repeat previously accepted design decisions. No production approval.
+
 ## 24 November 2026 — compact permission matrix design acceptance
 
 - Requestor accepted compact module/submodule permission-matrix concept for Create Role and Edit Role. DOC-007 v0.4 section 4C specifies collapsed groups, search, counts, actual action mapping, shared selector, mobile/dark/light and preserved selections. No invented rights, automatic grants or changes to protected/existing roles. CT-P01 planned deliverables and checks updated.

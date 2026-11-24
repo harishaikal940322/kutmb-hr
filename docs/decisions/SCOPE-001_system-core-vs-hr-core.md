@@ -17,6 +17,12 @@ Requestor accepted the updated demo and authorized proceeding to technical desig
 
 Requestor selected Option A: minimum Employee & Organization foundation as initial release of MOD-004. MOD-004 remains an independent major HR Core module (F-009), not a submodule of MOD-005. Its first delivery supplies employee directory/profile, organization units, category, effective assignments, account association and named approval office assignment required by Cuti Tahunan. See [DOC-007 draft](../requirements/modules/DOC-007_MOD-004_Employee_Organization_v0.1_DRAFT.md). Broader employee management is deferred, not removed from the future product. No new module ID, feature ID, normative approval or implementation authorization; existing HOLD remains until formal requirements and explicit release/development authorization.
 
+## 24 November 2026 — UI/UX authority and delegated development sequencing
+
+Requestor clarified that HR sign-off is not required for UI/UX decisions and delegated technical development sequencing/decisions to the assistant. Requestor approval is sufficient for the accepted presentation designs; HR remains the authority for HR requirements, business rules and actual appointment/permission ownership. The instruction to proceed is recorded as development direction; it is not evidence of formal HR approval of the HR Core requirements.
+
+First authorized slice selected: bounded MOD-001 System Core enhancement for shared compact Create/Edit Role permission selector and optional role-template mechanism using existing registered assignable IAM permissions only. No new HR permissions, role grants, employee schema/data, business workflows, identity/security weakening or infrastructure changes. HR template definitions are planning references until matching HR permissions are approved/implemented. Preserve SCOPE-001 HR Core implementation hold; no additional UI/UX sign-off from HR is required. Local AGENTS.md preflight and verification remain mandatory.
+
 ## Definitions
 
 - **KUTMB HR System** is the overall product.
