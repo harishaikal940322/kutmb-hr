@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P02 technical session simulation
+
+- Added an unexposed local/testing-only session simulation that resolves a technically confirmed schedule and calendar separately for every supplied date, then counts integer half-day units. A missing or inconsistent version on any date aborts the whole simulation. It neither confirms schedules nor creates requests, balances or approvals; technical confirmation/acknowledgement is not HR approval, and future workflows still require authority, full-range coverage and transaction/snapshot guarantees.
+- Rollback-isolated synthetic MySQL test passed (1 test, 6 assertions) for half/full-day counts, holiday/weekend exclusions, missing subsequent version and production denial. Targeted Pint/PHPStan and `git diff --check` passed; no data or routes added. Synthetic confirmed working-schedule fixtures were transaction-only; no working policy was confirmed in the environment.
+- Next: resolve the P02 schedule/rate confirmation and calendar-impact contracts before activating CT-P03–09; continue independent ready work without inventing service bands, category mapping or actual HR values.
+
 ## 24 November 2026 — CT-P01 employee directory search
 
 - Added server-side name/employee-number search to the local authorized employee directory. The query remains behind existing active-account and employee-view checks, and assignment props are limited to returned employee IDs. This adds no broader directory permission or account data exposure.
