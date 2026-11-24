@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P02 fail-closed technical version lookup
+
+- Added an unexposed lookup requiring exactly one technically confirmed, noncancelled version for a date. It rejects missing/ambiguous/partially confirmed or cancelled states, incomplete working-time settings, invalid weekday/time ordering and inconsistent active calendar replacement links; cancelled days are excluded. It does not authorize an actor, establish HR approval or prove calendar coverage, and it is not wired to leave operations. Future callers must also establish formal authority, full-range coverage, transaction locking, snapshot consistency and calendar-change impact before use.
+- Rollback-isolated MySQL test passed (1 test, 13 assertions) covering missing/incomplete/overlapping versions, inconsistent state, cancelled entries, broken replacement and invalid date. Targeted Pint/PHPStan and `git diff --check` passed; no persistent policies/calendars/dates remain. No confirmation UI, HR values or operational release introduced.
+- Next: reconcile full-range calendar/version selection and HR-dependent policy rules with CT-P03/04; do not infer service bands or enable posting/submission while those prerequisites are unresolved.
+
 ## 24 November 2026 — CT-P02 reversible draft-version cancellation
 
 - Added audited cancellation/restoration of unconfirmed calendar and policy versions. Cancelled versions and their contents remain visible but are locked against edits and excluded from draft overlap warnings; restoration reinstates warnings. Confirmed/partially confirmed versions cannot be cancelled. Fixed edit/cancel presentation guards for cancelled child drafts. Future version selection must explicitly exclude cancelled and inconsistent states; no confirmation or operational selection exists.
