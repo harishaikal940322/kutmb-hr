@@ -40,7 +40,16 @@ class CalendarDraftTest extends TestCase
         $this->post($path, ['date' => '2026-03-02', 'name' => 'Replacement', 'kind' => 'replacement', 'original_day_id' => $day->id])->assertRedirect();
         $other = DB::table('leave_calendar_versions')->insertGetId(['label' => 'Other synthetic '.$suffix, 'effective_from' => '2026-01-01']);
         $this->post('/leave/calendar-drafts/'.$other.'/days', ['date' => '2026-03-02', 'name' => 'Invalid', 'kind' => 'replacement', 'original_day_id' => $day->id])->assertSessionHasErrors('original_day_id');
+        $editPath = $path.'/'.$day->id;
+        $this->patch($editPath, ['date' => '2026-03-02', 'name' => 'Collision'])->assertSessionHasErrors('date');
+        $this->assertDatabaseMissing('leave_calendar_day_history', ['calendar_day_id' => $day->id]);
+        $this->patch($editPath, ['date' => '2026-03-04', 'name' => 'Revised'])->assertRedirect();
+        $this->assertDatabaseHas('leave_calendar_day_history', ['calendar_day_id' => $day->id, 'previous_date' => '2026-03-01', 'previous_name' => 'Synthetic holiday', 'actor_id' => $actor->id]);
+        $this->assertDatabaseHas('leave_calendar_days', ['id' => $day->id, 'date' => '2026-03-04', 'name' => 'Revised']);
+        $this->assertDatabaseHas('audit_events', ['action_code' => 'leave.calendar.day_updated', 'target_ref' => 'calendar_day:'.$day->id]);
+        $this->patch('/leave/calendar-drafts/'.$other.'/days/'.$day->id, ['date' => '2026-03-04', 'name' => 'Invalid'])->assertNotFound();
         DB::table('leave_calendar_versions')->where('id', $version->id)->update(['confirmed_at' => now(), 'confirmed_by' => $actor->id]);
+        $this->patch($editPath, ['date' => '2026-03-05', 'name' => 'Denied'])->assertSessionHasErrors('date');
         $this->post($path, [...$holiday, 'date' => '2026-04-01'])->assertSessionHasErrors('date');
         $this->app['env'] = 'production';
         try {

@@ -17,8 +17,9 @@ class LeaveCalendarDraftController extends Controller
     public function index(): Response
     {
         return Inertia::render('leave/CalendarDrafts', [
-            'versions' => DB::table('leave_calendar_versions')->orderByDesc('effective_from')->get(['id', 'label', 'effective_from', 'effective_to', 'confirmed_at']),
+            'versions' => DB::table('leave_calendar_versions')->orderByDesc('effective_from')->get(['id', 'label', 'effective_from', 'effective_to', 'confirmed_at', 'confirmed_by']),
             'days' => DB::table('leave_calendar_days')->orderBy('date')->get(['id', 'calendar_version_id', 'date', 'name', 'kind', 'original_day_id']),
+            'history' => DB::table('leave_calendar_day_history')->orderByDesc('id')->get(['id', 'calendar_day_id', 'previous_date', 'previous_name', 'created_at']),
         ]);
     }
 
@@ -79,6 +80,42 @@ class LeaveCalendarDraftController extends Controller
         }
 
         return to_route('leave.calendar.drafts.index')->with('success', 'Tarikh ditambah ke draf.');
+    }
+
+    public function updateDay(Request $request, int $versionId, int $dayId): RedirectResponse
+    {
+        $request->merge(['name' => is_string($request->input('name')) ? trim($request->input('name')) : $request->input('name')]);
+        $data = $request->validate(['date' => ['required', 'date_format:Y-m-d'], 'name' => ['required', 'string', 'max:255']]);
+        try {
+            DB::transaction(function () use ($request, $versionId, $dayId, $data): void {
+                $version = DB::table('leave_calendar_versions')->where('id', $versionId)->lockForUpdate()->first();
+                abort_if($version === null, 404);
+                if ($version->confirmed_at !== null || $version->confirmed_by !== null) {
+                    throw ValidationException::withMessages(['date' => 'Kalendar yang disahkan tidak boleh diubah.']);
+                }
+                $day = DB::table('leave_calendar_days')->where('calendar_version_id', $versionId)->where('id', $dayId)->lockForUpdate()->first();
+                abort_if($day === null, 404);
+                if ($data['date'] < $version->effective_from || ($version->effective_to !== null && $data['date'] > $version->effective_to)) {
+                    throw ValidationException::withMessages(['date' => 'Tarikh di luar tempoh versi kalendar.']);
+                }
+                if ($day->kind === 'replacement' && DB::table('leave_calendar_days')->where('id', $day->original_day_id)->where('calendar_version_id', $versionId)->where('date', $data['date'])->exists()) {
+                    throw ValidationException::withMessages(['date' => 'Tarikh gantian tidak boleh sama dengan cuti asal.']);
+                }
+                if ($day->date === $data['date'] && $day->name === $data['name']) {
+                    return;
+                }
+                DB::table('leave_calendar_day_history')->insert([
+                    'calendar_day_id' => $dayId, 'previous_date' => $day->date, 'previous_name' => $day->name,
+                    'actor_id' => $request->user()->getKey(), 'created_at' => now(),
+                ]);
+                DB::table('leave_calendar_days')->where('id', $dayId)->update([...$data, 'updated_at' => now()]);
+                $this->audit($request, 'leave.calendar.day_updated', 'calendar_day:'.$dayId, ['calendar_day']);
+            }, 3);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['date' => 'Tarikh telah wujud dalam versi ini.']);
+        }
+
+        return to_route('leave.calendar.drafts.index')->with('success', 'Tarikh draf dikemas kini.');
     }
 
     /** @param list<string> $fields */

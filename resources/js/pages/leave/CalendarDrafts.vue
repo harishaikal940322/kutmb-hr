@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
+import CalendarDayEditForm from './CalendarDayEditForm.vue';
 import CalendarDayForm from './CalendarDayForm.vue';
 type Version = {
     id: number;
@@ -7,6 +8,7 @@ type Version = {
     effective_from: string;
     effective_to: string | null;
     confirmed_at: string | null;
+    confirmed_by: number | null;
 };
 type Day = {
     id: number;
@@ -16,7 +18,14 @@ type Day = {
     kind: string;
     original_day_id: number | null;
 };
-defineProps<{ versions: Version[]; days: Day[] }>();
+type History = {
+    id: number;
+    calendar_day_id: number;
+    previous_date: string;
+    previous_name: string;
+    created_at: string;
+};
+defineProps<{ versions: Version[]; days: Day[]; history: History[] }>();
 const form = useForm({ label: '', effective_from: '', effective_to: '' });
 function submit() {
     form.post('/leave/calendar-drafts', {
@@ -98,25 +107,60 @@ function submit() {
                 <p class="text-sm text-muted-foreground">
                     {{ version.effective_from }} —
                     {{ version.effective_to ?? 'terbuka' }} ·
-                    {{ version.confirmed_at ? 'Disahkan' : 'Draf' }}
+                    {{
+                        version.confirmed_at || version.confirmed_by
+                            ? 'Disahkan / terkunci'
+                            : 'Draf'
+                    }}
                 </p>
-                <ul class="space-y-1 text-sm">
+                <ul class="space-y-3 text-sm">
                     <li
                         v-for="day in days.filter(
                             (item) => item.calendar_version_id === version.id,
                         )"
                         :key="day.id"
+                        class="rounded-md border p-3"
                     >
-                        {{ day.date }} · {{ day.name }} ·
-                        {{
-                            day.kind === 'holiday'
-                                ? 'Cuti umum'
-                                : 'Cuti gantian'
-                        }}
+                        <p>
+                            {{ day.date }} · {{ day.name }} ·
+                            {{
+                                day.kind === 'holiday'
+                                    ? 'Cuti umum'
+                                    : 'Cuti gantian'
+                            }}
+                        </p>
+                        <ul
+                            v-if="
+                                history.some(
+                                    (item) => item.calendar_day_id === day.id,
+                                )
+                            "
+                            class="mt-2 text-muted-foreground"
+                            aria-label="Sejarah perubahan"
+                        >
+                            <li
+                                v-for="change in history.filter(
+                                    (item) => item.calendar_day_id === day.id,
+                                )"
+                                :key="change.id"
+                            >
+                                Sebelum ini: {{ change.previous_date }} ·
+                                {{ change.previous_name }} ({{
+                                    change.created_at
+                                }})
+                            </li>
+                        </ul>
+                        <CalendarDayEditForm
+                            v-if="
+                                !version.confirmed_at && !version.confirmed_by
+                            "
+                            :version-id="version.id"
+                            :day="day"
+                        />
                     </li>
                 </ul>
                 <CalendarDayForm
-                    v-if="!version.confirmed_at"
+                    v-if="!version.confirmed_at && !version.confirmed_by"
                     :version-id="version.id"
                     :effective-from="version.effective_from"
                     :effective-to="version.effective_to"

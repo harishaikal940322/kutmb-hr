@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P02 draft calendar corrections
+
+- Added date/name corrections for unconfirmed calendar days with prior values and actor preserved in a restricted history table, transactionally with the safe audit event. Confirmed or partially confirmed versions remain locked; cross-version targets, duplicate dates and dates outside version bounds are rejected. Holiday type and replacement source cannot be silently changed, and no delete, confirmation or leave impact operation was introduced.
+- Applied the additive history table after checking local database target and SQL preview; versions, days and history remain empty after rollback testing. Focused MySQL test passed (1 test, 42 assertions) including prior values, duplicate rollback, audit, cross-version target and confirmed lock; targeted Pint/PHPStan, Vue formatting/lint, type check, build and `git diff --check` passed. Browser, concurrent-worker and full calendar-impact checks remain outstanding.
+- Next: evaluate policy-configuration foundation and remaining calendar revision/cancellation requirements without activating unconfirmed rules. CT-P03–09 remain dependent on safe upstream contracts and HR decisions; no operational approval.
+
 ## 24 November 2026 — CT-P02 draft calendar warnings
 
 - Added presentation-only warnings for duplicate and weekend dates in draft entry. For a Sunday holiday the form suggests Monday, or Tuesday if Monday is already occupied; if that candidate is occupied or outside the draft version it asks for HR review. Saturday explicitly does not create a Monday replacement. Suggestions never create or confirm a replacement and server-side uniqueness/source checks remain authoritative. Rules beyond the documented Monday/Tuesday case remain for HR review rather than being inferred.

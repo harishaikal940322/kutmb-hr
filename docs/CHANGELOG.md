@@ -1,3 +1,5 @@
+- 2026-11-24: Added audited draft-calendar date/name corrections with retained prior values; confirmed versions stay locked. See CURRENT_HANDOFF.
+
 - 2026-11-24: Added non-mutating weekend, collision and bounded replacement guidance to local calendar drafts. See CURRENT_HANDOFF.
 
 - 2026-11-24: Added local, audited leave calendar drafts with date and replacement-source validation; no calendar activation. See CURRENT_HANDOFF.
