@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P02 policy schema foundation
+
+- Added an empty leave-policy version table for effective dates, explicitly supplied working weekdays and session boundaries. Settings are nullable so missing values remain missing; no policy rates, configuration values, confirmation, defaults, routes or calculations were added. Future commands must validate complete settings, effective-date conflicts and immutable confirmed history before any use.
+- Applied the additive migration only after verifying local database and previewing SQL. The table is InnoDB and empty after a rollback-isolated MySQL test (1 test, 10 assertions) of absent defaults and confirmation-actor foreign key; targeted Pint and `git diff --check` passed. Auto-increment counters may advance.
+- Next: implement permission-gated draft policy input with explicit validation, leave confirmation/activation disabled pending HR and impact handling. CT-P03–09 and production remain incomplete/unapproved.
+
 ## 24 November 2026 — CT-P02 draft calendar corrections
 
 - Added date/name corrections for unconfirmed calendar days with prior values and actor preserved in a restricted history table, transactionally with the safe audit event. Confirmed or partially confirmed versions remain locked; cross-version targets, duplicate dates and dates outside version bounds are rejected. Holiday type and replacement source cannot be silently changed, and no delete, confirmation or leave impact operation was introduced.
