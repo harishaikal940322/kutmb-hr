@@ -103,6 +103,7 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:lea
         Route::post('/', [LeaveCalendarDraftController::class, 'storeVersion'])->name('store');
         Route::post('/{versionId}/days', [LeaveCalendarDraftController::class, 'storeDay'])->whereNumber('versionId')->name('days.store');
         Route::patch('/{versionId}/days/{dayId}', [LeaveCalendarDraftController::class, 'updateDay'])->whereNumber(['versionId', 'dayId'])->name('days.update');
+        Route::patch('/{versionId}/days/{dayId}/cancellation', [LeaveCalendarDraftController::class, 'setDayCancellation'])->whereNumber(['versionId', 'dayId'])->name('days.cancellation');
     });
 
 Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:leave.policy.manage'])

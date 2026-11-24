@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
+import CalendarCancellationForm from './CalendarCancellationForm.vue';
 import CalendarDayEditForm from './CalendarDayEditForm.vue';
 import CalendarDayForm from './CalendarDayForm.vue';
 type Version = {
@@ -18,6 +19,8 @@ type Day = {
     name: string;
     kind: string;
     original_day_id: number | null;
+    cancelled_at: string | null;
+    cancelled_by: number | null;
 };
 type History = {
     id: number;
@@ -159,9 +162,29 @@ function submit() {
                                 }})
                             </li>
                         </ul>
-                        <CalendarDayEditForm
+                        <p
+                            v-if="day.cancelled_at || day.cancelled_by"
+                            class="mt-1 text-muted-foreground"
+                        >
+                            Dibatalkan dalam draf; tarikh masih ditempah untuk
+                            rekod ini.
+                        </p>
+                        <CalendarCancellationForm
                             v-if="
                                 !version.confirmed_at && !version.confirmed_by
+                            "
+                            :version-id="version.id"
+                            :day-id="day.id"
+                            :is-cancelled="
+                                Boolean(day.cancelled_at || day.cancelled_by)
+                            "
+                        />
+                        <CalendarDayEditForm
+                            v-if="
+                                !version.confirmed_at &&
+                                !version.confirmed_by &&
+                                !day.cancelled_at &&
+                                !day.cancelled_by
                             "
                             :version-id="version.id"
                             :day="day"

@@ -2,7 +2,14 @@
 import { useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { calendarGuidance } from './calendarGuidance';
-type Day = { id: number; date: string; name: string; kind: string };
+type Day = {
+    id: number;
+    date: string;
+    name: string;
+    kind: string;
+    cancelled_at: string | null;
+    cancelled_by: number | null;
+};
 const props = defineProps<{
     versionId: number;
     days: Day[];
@@ -79,7 +86,10 @@ function submit() {
                 <option value="">Pilih cuti umum</option>
                 <option
                     v-for="day in days.filter(
-                        (item) => item.kind === 'holiday',
+                        (item) =>
+                            item.kind === 'holiday' &&
+                            !item.cancelled_at &&
+                            !item.cancelled_by,
                     )"
                     :key="day.id"
                     :value="day.id"

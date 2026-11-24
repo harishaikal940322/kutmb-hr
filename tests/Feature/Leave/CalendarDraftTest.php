@@ -38,6 +38,18 @@ class CalendarDraftTest extends TestCase
         $this->post($path, $holiday)->assertSessionHasErrors('date');
         $this->post($path, ['date' => '2026-03-02', 'name' => 'Replacement', 'kind' => 'replacement', 'original_day_id' => null])->assertSessionHasErrors('original_day_id');
         $this->post($path, ['date' => '2026-03-02', 'name' => 'Replacement', 'kind' => 'replacement', 'original_day_id' => $day->id])->assertRedirect();
+        $replacement = DB::table('leave_calendar_days')->where('calendar_version_id', $version->id)->where('kind', 'replacement')->sole();
+        $cancelHoliday = $path.'/'.$day->id.'/cancellation';
+        $cancelReplacement = $path.'/'.$replacement->id.'/cancellation';
+        $this->patch($cancelHoliday, ['cancelled' => true])->assertSessionHasErrors('cancelled');
+        $this->patch($cancelReplacement, ['cancelled' => true])->assertRedirect();
+        $this->patch($cancelHoliday, ['cancelled' => true])->assertRedirect();
+        $this->assertDatabaseHas('audit_events', ['action_code' => 'leave.calendar.day_cancelled', 'target_ref' => 'calendar_day:'.$day->id]);
+        $this->post($path, $holiday)->assertSessionHasErrors('date');
+        $this->patch($cancelReplacement, ['cancelled' => false])->assertSessionHasErrors('cancelled');
+        $this->patch($cancelHoliday, ['cancelled' => false])->assertRedirect();
+        $this->patch($cancelReplacement, ['cancelled' => false])->assertRedirect();
+        $this->assertDatabaseHas('audit_events', ['action_code' => 'leave.calendar.day_restored', 'target_ref' => 'calendar_day:'.$day->id]);
         $other = DB::table('leave_calendar_versions')->insertGetId(['label' => 'Other synthetic '.$suffix, 'effective_from' => '2026-01-01']);
         $this->get('/leave/calendar-drafts')->assertOk()->assertInertia(fn (Assert $page) => $page->where('versions.0.overlapping_ids', [$version->id]));
         $this->post('/leave/calendar-drafts/'.$other.'/days', ['date' => '2026-03-02', 'name' => 'Invalid', 'kind' => 'replacement', 'original_day_id' => $day->id])->assertSessionHasErrors('original_day_id');
@@ -51,6 +63,7 @@ class CalendarDraftTest extends TestCase
         $this->patch('/leave/calendar-drafts/'.$other.'/days/'.$day->id, ['date' => '2026-03-04', 'name' => 'Invalid'])->assertNotFound();
         DB::table('leave_calendar_versions')->where('id', $version->id)->update(['confirmed_at' => now(), 'confirmed_by' => $actor->id]);
         $this->patch($editPath, ['date' => '2026-03-05', 'name' => 'Denied'])->assertSessionHasErrors('date');
+        $this->patch($cancelHoliday, ['cancelled' => true])->assertSessionHasErrors('cancelled');
         $this->post($path, [...$holiday, 'date' => '2026-04-01'])->assertSessionHasErrors('date');
         $this->app['env'] = 'production';
         try {

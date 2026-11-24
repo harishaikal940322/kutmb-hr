@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P02 reversible draft-date cancellation
+
+- Added audited cancellation/restoration of unconfirmed calendar dates without deleting records. A holiday with an active replacement cannot be cancelled until its replacement is cancelled; a replacement cannot be restored while its source is cancelled. Confirmed/partially confirmed versions are locked, and cancelled entries cannot be edited until restored. A cancelled entry continues to reserve its date under the existing unique key; restore it to correct/reuse that date. Future calendar calculations must explicitly exclude cancelled entries and reject inconsistent cancellation state before activation.
+- Added only nullable cancellation fields and a restricted actor foreign key on the verified local database after migration preview. Focused rollback-isolated MySQL test passed (1 test, 65 assertions), including source dependencies, duplicate date retention, audit, restore and confirmed lock. Targeted Pint/PHPStan, frontend format/lint, type check, build and `git diff --check` passed. No browser acceptance, simultaneous concurrency or active calendar impact tested.
+- Next: entitlement policy drafts and safe source reconciliation; confirmation and request impact remain disabled until HR and downstream workflow requirements are resolved. No operational approval.
+
 ## 24 November 2026 — CT-P02 version-period overlap warnings
 
 - Added server-calculated inclusive effective-period overlap warnings to calendar and policy draft lists, including open-ended periods. Drafts may coexist for review; warnings do not confirm, select or activate a version. Future confirmation must enforce conflict resolution transactionally rather than relying on this display.

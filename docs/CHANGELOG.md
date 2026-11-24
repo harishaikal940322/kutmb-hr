@@ -1,3 +1,5 @@
+- 2026-11-24: Added reversible, audited calendar draft cancellation with replacement-source safeguards. See CURRENT_HANDOFF.
+
 - 2026-11-24: Added inclusive effective-period conflict warnings for draft leave calendar and policy versions. See CURRENT_HANDOFF.
 
 - 2026-11-24: Added audited draft policy edits with prior settings retained and confirmed versions locked. See CURRENT_HANDOFF.
