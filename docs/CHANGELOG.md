@@ -1,3 +1,5 @@
+- 2026-11-24: Added non-mutating weekend, collision and bounded replacement guidance to local calendar drafts. See CURRENT_HANDOFF.
+
 - 2026-11-24: Added local, audited leave calendar drafts with date and replacement-source validation; no calendar activation. See CURRENT_HANDOFF.
 
 - 2026-11-24: Added empty, versioned CT-P02 calendar schema to local development; no calendar or leave operation activated. See CURRENT_HANDOFF.

@@ -1,13 +1,29 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import { calendarGuidance } from './calendarGuidance';
 type Day = { id: number; date: string; name: string; kind: string };
-const props = defineProps<{ versionId: number; days: Day[] }>();
+const props = defineProps<{
+    versionId: number;
+    days: Day[];
+    effectiveFrom: string;
+    effectiveTo: string | null;
+}>();
 const form = useForm({
     date: '',
     name: '',
     kind: 'holiday',
     original_day_id: '',
 });
+const guidance = computed(() =>
+    calendarGuidance(
+        form.date,
+        form.kind,
+        props.days,
+        props.effectiveFrom,
+        props.effectiveTo,
+    ),
+);
 function submit() {
     form.transform((data) => ({
         ...data,
@@ -74,6 +90,13 @@ function submit() {
                 form.errors.original_day_id
             }}</span></label
         >
+        <ul
+            v-if="guidance.length"
+            class="space-y-1 text-sm sm:col-span-2"
+            aria-live="polite"
+        >
+            <li v-for="message in guidance" :key="message">{{ message }}</li>
+        </ul>
         <button
             type="submit"
             :disabled="form.processing"

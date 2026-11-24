@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P02 draft calendar warnings
+
+- Added presentation-only warnings for duplicate and weekend dates in draft entry. For a Sunday holiday the form suggests Monday, or Tuesday if Monday is already occupied; if that candidate is occupied or outside the draft version it asks for HR review. Saturday explicitly does not create a Monday replacement. Suggestions never create or confirm a replacement and server-side uniqueness/source checks remain authoritative. Rules beyond the documented Monday/Tuesday case remain for HR review rather than being inferred.
+- Checks: Node test passed covering Sunday/Monday/Tuesday collisions and bounds, Saturday, duplicate dates, replacement selection and empty input; focused frontend formatting/lint, Vue type check, build and `git diff --check` passed. No browser visual or calendar activation test was run; no database operations or business records created.
+- Next: draft corrections with retained history; policy configuration must distinguish missing values from approved values. Confirmation and request impact remain gated on later workflow work.
+
 ## 24 November 2026 — CT-P02 local draft calendar entry
 
 - Added local/testing-only version and holiday/replacement draft entry behind the separate ungranted `leave.calendar.manage` permission. Draft dates must be within the version, unique per version, and replacement entries reference a holiday in the same version. Confirmed versions cannot accept new days; every successful draft mutation records a safe audit event. There is no confirmation, publication, modification, deletion, automatic replacement, leave calculation or request-impact action. Dates, names and versions were not seeded.

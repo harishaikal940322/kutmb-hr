@@ -118,6 +118,8 @@ function submit() {
                 <CalendarDayForm
                     v-if="!version.confirmed_at"
                     :version-id="version.id"
+                    :effective-from="version.effective_from"
+                    :effective-to="version.effective_to"
                     :days="
                         days.filter(
                             (item) => item.calendar_version_id === version.id,
