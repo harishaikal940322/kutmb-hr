@@ -7,7 +7,7 @@
 | Q-001 | Skop pemilik sistem | Untuk KUTMB sahaja, organisasi tunggal atau reka bentuk yang boleh guna semula? | Critical | HR/Management | BLOCKED |
 | Q-002 | Makna panggilan | Adakah gelaran sapaan seperti Encik/Puan/Dr? | High | Requestor | OPEN |
 | Q-003 | Log masuk | Email, ID staf, username atau SSO? | Critical | HR/IT | BLOCKED |
-| Q-004 | Pentadbir awal | Siapa System Admin, HR Admin dan hak terperinci mereka? | Critical | HR/IT | BLOCKED |
+| Q-004 | Pentadbir awal | Siapa System Admin, HR Admin dan hak terperinci mereka? | Critical | HR/IT | PARTIALLY RESOLVED — requestor accepted MOD-004 permission baseline 24 Nov 2026 (DOC-007 v0.3); actual HR/IT authority, named holders and wider IAM scope remain BLOCKED |
 | Q-005 | Pengguna vs pekerja | Perlukah semua pekerja mempunyai akaun, dan bila employee registry mula? | High | HR | PARTIALLY RESOLVED — requestor 24 Nov 2026 accepted independent MOD-004 foundation and optional explicit unique account link; formal HR confirmation pending (DOC-007 v0.2) |
 | Q-006 | Senarai tetapan awal | Kategori selain panggilan: jabatan, jawatan, gred, cawangan, status pekerjaan? | High | HR | OPEN |
 | Q-007 | Medan pengguna | Nama, emel, status, no telefon, ID pekerja, pilihan panggilan: mana wajib? | High | HR | OPEN |

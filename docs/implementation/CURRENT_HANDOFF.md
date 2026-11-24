@@ -1,3 +1,8 @@
+## 24 November 2026 — MOD-004 permission matrix and role template direction
+
+- Requestor accepted the proposed MOD-004 permission matrix and requested templates using existing support. DOC-007 v0.3 section 4B records a bounded MOD-001 supporting design: optional presets in existing role creation, editable permission selection, server catalogue validation, explicit save, no new authorization engine/table or automatic grant/assignment. Current Roles.vue/IdentityRoleController/PermissionCatalog/config and seed migration confirm manual reusable roles and menu control; no preset selector, HR catalogue or user-role assignment in that screen.
+- CT-P01 plan includes authorized IAM catalogue/preset work only when formal HR requirement/authority and explicit development authorization recorded. Q-004 partially resolved at requestor level; actual appointed holders and wider IAM authority still blocked. No source, migration, data, permissions, role assignments, SRS/RTM or infrastructure changes. Tests planned only. Next genuine interaction: HR formal approval/authority and CT-P01 development authorization.
+
 ## 24 November 2026 — MOD-004 minimum fields and account link accepted
 
 - Requestor accepted eight minimum profile fields (employee no, full name, service start, unit, category required; confirmation date, service end and linked user optional), explicit manual nullable unique employee/account association. DOC-007 v0.2 records acceptance and proposed least-privilege permission matrix based on current IAM catalogue/menu/protected routes. Employee and required initial assignment created atomically in proposed design; user lifecycle remains MOD-001.
