@@ -4,6 +4,7 @@ use App\Http\Controllers\ApprovalOfficeController;
 use App\Http\Controllers\EmployeeAccountLinkController;
 use App\Http\Controllers\EmployeeAssignmentController;
 use App\Http\Controllers\EmployeeFoundationController;
+use App\Http\Controllers\EmployeeSelfProfileController;
 use App\Http\Controllers\IdentityMenuAccessController;
 use App\Http\Controllers\IdentityPermissionController;
 use App\Http\Controllers\IdentityRoleController;
@@ -90,3 +91,6 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.
         Route::post('/', [ApprovalOfficeController::class, 'store'])->name('store');
         Route::patch('/{id}/end', [ApprovalOfficeController::class, 'end'])->whereNumber('id')->name('end');
     });
+
+Route::get('/employee-profile', EmployeeSelfProfileController::class)
+    ->middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.profile.self.view'])->name('employees.self');

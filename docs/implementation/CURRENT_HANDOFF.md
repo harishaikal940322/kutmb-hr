@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P01 own employee profile
+
+- Added local/testing-only read-only own employee profile requiring `hr.profile.self.view` and an explicit employee/account link. It shows only the linked minimum profile and, when exactly one assignment applies during employment on the Malaysia-local date, the current unit/category. Missing or ambiguous current assignment is not guessed. No general employee directory or account link is exposed by this permission.
+- Registered the permission on the verified local development database after SQL preview; it has no grants and synthetic records rolled back. Checks: rollback-isolated MySQL test passed (1 test, 26 assertions) for permission denial, missing link, own profile, ambiguous assignments and revocation. Targeted Pint/PHPStan, frontend format/lint, Vue type check, build and `git diff --check` passed. No browser acceptance or real-data use.
+- Next: role templates and CT-P01 consolidated security/UI checks. Scoped office-holder views are deferred until actual leave tasks provide a bounded purpose; no broad approver directory is inferred. HR/IT authority and production remain unapproved.
+
 ## 24 November 2026 — CT-P01 approval-office assignments
 
 - Added local/testing-only appointment and end actions for PU (unit-scoped), PB and Setiausaha ALK (organization-wide), with `hr.offices.manage` plus active-account checks. A dedicated InnoDB guard row serializes appointment writes; the server rejects overlapping office/scope dates, inactive targets/units, invalid scope and actors appointing or ending their own office. Non-employee account holders are supported; appointments grant no permissions or roles. Audit records safe references; no delete or delegation was added.
