@@ -8,6 +8,7 @@ use App\Http\Middleware\EnsureMfaEnrolled;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\LogoutKeycloakSession;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -41,6 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
             DisableRememberMe::class,
             BlockFortifyTwoFactorManagement::class,
+            LogoutKeycloakSession::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

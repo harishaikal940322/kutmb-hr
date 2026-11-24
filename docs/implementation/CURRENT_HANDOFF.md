@@ -1,3 +1,8 @@
+## 24 November 2026 — local SSO logout
+
+- HR logout now ends the local session and redirects SSO-authenticated browsers to Keycloak RP-initiated logout, using the ID token captured in the server session. Local-password logout retains its existing behavior. The local Keycloak client post-logout redirect is set to `http://kutmb-hr.localhost:8080/login`.
+- Verified focused SSO feature tests, including Inertia logout and local logout; full real-browser logout remains to be verified. Sessions created before this change must sign in through SSO again to receive the logout marker. This remains a local trial; production SSO decisions and review remain open.
+
 ## 24 November 2026 — local Keycloak SSO trial
 
 - Added an opt-in, local-only Keycloak login using authorization code with PKCE and session state. A manually configured Keycloak subject maps to one existing active HR username; no account is auto-created or linked by email. Existing Fortify login and application authorization remain in place. SSO is unavailable when MFA is enabled because the external authentication flow has not been integrated with the HR MFA challenge.

@@ -53,6 +53,8 @@ class KeycloakController extends Controller
         }
         Auth::login($user);
         $request->session()->regenerate();
+        $request->session()->put('keycloak.id_token', $identity->accessTokenResponseBody['id_token'] ?? null);
+        $request->session()->put('keycloak.login', true);
 
         return redirect()->intended(route('dashboard'));
     }
