@@ -113,4 +113,5 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:lea
         Route::patch('/{versionId}', [LeavePolicyDraftController::class, 'update'])->whereNumber('versionId')->name('update');
         Route::post('/{versionId}/entitlements', [LeavePolicyDraftController::class, 'storeEntitlementDraft'])->whereNumber('versionId')->name('entitlements.store');
         Route::patch('/{versionId}/entitlements/{ruleId}', [LeavePolicyDraftController::class, 'updateEntitlementDraft'])->whereNumber(['versionId', 'ruleId'])->name('entitlements.update');
+        Route::patch('/{versionId}/entitlements/{ruleId}/cancellation', [LeavePolicyDraftController::class, 'setEntitlementCancellation'])->whereNumber(['versionId', 'ruleId'])->name('entitlements.cancellation');
     });

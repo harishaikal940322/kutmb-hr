@@ -42,7 +42,16 @@ class EntitlementDraftTest extends TestCase
         $this->assertDatabaseHas('leave_entitlement_rule_drafts', ['id' => $draft->id, 'band_description' => 'Synthetic revised', 'annual_half_day_units' => 12]);
         $this->assertDatabaseHas('audit_events', ['action_code' => 'leave.entitlement.draft_updated', 'target_ref' => 'entitlement_draft:'.$draft->id]);
         $this->patch('/leave/policy-drafts/999999999/entitlements/'.$draft->id, $payload)->assertNotFound();
+        $cancel = $edit.'/cancellation';
+        $this->patch($cancel, ['cancelled' => true])->assertRedirect();
+        $this->assertDatabaseHas('leave_entitlement_rule_drafts', ['id' => $draft->id, 'cancelled_by' => $actor->id]);
+        $this->patch($edit, $payload)->assertSessionHasErrors('band_description');
+        $this->patch($cancel, ['cancelled' => false])->assertRedirect();
+        $this->assertDatabaseHas('leave_entitlement_rule_drafts', ['id' => $draft->id, 'cancelled_at' => null, 'cancelled_by' => null]);
+        $this->assertDatabaseHas('audit_events', ['action_code' => 'leave.entitlement.draft_cancelled', 'target_ref' => 'entitlement_draft:'.$draft->id]);
+        $this->assertDatabaseHas('audit_events', ['action_code' => 'leave.entitlement.draft_restored', 'target_ref' => 'entitlement_draft:'.$draft->id]);
         DB::table('leave_policy_versions')->where('id', $version)->update(['confirmed_by' => $actor->id, 'confirmed_at' => now()]);
+        $this->patch($cancel, ['cancelled' => true])->assertSessionHasErrors('cancelled');
         $this->patch($edit, $payload)->assertSessionHasErrors('band_description');
         $this->post($path, [...$payload, 'band_description' => 'Denied'])->assertSessionHasErrors('band_description');
         $actor->revokePermissionTo('leave.policy.manage');

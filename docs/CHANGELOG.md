@@ -1,3 +1,5 @@
+- 2026-11-24: Added reversible audited cancellation for non-executable entitlement drafts. See CURRENT_HANDOFF.
+
 - 2026-11-24: Added auditable correction history for non-executable entitlement drafts. See CURRENT_HANDOFF.
 
 - 2026-11-24: Added non-executable local entitlement proposals with explicit unset rates and recorded synthetic UI/guard verification. See CURRENT_HANDOFF.

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
+import EntitlementCancellationForm from './EntitlementCancellationForm.vue';
 import EntitlementDraftEditForm from './EntitlementDraftEditForm.vue';
 import EntitlementDraftForm from './EntitlementDraftForm.vue';
 import PolicyEditForm from './PolicyEditForm.vue';
@@ -33,6 +34,8 @@ type EntitlementDraft = {
     category_id: number;
     band_description: string;
     annual_half_day_units: number | null;
+    cancelled_at: string | null;
+    cancelled_by: number | null;
 };
 defineProps<{
     versions: Version[];
@@ -320,6 +323,29 @@ function submit() {
                                         </li>
                                     </ul>
                                 </details>
+                                <p
+                                    v-if="
+                                        rule.cancelled_at || rule.cancelled_by
+                                    "
+                                    class="text-muted-foreground"
+                                >
+                                    Cadangan dibatalkan; label masih ditempah
+                                    untuk rekod ini.
+                                </p>
+                                <EntitlementCancellationForm
+                                    v-if="
+                                        !version.confirmed_at &&
+                                        !version.confirmed_by
+                                    "
+                                    :version-id="version.id"
+                                    :rule-id="rule.id"
+                                    :is-cancelled="
+                                        Boolean(
+                                            rule.cancelled_at ||
+                                            rule.cancelled_by,
+                                        )
+                                    "
+                                />
                                 <EntitlementDraftEditForm
                                     v-if="
                                         !version.confirmed_at &&

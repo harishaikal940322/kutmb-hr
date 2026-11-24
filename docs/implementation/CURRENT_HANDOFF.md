@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P02 entitlement proposal cancellation
+
+- Added audited, reversible cancellation of unconfirmed entitlement proposals; cancelled proposals cannot be edited until restored and retain their reserved label/history. Confirmed or partially confirmed versions stay locked. A future policy selector must exclude cancelled proposals and reject inconsistent cancellation state; no selection, rate application or posting exists yet.
+- Applied nullable cancellation fields and restricted actor FK after local target/SQL preview. Focused rollback-isolated MySQL test passed (1 test, 37 assertions), including cancellation/restore, audit, blocked edits and confirmed lock. Targeted Pint/PHPStan, frontend format/lint, type check, build and `git diff --check` passed. No browser or concurrent-worker acceptance of this form; no actual values or HR approval.
+- Next: consolidated CT-P01/02 security and integrity checks, review unresolved policy sources, then proceed only with genuinely dependency-ready pieces. Do not activate leave requests or infer HR policy.
+
 ## 24 November 2026 — CT-P02 entitlement draft correction history
 
 - Added local corrections to descriptive entitlement proposals, retaining previous category, label, nullable rate and actor in a restricted history table with atomic audit. Version locks, active-category checks, duplicate labels and confirmed-policy denial apply. These drafts remain non-executable; service-band mapping and rates are not inferred or approved, and no ledger or policy activation was added.
