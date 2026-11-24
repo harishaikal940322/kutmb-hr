@@ -41,3 +41,5 @@ No application features were implemented as part of the initial documentation ba
 | 2026-11-24 | DOC-007 v0.2 | Record requestor acceptance of minimum employee profile and optional explicit account link; propose least-privilege permission matrix; Q-005 partially resolved. No grants or functional changes. | REQUESTOR FIELD DESIGN ACCEPTED; IMPLEMENTATION HOLD |
 
 | 2026-11-24 | DOC-007 v0.3 | Record requestor acceptance of permission matrix and requested editable role presets reusing existing MOD-001 role UI/catalogue; update CT-P01 scope and Q-004. No grants or implementation. | REQUESTOR PERMISSION DESIGN ACCEPTED; IMPLEMENTATION HOLD |
+
+| 2026-11-24 | DOC-007 v0.4 | Record requestor compact permission-matrix design acceptance for shared Create/Edit Role selector; update CT-P01 planned UI and checks. No functional changes. | REQUESTOR UI DESIGN ACCEPTED; IMPLEMENTATION HOLD |

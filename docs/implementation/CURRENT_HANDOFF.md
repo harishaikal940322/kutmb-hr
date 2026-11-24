@@ -1,3 +1,8 @@
+## 24 November 2026 — compact permission matrix design acceptance
+
+- Requestor accepted compact module/submodule permission-matrix concept for Create Role and Edit Role. DOC-007 v0.4 section 4C specifies collapsed groups, search, counts, actual action mapping, shared selector, mobile/dark/light and preserved selections. No invented rights, automatic grants or changes to protected/existing roles. CT-P01 planned deliverables and checks updated.
+- Documentation only; no UI code, permission grants, schema or runtime tests. Formal HR requirement/authority confirmation and explicit CT-P01 development authorization remain before functional work; local preflight required.
+
 ## 24 November 2026 — MOD-004 permission matrix and role template direction
 
 - Requestor accepted the proposed MOD-004 permission matrix and requested templates using existing support. DOC-007 v0.3 section 4B records a bounded MOD-001 supporting design: optional presets in existing role creation, editable permission selection, server catalogue validation, explicit save, no new authorization engine/table or automatic grant/assignment. Current Roles.vue/IdentityRoleController/PermissionCatalog/config and seed migration confirm manual reusable roles and menu control; no preset selector, HR catalogue or user-role assignment in that screen.
