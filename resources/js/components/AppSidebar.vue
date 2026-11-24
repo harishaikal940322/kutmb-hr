@@ -36,6 +36,11 @@ const mainNavItems: NavItem[] = [
     },
 ];
 const menuCatalog: Record<string, NavItem> = {
+    'organization.offices.index': {
+        title: 'Penetapan Pegawai',
+        href: '/organization/offices',
+        icon: UsersRound,
+    },
     'employees.index': {
         title: 'Pekerja',
         href: '/employees',

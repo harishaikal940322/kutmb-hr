@@ -41,6 +41,10 @@ return [
                 'label' => 'View employees', 'description' => 'View the local development employee directory.',
                 'group' => 'Employee and organization', 'submodule' => 'Employees', 'action' => 'View', 'system_only' => false,
             ],
+            'hr.offices.manage' => [
+                'label' => 'Manage approval offices', 'description' => 'Manage local development approval office appointments.',
+                'group' => 'Employee and organization', 'submodule' => 'Approval offices', 'action' => 'Manage', 'system_only' => false,
+            ],
             'hr.accounts.link' => [
                 'label' => 'Link employee accounts', 'description' => 'Manage local development employee account associations.',
                 'group' => 'Employee and organization', 'submodule' => 'Account association', 'action' => 'Manage', 'system_only' => false,
@@ -71,6 +75,10 @@ return [
         ],
     ],
     'menus' => [
+        'organization.offices.index' => [
+            'label' => 'Penetapan Pegawai', 'href' => '/organization/offices', 'icon' => 'users',
+            'permission' => 'hr.offices.manage', 'editable' => false,
+        ],
         'employees.index' => [
             'label' => 'Pekerja', 'href' => '/employees', 'icon' => 'users',
             'permission' => 'hr.employees.view', 'editable' => false,

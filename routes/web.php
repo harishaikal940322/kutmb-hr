@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ApprovalOfficeController;
 use App\Http\Controllers\EmployeeAccountLinkController;
 use App\Http\Controllers\EmployeeAssignmentController;
 use App\Http\Controllers\EmployeeFoundationController;
@@ -81,4 +82,11 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.
         Route::patch('/{employeeId}', [EmployeeFoundationController::class, 'update'])->whereNumber('employeeId')->middleware('permission:hr.employees.manage')->name('update');
         Route::put('/{employeeId}/account', [EmployeeAccountLinkController::class, 'update'])->whereNumber('employeeId')->middleware('permission:hr.accounts.link')->name('account.update');
         Route::post('/{employeeId}/assignments', [EmployeeAssignmentController::class, 'store'])->whereNumber('employeeId')->middleware('permission:hr.assignments.manage')->name('assignments.store');
+    });
+
+Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.offices.manage'])
+    ->prefix('organization/offices')->name('organization.offices.')->group(function (): void {
+        Route::get('/', [ApprovalOfficeController::class, 'index'])->name('index');
+        Route::post('/', [ApprovalOfficeController::class, 'store'])->name('store');
+        Route::patch('/{id}/end', [ApprovalOfficeController::class, 'end'])->whereNumber('id')->name('end');
     });
