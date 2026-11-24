@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 import VersionCancellationForm from './VersionCancellationForm.vue';
 import CalendarCancellationForm from './CalendarCancellationForm.vue';
 import CalendarDayEditForm from './CalendarDayEditForm.vue';
@@ -33,7 +33,12 @@ type History = {
     previous_name: string;
     created_at: string;
 };
-defineProps<{ versions: Version[]; days: Day[]; history: History[] }>();
+defineProps<{
+    versions: Version[];
+    days: Day[];
+    history: History[];
+    canSimulate: boolean;
+}>();
 const form = useForm({ label: '', effective_from: '', effective_to: '' });
 function submit() {
     form.post('/leave/calendar-drafts', {
@@ -52,6 +57,12 @@ function submit() {
                 Draf data sintetik untuk pembangunan tempatan. Draf tidak
                 mengesahkan kalendar atau mengubah permohonan cuti.
             </p>
+            <Link
+                v-if="canSimulate"
+                href="/leave/session-simulation"
+                class="mt-3 inline-flex min-h-10 items-center rounded-md border px-3 text-sm"
+                >Simulasi sesi</Link
+            >
         </header>
         <section class="space-y-4" aria-labelledby="new-calendar">
             <h2 id="new-calendar" class="text-xl font-semibold">

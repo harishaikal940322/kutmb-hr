@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P02 session simulation page
+
+- Added a read-only local/testing-only single-date AM/PM simulation page requiring both calendar-manage and policy-manage permissions. It uses only technically simulated versions, reports missing/inconsistent versions without calculating, and produces integer half-day units for display. It creates no request, balance, reservation, audit mutation or approval. Calendar page links to it only when the policy permission is also present; server checks both permissions independently.
+- Focused rollback-isolated MySQL test passed (1 test, 39 assertions) for both permission gates, missing versions, synthetic result, duplicate session validation and simulated production denial. Targeted Pint/PHPStan, frontend format/lint, type check, build and `git diff --check` passed. Initial test attempt failed because the new Vite page had not built; final build and test passed. No authenticated browser submission or real HR data.
+- Next: review outstanding CT-P02 confirmation/impact and P03 dependencies; simulation is not HR policy, entitlement calculation or release approval.
+
 ## 24 November 2026 — CT-P02 separate working-schedule simulation
 
 - Added local/testing-only schedule simulation confirmation, using separate `schedule_simulated_at/by` fields rather than whole-policy approval. It requires authorized draft management, explicit synthetic-schedule acknowledgement, complete valid weekdays/times, finite effective dates and no overlapping simulated/confirmed or inconsistent version. A dedicated InnoDB guard serializes confirmation; simulated versions are locked against further changes. Entitlement rules and formal policy remain unconfirmed and unusable. The unexposed technical lookup now selects only these schedule-simulation markers, never whole-policy confirmation.

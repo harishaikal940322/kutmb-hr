@@ -11,6 +11,7 @@ use App\Http\Controllers\IdentityRoleController;
 use App\Http\Controllers\KeycloakController;
 use App\Http\Controllers\LeaveCalendarDraftController;
 use App\Http\Controllers\LeavePolicyDraftController;
+use App\Http\Controllers\LeaveSessionSimulationController;
 use App\Http\Controllers\LocalSystemAdminBootstrapController;
 use App\Http\Controllers\MfaController;
 use App\Http\Controllers\OrganizationReferenceController;
@@ -119,3 +120,7 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:lea
         Route::patch('/{versionId}/entitlements/{ruleId}', [LeavePolicyDraftController::class, 'updateEntitlementDraft'])->whereNumber(['versionId', 'ruleId'])->name('entitlements.update');
         Route::patch('/{versionId}/entitlements/{ruleId}/cancellation', [LeavePolicyDraftController::class, 'setEntitlementCancellation'])->whereNumber(['versionId', 'ruleId'])->name('entitlements.cancellation');
     });
+
+Route::get('/leave/session-simulation', LeaveSessionSimulationController::class)
+    ->middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:leave.calendar.manage', 'permission:leave.policy.manage'])
+    ->name('leave.session-simulation');

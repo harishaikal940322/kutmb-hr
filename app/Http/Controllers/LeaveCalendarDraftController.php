@@ -17,11 +17,12 @@ use Inertia\Response;
 
 class LeaveCalendarDraftController extends Controller
 {
-    public function index(VersionPeriodOverlap $overlap): Response
+    public function index(Request $request, VersionPeriodOverlap $overlap): Response
     {
         return Inertia::render('leave/CalendarDrafts', [
             'versions' => $overlap->annotate(DB::table('leave_calendar_versions')->orderByDesc('effective_from')->orderByDesc('id')->get(['id', 'label', 'effective_from', 'effective_to', 'confirmed_at', 'confirmed_by', 'cancelled_at', 'cancelled_by'])),
             'days' => DB::table('leave_calendar_days')->orderBy('date')->get(['id', 'calendar_version_id', 'date', 'name', 'kind', 'original_day_id', 'cancelled_at', 'cancelled_by']),
+            'canSimulate' => $request->user()->can('leave.policy.manage'),
             'history' => DB::table('leave_calendar_day_history')->orderByDesc('id')->get(['id', 'calendar_day_id', 'previous_date', 'previous_name', 'created_at']),
         ]);
     }
