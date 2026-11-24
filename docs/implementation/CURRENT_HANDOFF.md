@@ -1,3 +1,9 @@
+## 24 November 2026 — local Keycloak SSO trial
+
+- Added an opt-in, local-only Keycloak login using authorization code with PKCE and session state. A manually configured Keycloak subject maps to one existing active HR username; no account is auto-created or linked by email. Existing Fortify login and application authorization remain in place. SSO is unavailable when MFA is enabled because the external authentication flow has not been integrated with the HR MFA challenge.
+- Realm `kutmb` and confidential client `kutmb-hr` were configured in the local Keycloak instance. Browser and HR container use `http://keycloak.localtest.me:8081`; the client secret and explicit mapping are in the ignored local `.env`. Initial user must complete profile and change the temporary password. This is a local technical trial; Q-003, UM-DEC-001, SSO policy and production security approvals remain open.
+- Verified: six focused feature tests (linked/unknown/inactive accounts, state and local/MFA gates), frontend build and Vue type check. Real browser-style redirect reached Keycloak and its profile-completion action; the full callback awaits the user's first-login actions. `composer audit` reported an existing low-severity Laravel framework advisory (CVE-2026-128083), not yet remediated.
+
 # Current Development Handoff
 
 ## 23 November 2026 — General proxy managed outside repository

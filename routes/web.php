@@ -3,6 +3,7 @@
 use App\Http\Controllers\IdentityMenuAccessController;
 use App\Http\Controllers\IdentityPermissionController;
 use App\Http\Controllers\IdentityRoleController;
+use App\Http\Controllers\KeycloakController;
 use App\Http\Controllers\LocalSystemAdminBootstrapController;
 use App\Http\Controllers\MfaController;
 use App\Http\Controllers\ProfileController;
@@ -10,6 +11,11 @@ use App\Http\Controllers\UserDirectoryController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
+
+Route::middleware('guest')->group(function (): void {
+    Route::get('/auth/keycloak', [KeycloakController::class, 'redirect'])->name('keycloak.redirect');
+    Route::get('/auth/keycloak/callback', [KeycloakController::class, 'callback'])->name('keycloak.callback');
+});
 
 Route::get('register', [LocalSystemAdminBootstrapController::class, 'create'])
     ->name('register');

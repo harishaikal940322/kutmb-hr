@@ -17,6 +17,7 @@ defineOptions({
 
 defineProps<{
     status?: string;
+    keycloakEnabled?: boolean;
     recoveryCodes?: string[] | null;
 }>();
 </script>
@@ -104,4 +105,5 @@ defineProps<{
             </Button>
         </div>
     </Form>
+    <a v-if="keycloakEnabled" href="/auth/keycloak" class="mt-4 block rounded-md border px-4 py-2 text-center text-sm font-medium">Log masuk dengan SSO</a>
 </template>

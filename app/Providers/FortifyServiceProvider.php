@@ -60,6 +60,7 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::loginView(fn (Request $request) => Inertia::render('auth/Login', [
             'status' => $request->session()->get('status'),
+            'keycloakEnabled' => app()->environment('local') && config('services.keycloak.enabled') && ! config('iam.mfa_enabled'),
             'recoveryCodes' => $request->session()->pull('iam.recovery_codes'),
         ]));
 
