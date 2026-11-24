@@ -72,6 +72,32 @@ return [
         ],
     ],
     'role_templates' => [
+        ...(in_array($appEnvironment, ['local', 'testing'], true) ? [
+            'staff-v1' => [
+                'label' => 'Staf', 'description' => 'Profil pekerja sendiri yang dipautkan.',
+                'permissions' => ['hr.profile.self.view'],
+            ],
+            'hr-executive-v1' => [
+                'label' => 'Eksekutif HR', 'description' => 'Profil pekerja dan penempatan pembangunan.',
+                'permissions' => ['hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage'],
+            ],
+            'hr-manager-v1' => [
+                'label' => 'Pengurus HR', 'description' => 'Pekerja, organisasi, pautan akaun dan penetapan pegawai pembangunan.',
+                'permissions' => ['hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage', 'hr.organization.manage', 'hr.accounts.link', 'hr.offices.manage'],
+            ],
+            'unit-manager-v1' => [
+                'label' => 'Pengurus Unit', 'description' => 'Profil sendiri dan skop tugasan; skop cuti belum tersedia.',
+                'permissions' => ['hr.profile.self.view', 'hr.organization.scoped.view'],
+            ],
+            'general-manager-v1' => [
+                'label' => 'Pengurus Besar', 'description' => 'Profil sendiri dan skop tugasan; skop cuti belum tersedia.',
+                'permissions' => ['hr.profile.self.view', 'hr.organization.scoped.view'],
+            ],
+            'alk-secretary-v1' => [
+                'label' => 'Setiausaha ALK', 'description' => 'Skop tugasan kelulusan belum tersedia.',
+                'permissions' => ['hr.organization.scoped.view'],
+            ],
+        ] : []),
         'directory-viewer-v1' => [
             'label' => 'User directory viewer',
             'description' => 'View the local development user directory preview.',

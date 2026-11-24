@@ -1,3 +1,5 @@
+- 2026-11-24: Added local HR role templates using delivered permissions; incomplete office templates remain unavailable. See CURRENT_HANDOFF.
+
 - 2026-11-24: Added a local linked-employee self-profile with fail-closed current-assignment display. See CURRENT_HANDOFF.
 
 - 2026-11-24: Added local approval-office appointments with scoped date overlap checks, independent actor and audit. See CURRENT_HANDOFF.

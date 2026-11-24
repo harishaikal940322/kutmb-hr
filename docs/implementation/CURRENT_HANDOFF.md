@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P01 local HR role templates
+
+- Added local/testing-only editable role-template definitions for Staff, HR Executive and HR Manager using the delivered permission catalogue. Unit Manager, General Manager and Secretary templates are visible but unavailable because `hr.organization.scoped.view` has not been implemented; no partial preset is applied. Templates do not create roles, assign permissions or appoint office holders. Production catalogue remains unchanged.
+- Checks: rollback-isolated catalogue test passed (1 test, 11 assertions) for exact ready template sets, unavailable approver templates and unchanged role/grant counts; targeted Pint and `git diff --check` passed. Existing role UI confirmation and protection behavior was not changed or retested. No HR/IT authority or operational approval is implied.
+- Next: CT-P01 consolidated security and UI checks, then dependency-ready CT-P02 calendar/policy work; office-scoped views require a real leave responsibility, and HR policy-dependent operations must remain closed.
+
 ## 24 November 2026 — CT-P01 own employee profile
 
 - Added local/testing-only read-only own employee profile requiring `hr.profile.self.view` and an explicit employee/account link. It shows only the linked minimum profile and, when exactly one assignment applies during employment on the Malaysia-local date, the current unit/category. Missing or ambiguous current assignment is not guessed. No general employee directory or account link is exposed by this permission.
