@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
+import AssignmentForm from './AssignmentForm.vue';
 type Reference = { id: number; code: string; name: string };
 type Employee = {
     id: number;
@@ -9,11 +10,20 @@ type Employee = {
     confirmation_date: string | null;
     service_end: string | null;
 };
+type Assignment = {
+    employee_id: number;
+    effective_from: string;
+    effective_to: string | null;
+    unit_name: string;
+    category_name: string;
+};
 defineProps<{
     employees: Employee[];
     units: Reference[];
     categories: Reference[];
     canCreate: boolean;
+    canAssign: boolean;
+    assignments: Assignment[];
 }>();
 const form = useForm({
     employee_no: '',
@@ -180,6 +190,28 @@ function submit() {
                         {{ employee.employee_no }} · Mula
                         {{ employee.service_start }}
                     </p>
+                    <ul
+                        class="mt-3 space-y-1 text-sm"
+                        aria-label="Sejarah penempatan"
+                    >
+                        <li
+                            v-for="assignment in assignments.filter(
+                                (item) => item.employee_id === employee.id,
+                            )"
+                            :key="assignment.effective_from"
+                        >
+                            {{ assignment.unit_name }} ·
+                            {{ assignment.category_name }} ·
+                            {{ assignment.effective_from }} —
+                            {{ assignment.effective_to ?? 'terbuka' }}
+                        </li>
+                    </ul>
+                    <AssignmentForm
+                        v-if="canAssign"
+                        :employee-id="employee.id"
+                        :units="units"
+                        :categories="categories"
+                    />
                 </li>
             </ul>
         </section>

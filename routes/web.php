@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\EmployeeAssignmentController;
 use App\Http\Controllers\EmployeeFoundationController;
 use App\Http\Controllers\IdentityMenuAccessController;
 use App\Http\Controllers\IdentityPermissionController;
@@ -76,4 +77,5 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.
     ->prefix('employees')->name('employees.')->group(function (): void {
         Route::get('/', [EmployeeFoundationController::class, 'index'])->name('index');
         Route::post('/', [EmployeeFoundationController::class, 'store'])->middleware('permission:hr.employees.manage')->name('store');
+        Route::post('/{employeeId}/assignments', [EmployeeAssignmentController::class, 'store'])->whereNumber('employeeId')->middleware('permission:hr.assignments.manage')->name('assignments.store');
     });

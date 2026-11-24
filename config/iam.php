@@ -41,6 +41,10 @@ return [
                 'label' => 'View employees', 'description' => 'View the local development employee directory.',
                 'group' => 'Employee and organization', 'submodule' => 'Employees', 'action' => 'View', 'system_only' => false,
             ],
+            'hr.assignments.manage' => [
+                'label' => 'Manage assignments', 'description' => 'Manage local development employee assignments.',
+                'group' => 'Employee and organization', 'submodule' => 'Assignments', 'action' => 'Manage', 'system_only' => false,
+            ],
             'hr.employees.manage' => [
                 'label' => 'Manage employees', 'description' => 'Create local development employee records.',
                 'group' => 'Employee and organization', 'submodule' => 'Employees', 'action' => 'Manage', 'system_only' => false,
