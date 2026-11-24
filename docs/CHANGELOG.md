@@ -31,3 +31,5 @@ No application features were implemented as part of the initial documentation ba
 | 2026-10-30 | WP-040B identity/RBAC schema development direction | Owner selected DOC-019 PD-001..PD-010 for synthetic-data schema development; additive user identity fields, relational RBAC, IAM guard and restricted audit foundation implemented on review branch. Organizational approvals and release gates remain open. | OWNER DEVELOPMENT DIRECTION; NOT HR/IT/SECURITY APPROVAL |
 
 | 2026-11-24 | MOD-005 UX-R01–R05 | Simplify AL/EL form and add pre-form and projected balances in Vue/HTML preview; retain >5-day threshold, align Unit Manager route, document unchanged notice policy. No functional or normative changes; local checks pending. | REQUESTOR UX DIRECTION ONLY |
+
+| 2026-11-24 | DOC-023 v0.5 / MOD-005 TD v0.2 | Record requestor UX acceptance and freeze at ffdeda3; refine bounded employee/org physical proposal and current HR answer alignment. No normative or functional changes. | REQUESTOR UX ACCEPTED; TECHNICAL DESIGN IN REVIEW; IMPLEMENTATION HOLD |

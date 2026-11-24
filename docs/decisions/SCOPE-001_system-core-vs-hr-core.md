@@ -9,6 +9,10 @@
 
 The requestor considers all 56 Cuti Tahunan decisions final for UI/UX design and directs the project to proceed with that design first. MOD-005 UI/UX design is authorized as the next design scope. This does not authorize backend, database, workflow execution, or other HR Core implementation. The accepted Cuti Tahunan decision baseline is frozen for design; changes use the existing change-control process. CR-HR-2026-002 records the final General Manager leave approver as Setiausaha ALK, superseding the conflicting Pengerusi ALK approval wording in CT-DEC-006.
 
+## 24 November 2026 — MOD-005 UX acceptance and technical planning
+
+Requestor accepted the updated demo and authorized proceeding to technical design/planning. DOC-023 v0.5 records the UX freeze at `ffdeda34062ae0dd5c9edbd08ec5e7ca44cab6a5`. MOD-005 technical design proposal and bounded MOD-004 dependency design may be reviewed; this is not formal HR/IT sign-off or authorization for HR Core functional implementation. No changes to scope hold, normative SRS/RTM or production gates.
+
 ## Definitions
 
 - **KUTMB HR System** is the overall product.

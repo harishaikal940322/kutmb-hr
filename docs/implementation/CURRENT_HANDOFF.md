@@ -1,3 +1,9 @@
+## 24 November 2026 — MOD-005 UX acceptance and technical design review
+
+- Requestor reviewed updated demo, accepted remaining screens and directed proceeding. DOC-023 v0.5 design frozen at source commit `ffdeda34062ae0dd5c9edbd08ec5e7ca44cab6a5` including UX-R01–R05. Existing filenames retained. This is requester acceptance, not independently executed device/build/UAT checks or formal HR approval.
+- Updated existing technical plan v0.2: inspected current Laravel/Vue directories and IAM schema; proposed bounded CT-P01 employee/org/approval assignment physical design and source/menu layout for review; aligned CT-DEC-050 route and current HR answers for negative balance, correction window, EL, cancellation, unit transfer, late approval, cross-year and HR recording. No change to SRS/RTM or permission grants. Remaining policy details and Q-004/005/006 must be resolved before migration; G2–G4 remain open.
+- CT-P00 IN REVIEW (UX accepted, other gates open); CT-P01 BLOCKED pending scope/field/authorization, subsequent packages HOLD. No source code, database, Docker or production changes. Remote documentation verification only; local preflight and focused build/browser checks remain pending. Next: review minimum MOD-004 dependency and formal HR/project authorization, finalize P01 physical schema in existing plan, then authorized implementation one slice at a time.
+
 ## 24 November 2026 — MOD-005 application form UX-R01–R05
 
 - Requestor accepted the revised form design and confirmed SRS approval threshold unchanged. Vue and HTML previews now use AL/EL dropdown, remove manual AL emergency checkbox, show four pre-form balance metrics and projected AL/Tabung separately; ordinary AL reason optional, EL reason required, attachment optional. All values synthetic; pending deducted once. Unit Manager preview aligns to FR-20; five days ends at GM, above five at Secretary ALK; GM own requests go to Secretary.

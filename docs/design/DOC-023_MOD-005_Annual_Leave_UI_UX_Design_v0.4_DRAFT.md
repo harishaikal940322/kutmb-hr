@@ -1,6 +1,6 @@
 # DOC-023 | MOD-005 Annual Leave UI/UX Design
 
-> **Version:** v0.4 DRAFT · **Date:** 23 November 2026 · **Review status:** Awaiting requestor review
+> **Version:** v0.5 · **Date:** 24 November 2026 · **Review status:** REQUESTOR UX ACCEPTED / DESIGN FROZEN
 >
 > **Baseline:** All 56 Cuti Tahunan decisions are frozen for UI/UX design per requestor direction. Setiausaha ALK is the final approver for all General Manager leave; this resolves the CT-DEC-001/006 conflict under CR-HR-2026-002. No new policy or status is introduced.
 >
@@ -50,6 +50,8 @@ The role selector is a design-review preview only. It changes the example dashbo
 - UX-R05: retain the existing SRS FR-19/20/23 and BR-24/25/26 threshold: up to and including five days ends at Pengurus Besar; above five days requires Setiausaha ALK. Unit Manager applies directly to GM for up to five days; above five GM supports, Secretary decides. All GM requests go to Secretary ALK under CR-HR-2026-002.
 - The checkbox removal is a UI decision, not a repeal of FR-18/BR-20/CT-DEC-009. The actual three-working-day notice rule and exception handling remain governed by the SRS; derive notice from dates in a later authorized functional design, or obtain a controlled policy change if removal is intended. No HR policy, backend or production approval is implied.
 
-## Review boundary
+## Final UX acceptance / freeze (24 November 2026)
 
-Review the SRS map first, then the staff application path, role queues, HR record maintenance, year-end/prorata and reports/audit views. Changes that alter an accepted HR decision go through the existing change-control process before the design is revised. The Vue presentation is now available for requestor review within the existing Dashboard. The main-system menu, backend, API, database and workflow implementation remain gated.
+The requestor confirmed after reviewing the updated demo that the remaining screens look satisfactory and directed the project to proceed. Record requester acceptance of the design across Staf, Pengurus Unit, Pengurus Besar, Setiausaha ALK, HR and Pentadbir IT, including UX-R01–R05. Frozen reference: commit `ffdeda34062ae0dd5c9edbd08ec5e7ca44cab6a5`, Vue `resources/js/pages/AnnualLeavePreview.vue` and the standalone HTML prototype linked above. Version v0.5 denotes the accepted design record; existing source filenames are retained to preserve links.
+
+This acceptance is a user-reported design review, not an independent build, accessibility/device test, formal HR sign-off or production acceptance. Functional route/menu integration is still a planned technical task; role selector remains preview-only. Small presentation refinements may be made during authorized development and logged; policy/workflow changes require existing change control. FR-18/BR-20/CT-DEC-009 remain unchanged. The main-system menu, backend, API, database and workflow implementation remain gated.
