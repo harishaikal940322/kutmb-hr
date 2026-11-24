@@ -72,6 +72,11 @@ return [
         ],
     ],
     'role_templates' => [
+        'directory-viewer-v1' => [
+            'label' => 'User directory viewer',
+            'description' => 'View the local development user directory preview.',
+            'permissions' => ['iam.users.view'],
+        ],
         ...(in_array($appEnvironment, ['local', 'testing'], true) ? [
             'staff-v1' => [
                 'label' => 'Staf', 'description' => 'Profil pekerja sendiri yang dipautkan.',
@@ -98,32 +103,29 @@ return [
                 'permissions' => ['hr.organization.scoped.view'],
             ],
         ] : []),
-        'directory-viewer-v1' => [
-            'label' => 'User directory viewer',
-            'description' => 'View the local development user directory preview.',
-            'permissions' => ['iam.users.view'],
-        ],
     ],
     'menus' => [
-        'employees.self' => [
-            'label' => 'Profil Pekerja Saya', 'href' => '/employee-profile', 'icon' => 'user',
-            'permission' => 'hr.profile.self.view', 'editable' => false,
-        ],
-        'organization.offices.index' => [
-            'label' => 'Penetapan Pegawai', 'href' => '/organization/offices', 'icon' => 'users',
-            'permission' => 'hr.offices.manage', 'editable' => false,
-        ],
-        'employees.index' => [
-            'label' => 'Pekerja', 'href' => '/employees', 'icon' => 'users',
-            'permission' => 'hr.employees.view', 'editable' => false,
-        ],
-        'organization.references.index' => [
-            'label' => 'Unit dan Kategori',
-            'href' => '/organization/references',
-            'icon' => 'users',
-            'permission' => 'hr.organization.manage',
-            'editable' => false,
-        ],
+        ...(in_array($appEnvironment, ['local', 'testing'], true) ? [
+            'employees.self' => [
+                'label' => 'Profil Pekerja Saya', 'href' => '/employee-profile', 'icon' => 'user',
+                'permission' => 'hr.profile.self.view', 'editable' => false,
+            ],
+            'organization.offices.index' => [
+                'label' => 'Penetapan Pegawai', 'href' => '/organization/offices', 'icon' => 'users',
+                'permission' => 'hr.offices.manage', 'editable' => false,
+            ],
+            'employees.index' => [
+                'label' => 'Pekerja', 'href' => '/employees', 'icon' => 'users',
+                'permission' => 'hr.employees.view', 'editable' => false,
+            ],
+            'organization.references.index' => [
+                'label' => 'Unit dan Kategori',
+                'href' => '/organization/references',
+                'icon' => 'users',
+                'permission' => 'hr.organization.manage',
+                'editable' => false,
+            ],
+        ] : []),
         'users.index' => [
             'label' => 'User Directory',
             'href' => '/users',

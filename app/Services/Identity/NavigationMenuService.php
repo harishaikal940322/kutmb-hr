@@ -25,7 +25,7 @@ class NavigationMenuService
                 continue;
             }
 
-            $permission = $permissionMap[$key] ?? $menu['permission'];
+            $permission = $menu['editable'] ? ($permissionMap[$key] ?? $menu['permission']) : $menu['permission'];
 
             if ($user->can($permission)) {
                 $visible[] = $key;
@@ -48,7 +48,7 @@ class NavigationMenuService
                 'key' => $key,
                 'label' => $menu['label'],
                 'href' => $menu['href'],
-                'permission' => $permissionMap[$key] ?? $menu['permission'],
+                'permission' => $menu['editable'] ? ($permissionMap[$key] ?? $menu['permission']) : $menu['permission'],
                 'editable' => $menu['editable'],
             ];
         }

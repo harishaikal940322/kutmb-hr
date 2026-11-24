@@ -42,8 +42,17 @@ class IdentityMenuAccessController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($request, $validated): void {
+        foreach ($menuDefinitions as $menuKey => $definition) {
+            if (! $definition['editable'] && $validated['mappings'][$menuKey] !== $definition['permission']) {
+                throw ValidationException::withMessages(['mappings' => 'A fixed menu permission cannot be changed.']);
+            }
+        }
+
+        DB::transaction(function () use ($request, $validated, $menuDefinitions): void {
             foreach ($validated['mappings'] as $menuKey => $permissionCode) {
+                if (! $menuDefinitions[$menuKey]['editable']) {
+                    continue;
+                }
                 $permissionId = Permission::query()
                     ->where('code', $permissionCode)
                     ->where('guard_name', 'web')

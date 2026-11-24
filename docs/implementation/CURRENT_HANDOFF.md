@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P01 menu integration correction and focused regression
+
+- Fixed an integration defect found during CT-P01 review: HR menu definitions and permissions now exist only in local/testing configuration, so production menu editing has no references to unavailable HR permissions. Fixed menu mappings use their code-defined permission in navigation and server-side menu updates reject attempts to replace them; existing editable System Core mappings retain their normal behavior. Restored directory-viewer template ordering for the existing RBAC regression test.
+- Checks: combined rollback-isolated employee and existing transactional RBAC tests passed (11 tests, 740 assertions); includes synthetic fixed-menu tampering. A production-configuration probe showed zero HR menus and permission definitions. Targeted PHPStan/Pint and `git diff --check` passed. Browser visual/accessibility review and concurrent mutation tests remain incomplete; nine older RefreshDatabase IAM tests were not run on the shared database. No grants or operational release implied.
+- Next: dependency-ready CT-P02 work may begin with documented, policy-independent calendar/configuration foundations while CT-P01 visual, concurrency and workflow-integration limitations remain open. Office-scoped approver views and account reassociation with leave history remain gated until the actual leave workflow is designed.
+
 ## 24 November 2026 — CT-P01 local HR role templates
 
 - Added local/testing-only editable role-template definitions for Staff, HR Executive and HR Manager using the delivered permission catalogue. Unit Manager, General Manager and Secretary templates are visible but unavailable because `hr.organization.scoped.view` has not been implemented; no partial preset is applied. Templates do not create roles, assign permissions or appoint office holders. Production catalogue remains unchanged.
