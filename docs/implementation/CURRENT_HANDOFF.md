@@ -1,3 +1,9 @@
+## 24 November 2026 — dependency advisory remediation
+
+- Consolidated dependency check reported low-severity `PKSA-yxbx-3c9s-cjt9` / `GHSA-63hm-g96r-2m2q` affecting Laravel framework before 13.40.0. Updated only the existing framework lock from 13.39.0 to 13.40.0 within the existing `^13.17` constraint; no new package, infrastructure or CI change. Composer audit now reports no advisories and `composer validate --no-check-publish` passes; npm audit reported zero vulnerabilities.
+- After the update, the focused rollback-isolated employee/leave/transactional-RBAC and unit selection passed (23 tests, 1,022 assertions), local `/login` returned HTTP 200, and `git diff --check` passed. The full destructive-harness suite was not run against the shared development database; no browser sign-in, release or HR/IT approval inferred.
+- Next: continue dependency-ready CT-P02 safety work and reconcile CT-P03 prerequisites; retain the calendar/request-impact and policy/HR decision gates documented below.
+
 ## 24 November 2026 — CT-P02 bounded calendar simulation confirmation
 
 - Added permission-gated, local/testing-only confirmation of a synthetic calendar for technical simulation. The form requires an explicit completeness acknowledgement and a finite effective period; a dedicated InnoDB guard serializes confirmation, overlapping confirmed/inconsistent versions are rejected, active dates/replacements are validated through the fail-closed lookup, and the version becomes immutable with an audit event. This is explicitly labelled simulation, not HR sign-off or operational approval. No policy confirmation, leave submission, posting or production route access was enabled.
