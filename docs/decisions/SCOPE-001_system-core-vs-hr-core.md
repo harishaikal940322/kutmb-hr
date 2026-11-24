@@ -13,6 +13,10 @@ The requestor considers all 56 Cuti Tahunan decisions final for UI/UX design and
 
 Requestor accepted the updated demo and authorized proceeding to technical design/planning. DOC-023 v0.5 records the UX freeze at `ffdeda34062ae0dd5c9edbd08ec5e7ca44cab6a5`. MOD-005 technical design proposal and bounded MOD-004 dependency design may be reviewed; this is not formal HR/IT sign-off or authorization for HR Core functional implementation. No changes to scope hold, normative SRS/RTM or production gates.
 
+## 24 November 2026 — MOD-004 major module / foundation release
+
+Requestor selected Option A: minimum Employee & Organization foundation as initial release of MOD-004. MOD-004 remains an independent major HR Core module (F-009), not a submodule of MOD-005. Its first delivery supplies employee directory/profile, organization units, category, effective assignments, account association and named approval office assignment required by Cuti Tahunan. See [DOC-007 draft](../requirements/modules/DOC-007_MOD-004_Employee_Organization_v0.1_DRAFT.md). Broader employee management is deferred, not removed from the future product. No new module ID, feature ID, normative approval or implementation authorization; existing HOLD remains until formal requirements and explicit release/development authorization.
+
 ## Definitions
 
 - **KUTMB HR System** is the overall product.

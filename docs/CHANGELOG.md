@@ -35,3 +35,5 @@ No application features were implemented as part of the initial documentation ba
 | 2026-11-24 | DOC-023 v0.5 / MOD-005 TD v0.2 | Record requestor UX acceptance and freeze at ffdeda3; refine bounded employee/org physical proposal and current HR answer alignment. No normative or functional changes. | REQUESTOR UX ACCEPTED; TECHNICAL DESIGN IN REVIEW; IMPLEMENTATION HOLD |
 
 | 2026-11-24 | MOD-005 TD v0.3 | Expand existing technical planning baseline with physical contracts, workflow, FE/BE integration, permission separation, all package delivery/acceptance and genuine interaction gates; verify 56 populated HR responses. No functional/normative changes or test execution. | PLANNING PREPARED; CT-P01 AUTHORIZATION BLOCKED |
+
+| 2026-11-24 | DOC-007 v0.1 / MOD-004 Option A | Record independent major Employee & Organization module with minimum foundation release, proposed submodules/fields and CT-P01 dependency. No new IDs or normative/functional changes. | REQUESTOR SCOPE ACCEPTED; IMPLEMENTATION HOLD |

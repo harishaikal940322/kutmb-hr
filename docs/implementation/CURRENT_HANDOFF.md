@@ -1,3 +1,8 @@
+## 24 November 2026 — MOD-004 Option A accepted as independent module
+
+- Requestor selected minimum foundation and explicitly retained Employee & Organization as a major module, not a Cuti Tahunan submodule. Existing MOD-004/F-009 IDs unchanged. Filled reserved DOC-007 with independent scope, proposed submodules, minimum fields, role boundaries and delivery plan; physical schema stays in existing technical plan section 6A. Updated scope and planning records only.
+- Scope choice resolved. CT-P01 remains blocked on minimum field/account association confirmation, actual unit/category and authority ownership, formal HR requirements approval and explicit implementation authorization, then local preflight. Other HR Core features stay deferred; no code, database, Docker, normative SRS/RTM or registry status change. Remote documentation only.
+
 ## 24 November 2026 — delegated MOD-005 technical planning baseline v0.3
 
 - Requestor directed autonomous continuation until a genuine interaction gate. Existing plan expanded (no duplicate register): proposed physical data contracts, transaction/status handling, feature-local Laravel/Vue and role permission design, backend/frontend deliverables and planned acceptance evidence for CT-P01–09. Reused existing CT-P00–09 IDs. No new GitHub Issues or permission grants.
