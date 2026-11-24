@@ -3,7 +3,7 @@
 ## Scope and authority
 
 - Treat the repository's SRS, RTM, decisions and current handoff as the source of truth. Requirements are DRAFT unless explicitly approved; a commit or merge is not HR/IT sign-off.
-- The current target is System Core, beginning with `MOD-001` Identity & Access. `MOD-004..011` HR Core remains ON HOLD until HR requirements are provided and approved. Never infer employee, payroll, attendance, leave, overtime, claims, sensitive-personal-data workflows or policy rates.
+- Latest requestor direction (24 November 2026): autonomous development of the documented MOD-004 minimum foundation and MOD-005 Cuti Tahunan scope in the existing local development environment, using synthetic data only. This limited development authorization supersedes the earlier blanket HR Core coding hold; formal HR requirements/authority, actual business values, live operation and production release remain unapproved. MOD-006..011 and broader MOD-004 scope remain on hold. Never infer missing HR business rules or policy rates. See SCOPE-001.
 - Before work that touches requirements, authentication, authorization or data, consult `docs/requirements/OPEN_QUESTIONS.md`, `docs/decisions/ADR_REGISTER.md`, `docs/requirements/RTM.md`, the applicable SRS, [SCOPE-001](docs/decisions/SCOPE-001_system-core-vs-hr-core.md), and the relevant design/security records. Resolve only decisions needed for the current change; do not reopen settled technical choices without concrete evidence.
 - Keep account identity separate from employee/person concepts as a proposed boundary. Do not add employee tables, joins or data to System Core.
 - Keep requirement and test IDs stable. Update SRS/RTM and the traceability CSV/XLSX master together only when approved requirements actually change; use the existing change-control process for normative scope changes.
@@ -22,11 +22,17 @@
 - Work only in `/home/haris/www/kutmb-hr`. Fetch `origin`, inspect `main` and the working tree before changes. Preserve unrelated local changes; never overwrite, reset or discard them.
 - Use `main` for ordinary development. Do not create clones, worktrees or feature branches. Do not modify or disable existing CI or add PR gates without owner approval.
 - Plan only the current implementation slice. Reuse the existing SRS, RTM, architecture and implementation records. Do not create duplicate plans, reports, checklists or work packages.
-- Implement one coherent, requirements-backed System Core feature at a time. Reuse Laravel/Vue/Inertia patterns and avoid speculative requirements and unnecessary abstractions.
+- Implement one coherent, requirements-backed authorized feature at a time, starting with CT-P01, then CT-P02–09 in dependency order. Reuse Laravel/Vue/Inertia patterns and avoid speculative requirements and unnecessary abstractions. Implement only documented behavior whose source is unambiguous; unresolved policy-dependent operations remain disabled/fail closed. HR Core functionality is development-only (local/testing, server-side fail-closed in production until separately authorized); no real HR data or actual notifications.
 - Run focused checks relevant to changed code. Do not repeatedly run the full suite for minor edits. Keep security, authorization, validation and integrity checks; run consolidated requirement, error-handling, UI/UX and dependency checks at the relevant phase exit. Do not claim a check passed unless it ran.
 - Update `docs/implementation/CURRENT_HANDOFF.md` and existing chronological records with delivered scope, files, checks/results, decisions/blockers, limitations and the next ready scope. Keep records concise and accurate.
 - Commit completed, verified work on `main`, push to `origin/main`, then verify the remote SHA and local status. Never bypass failing CI, enforced protection or required reviews. Report a genuine blocker with evidence.
 - Do not deploy, create production credentials, merge external PRs or claim release/business approval unless explicitly authorized.
+
+## Autonomous execution
+
+- Requestor delegates ordinary technical decisions, debugging, design alignment, migration design, test strategy and sequencing within authorized scope. Do not ask for repeated approvals or stop after a successful slice. Read current handoff, verify preflight, implement, run focused checks, resolve failures, document and commit/push verified work before selecting the next ready slice.
+- Investigate and resolve technical blockers independently, using safe alternatives within constraints. If a blocker cannot be safely resolved, record exact evidence, affected scope, attempted remedies and next action in CURRENT_HANDOFF.md. Continue independent ready work; do not skip prerequisites, fabricate checks or bypass security. Escalate only when no independent authorized work remains, or a decision/credential/manual action truly requires requestor/HR/IT. Group such decisions into one concise interaction.
+- Additive migrations for the authorized MOD-004/005 development schema are allowed only on the verified existing development database after checking target and migration plan; no destructive operations, extra databases/containers, real records, privilege grants to existing accounts, or infrastructure changes. Use rollback-isolated synthetic tests; do not run RefreshDatabase or destructive suites on the shared development database. If testing cannot safely proceed, record limitations honestly and do not claim full acceptance. Preserve prior evidence; retest affected behavior only.
 
 ## Current handoff
 

@@ -23,11 +23,15 @@ Requestor clarified that HR sign-off is not required for UI/UX decisions and del
 
 First authorized slice selected: bounded MOD-001 System Core enhancement for shared compact Create/Edit Role permission selector and optional role-template mechanism using existing registered assignable IAM permissions only. No new HR permissions, role grants, employee schema/data, business workflows, identity/security weakening or infrastructure changes. HR template definitions are planning references until matching HR permissions are approved/implemented. Preserve SCOPE-001 HR Core implementation hold; no additional UI/UX sign-off from HR is required. Local AGENTS.md preflight and verification remain mandatory.
 
+## 24 November 2026 — autonomous development-only direction (latest)
+
+After delivery of MOD-001 RBAC enhancement at 90642c9, requestor directed proceeding with all planned work until a genuine blocker, with Codex resolving technical blockers independently and minimizing interaction. Interpret this as authorization for local synthetic-data development of the documented MOD-004 minimum foundation and MOD-005 Cuti Tahunan scope, not as formal HR approval or permission to activate live HR workflows. This supersedes the previous blanket coding hold only for this bounded development scope. Proceed with CT-P01, then dependency-ready portions of CT-P02–09. Review exact source requirements before each slice; unresolved HR rules must be explicitly blocked or deferred, never invented. Continue independent work instead of asking approval at every package. HR remains the authority for unresolved policy, actual appointment/permission ownership and business acceptance; formal HR/IT sign-off and release authorization remain gates before real data, operational use or deployment. UI/UX approval belongs to requestor. Keep HR features server-side restricted to local/testing until separately authorized for production. No additional HR modules, broader personnel records, destructive data operations, new infrastructure or auto grants.
+
 ## Definitions
 
 - **KUTMB HR System** is the overall product.
 - **System Core / Platform Core** is the technical application foundation, independent of HR domain workflows. It covers identity, authentication, user administration and access control, plus the minimum configuration/security/audit required to support those functions.
-- **HR Core** is the HR business domain, including employee records, organizational/employment information and future HR workflows. **Do not begin HR Core implementation until HR supplies and approves its requirements.**
+- **HR Core** is the HR business domain, including employee records, organizational/employment information and future HR workflows. **Except for the bounded local synthetic-data development authorization above, HR Core implementation remains on hold; formal HR approval is required before operational use.**
 - The previous phrase **"HR Foundation"** in v0.1 documentation should be read only as the historical *system foundation for the HR product*, **not** as approval to develop HR Core. Existing document IDs and requirement IDs remain stable until a controlled rebaseline.
 
 ## Development sequence
@@ -35,7 +39,7 @@ First authorized slice selected: bounded MOD-001 System Core enhancement for sha
 1. **Now / first implementation module:** `MOD-001 Identity & Access` with priority on **User Management**. Plan: create/list/search/update account, login/logout, enable/disable account, roles and permissions as required for a usable and secure user administration module. Final behavior and permission matrix still require explicit review.
 2. **Supporting system capabilities:** `MOD-003` security/auditing and a minimal subset of `MOD-002` System Config only when necessary for MOD-001. General settings including `panggilan` must not be mistaken for HR Core approval; confirm meaning and scope before implementation.
 3. **Later:** Broader configuration and reference data once its requirements are confirmed.
-4. **On hold:** Employee & Organization and all other **HR Core** domain modules (`MOD-004` onward), until formal HR requirements, review, SRS, RTM and explicit release/development authorization are available.
+4. **Development only:** bounded MOD-004 and MOD-005 documented scope per latest direction above. Formal business approval, real data and release remain gated; MOD-006 onward and broader employee scope remain on hold.
 
 ## Boundary rules
 
