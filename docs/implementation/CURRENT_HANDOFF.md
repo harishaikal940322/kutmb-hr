@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P03 independent projection arithmetic
+
+- Added an unexposed pure integer half-day projection for explicitly supplied annual/Tabung balances and already allocated pending holds. It deducts those holds once, applies a hypothetical request to available AL then Tabung, places any deficit in AL, rejects negative/inconsistent Tabung holds and guards integer overflow. It does not derive entitlements, allocate or persist holds, authorize users, select years or post ledger entries; those operations remain gated on CT-P01/02 and unresolved HR rules.
+- Unit checks passed (5 tests, 14 assertions), covering the documented 2 AL + 3 Tabung − 8 = −3 AL/0 Tabung example, pending once, existing deficit, invalid holds and underflow. Targeted Pint/PHPStan and `git diff --check` passed. No database, route, grant or HR policy change.
+- Next: independently review the account/ledger integrity design; do not expose posting or request flows until policy, source-year provenance, concurrency and authority prerequisites are satisfied.
+
 ## 24 November 2026 — CT-P02 session simulation page
 
 - Added a read-only local/testing-only single-date AM/PM simulation page requiring both calendar-manage and policy-manage permissions. It uses only technically simulated versions, reports missing/inconsistent versions without calculating, and produces integer half-day units for display. It creates no request, balance, reservation, audit mutation or approval. Calendar page links to it only when the policy permission is also present; server checks both permissions independently.
