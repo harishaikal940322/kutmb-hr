@@ -29,7 +29,10 @@ return [
             'action' => 'Manage',
             'system_only' => true,
         ],
-        ...(in_array($appEnvironment, ['local', 'testing'], true) ? ['leave.calendar.manage' => [
+        ...(in_array($appEnvironment, ['local', 'testing'], true) ? ['leave.policy.manage' => [
+            'label' => 'Manage draft leave policies', 'description' => 'Manage local development leave policy drafts.',
+            'group' => 'Annual leave', 'submodule' => 'Policy drafts', 'action' => 'Manage', 'system_only' => false,
+        ], 'leave.calendar.manage' => [
             'label' => 'Manage draft leave calendars', 'description' => 'Manage local development leave calendar drafts.',
             'group' => 'Annual leave', 'submodule' => 'Calendar drafts', 'action' => 'Manage', 'system_only' => false,
         ], 'hr.organization.manage' => [
@@ -127,6 +130,10 @@ return [
                 'icon' => 'users',
                 'permission' => 'hr.organization.manage',
                 'editable' => false,
+            ],
+            'leave.policy.drafts.index' => [
+                'label' => 'Draf Dasar Cuti', 'href' => '/leave/policy-drafts', 'icon' => 'menu',
+                'permission' => 'leave.policy.manage', 'editable' => false,
             ],
             'leave.calendar.drafts.index' => [
                 'label' => 'Draf Kalendar Cuti', 'href' => '/leave/calendar-drafts', 'icon' => 'menu',

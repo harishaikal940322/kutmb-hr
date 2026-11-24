@@ -10,6 +10,7 @@ use App\Http\Controllers\IdentityPermissionController;
 use App\Http\Controllers\IdentityRoleController;
 use App\Http\Controllers\KeycloakController;
 use App\Http\Controllers\LeaveCalendarDraftController;
+use App\Http\Controllers\LeavePolicyDraftController;
 use App\Http\Controllers\LocalSystemAdminBootstrapController;
 use App\Http\Controllers\MfaController;
 use App\Http\Controllers\OrganizationReferenceController;
@@ -102,4 +103,10 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:lea
         Route::post('/', [LeaveCalendarDraftController::class, 'storeVersion'])->name('store');
         Route::post('/{versionId}/days', [LeaveCalendarDraftController::class, 'storeDay'])->whereNumber('versionId')->name('days.store');
         Route::patch('/{versionId}/days/{dayId}', [LeaveCalendarDraftController::class, 'updateDay'])->whereNumber(['versionId', 'dayId'])->name('days.update');
+    });
+
+Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:leave.policy.manage'])
+    ->prefix('leave/policy-drafts')->name('leave.policy.drafts.')->group(function (): void {
+        Route::get('/', [LeavePolicyDraftController::class, 'index'])->name('index');
+        Route::post('/', [LeavePolicyDraftController::class, 'store'])->name('store');
     });

@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P02 draft working-time policy
+
+- Added local/testing-only draft policy input behind ungranted `leave.policy.manage`. Effective dates, optional explicit weekdays and session times are validated; missing weekdays/times remain null, and supplied session times must be ordered. Drafts are audited and cannot be confirmed, edited, deleted or used for leave calculations. No entitlement rates, automatic defaults, actual HR values or operational policy were introduced.
+- Registered permission after local target/SQL preview; policy rows and grants remain zero after rollback tests. Focused MySQL test passed (1 test, 28 assertions) for access, empty vs configured values, invalid dates/weekdays/times, audit, revocation and simulated production denial. Targeted Pint/PHPStan, frontend format/lint, type check, build and `git diff --check` passed; no browser acceptance or policy-effective-date concurrency checks. Auto-increment counters may advance.
+- Next: draft policy revision/history and unambiguous policy-independent CT-P02 work. Confirmation, effective policy selection and calendar/request impact require HR and later workflow integration; no operational use or production activation.
+
 ## 24 November 2026 — CT-P02 policy schema foundation
 
 - Added an empty leave-policy version table for effective dates, explicitly supplied working weekdays and session boundaries. Settings are nullable so missing values remain missing; no policy rates, configuration values, confirmation, defaults, routes or calculations were added. Future commands must validate complete settings, effective-date conflicts and immutable confirmed history before any use.

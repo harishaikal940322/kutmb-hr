@@ -1,3 +1,5 @@
+- 2026-11-24: Added local audited working-time policy drafts with explicit unset values; no confirmation or calculations. See CURRENT_HANDOFF.
+
 - 2026-11-24: Added empty CT-P02 policy-version schema with nullable settings and no inferred defaults. See CURRENT_HANDOFF.
 
 - 2026-11-24: Added audited draft-calendar date/name corrections with retained prior values; confirmed versions stay locked. See CURRENT_HANDOFF.
