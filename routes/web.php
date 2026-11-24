@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\EmployeeFoundationController;
 use App\Http\Controllers\IdentityMenuAccessController;
 use App\Http\Controllers\IdentityPermissionController;
 use App\Http\Controllers\IdentityRoleController;
@@ -69,4 +70,10 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.
         Route::get('references', [OrganizationReferenceController::class, 'index'])->name('references.index');
         Route::post('references/{kind}', [OrganizationReferenceController::class, 'store'])->whereIn('kind', ['units', 'categories'])->name('references.store');
         Route::patch('references/{kind}/{id}', [OrganizationReferenceController::class, 'update'])->whereIn('kind', ['units', 'categories'])->whereNumber('id')->name('references.update');
+    });
+
+Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.employees.view'])
+    ->prefix('employees')->name('employees.')->group(function (): void {
+        Route::get('/', [EmployeeFoundationController::class, 'index'])->name('index');
+        Route::post('/', [EmployeeFoundationController::class, 'store'])->middleware('permission:hr.employees.manage')->name('store');
     });

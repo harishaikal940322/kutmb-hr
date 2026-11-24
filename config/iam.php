@@ -36,7 +36,16 @@ return [
             'submodule' => 'Organization references',
             'action' => 'Manage',
             'system_only' => false,
-        ]] : []),
+        ],
+            'hr.employees.view' => [
+                'label' => 'View employees', 'description' => 'View the local development employee directory.',
+                'group' => 'Employee and organization', 'submodule' => 'Employees', 'action' => 'View', 'system_only' => false,
+            ],
+            'hr.employees.manage' => [
+                'label' => 'Manage employees', 'description' => 'Create local development employee records.',
+                'group' => 'Employee and organization', 'submodule' => 'Employees', 'action' => 'Manage', 'system_only' => false,
+            ],
+        ] : []),
         'iam.users.view' => [
             'label' => 'View user directory',
             'description' => 'View the local development user directory preview.',
@@ -54,6 +63,10 @@ return [
         ],
     ],
     'menus' => [
+        'employees.index' => [
+            'label' => 'Pekerja', 'href' => '/employees', 'icon' => 'users',
+            'permission' => 'hr.employees.view', 'editable' => false,
+        ],
         'organization.references.index' => [
             'label' => 'Unit dan Kategori',
             'href' => '/organization/references',

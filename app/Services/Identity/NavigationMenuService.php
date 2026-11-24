@@ -16,7 +16,7 @@ class NavigationMenuService
         $visible = [];
 
         foreach ($menus as $key => $menu) {
-            if ($key === 'organization.references.index' && ! app()->environment(['local', 'testing'])) {
+            if (in_array($key, ['organization.references.index', 'employees.index'], true) && ! app()->environment(['local', 'testing'])) {
                 continue;
             }
 

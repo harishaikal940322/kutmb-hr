@@ -1,3 +1,5 @@
+- 2026-11-24: Added local employee directory and atomic employee/initial-assignment creation, with separate ungranted view/manage permissions. See CURRENT_HANDOFF.
+
 - 2026-11-24: Added local-only, permission-gated unit and employment-category maintenance with audited mutations; no grants or reference data were added. See CURRENT_HANDOFF.
 
 - 2026-11-24: Added and verified the additive, empty CT-P01 employee/organization schema on the existing local development database; application operations and operational approval remain outstanding. See CURRENT_HANDOFF.
