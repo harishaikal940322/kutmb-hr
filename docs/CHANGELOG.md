@@ -1,3 +1,5 @@
+- 2026-11-24: Added and verified the additive, empty CT-P01 employee/organization schema on the existing local development database; application operations and operational approval remain outstanding. See CURRENT_HANDOFF.
+
 # Documentation change log
 
 | Date | Version | Change | Approval |
