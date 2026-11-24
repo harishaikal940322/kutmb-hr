@@ -36,6 +36,11 @@ const mainNavItems: NavItem[] = [
     },
 ];
 const menuCatalog: Record<string, NavItem> = {
+    'leave.calendar.drafts.index': {
+        title: 'Draf Kalendar Cuti',
+        href: '/leave/calendar-drafts',
+        icon: MenuIcon,
+    },
     'employees.self': {
         title: 'Profil Pekerja Saya',
         href: '/employee-profile',

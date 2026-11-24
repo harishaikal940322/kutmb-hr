@@ -1,3 +1,5 @@
+- 2026-11-24: Added local, audited leave calendar drafts with date and replacement-source validation; no calendar activation. See CURRENT_HANDOFF.
+
 - 2026-11-24: Added empty, versioned CT-P02 calendar schema to local development; no calendar or leave operation activated. See CURRENT_HANDOFF.
 
 - 2026-11-24: Restricted local HR navigation configuration and enforced fixed menu permissions server-side; ran focused employee and RBAC regression. See CURRENT_HANDOFF.

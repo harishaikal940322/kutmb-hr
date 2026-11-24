@@ -9,6 +9,7 @@ use App\Http\Controllers\IdentityMenuAccessController;
 use App\Http\Controllers\IdentityPermissionController;
 use App\Http\Controllers\IdentityRoleController;
 use App\Http\Controllers\KeycloakController;
+use App\Http\Controllers\LeaveCalendarDraftController;
 use App\Http\Controllers\LocalSystemAdminBootstrapController;
 use App\Http\Controllers\MfaController;
 use App\Http\Controllers\OrganizationReferenceController;
@@ -94,3 +95,10 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.
 
 Route::get('/employee-profile', EmployeeSelfProfileController::class)
     ->middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.profile.self.view'])->name('employees.self');
+
+Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:leave.calendar.manage'])
+    ->prefix('leave/calendar-drafts')->name('leave.calendar.drafts.')->group(function (): void {
+        Route::get('/', [LeaveCalendarDraftController::class, 'index'])->name('index');
+        Route::post('/', [LeaveCalendarDraftController::class, 'storeVersion'])->name('store');
+        Route::post('/{versionId}/days', [LeaveCalendarDraftController::class, 'storeDay'])->whereNumber('versionId')->name('days.store');
+    });

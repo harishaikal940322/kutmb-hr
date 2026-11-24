@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P02 local draft calendar entry
+
+- Added local/testing-only version and holiday/replacement draft entry behind the separate ungranted `leave.calendar.manage` permission. Draft dates must be within the version, unique per version, and replacement entries reference a holiday in the same version. Confirmed versions cannot accept new days; every successful draft mutation records a safe audit event. There is no confirmation, publication, modification, deletion, automatic replacement, leave calculation or request-impact action. Dates, names and versions were not seeded.
+- Registered permission on verified `local` / `kutmb_hr_dev` after SQL preview; no role/user grant or calendar row remains after rollback. Checks: rollback-isolated MySQL test passed (1 test, 32 assertions) for unauthorized/revoked access, date bounds and collisions, same-version source, confirmed lock, audit and simulated production denial. Targeted Pint/PHPStan, frontend formatting/lint, Vue type check, build and `git diff --check` passed. No browser acceptance or concurrent-worker test; auto-increment counters may advance.
+- Next: implement weekend/collision warnings and explicit replacement suggestions without auto-creation, and safe draft correction/history. Calendar confirmation and impact on requests remain gated on CT-P05–06; unconfirmed HR calendar data and policy values must never be used for operational leave.
+
 ## 24 November 2026 — CT-P02 calendar schema foundation
 
 - Reviewed the Cuti Tahunan SRS and current CT-DEC-010/012/043/044/047 source answers. Added separate versioned calendar and date tables with per-version date uniqueness, optional replacement-to-original reference and restricted historical deletion. No holidays, policy values, routes or calendar confirmation were created. This partial CT-P02 schema is independent of the remaining CT-P01 browser/concurrency work, not a usable leave calendar.

@@ -29,7 +29,10 @@ return [
             'action' => 'Manage',
             'system_only' => true,
         ],
-        ...(in_array($appEnvironment, ['local', 'testing'], true) ? ['hr.organization.manage' => [
+        ...(in_array($appEnvironment, ['local', 'testing'], true) ? ['leave.calendar.manage' => [
+            'label' => 'Manage draft leave calendars', 'description' => 'Manage local development leave calendar drafts.',
+            'group' => 'Annual leave', 'submodule' => 'Calendar drafts', 'action' => 'Manage', 'system_only' => false,
+        ], 'hr.organization.manage' => [
             'label' => 'Manage organization references',
             'description' => 'Manage local development units and employment categories.',
             'group' => 'Employee and organization',
@@ -124,6 +127,10 @@ return [
                 'icon' => 'users',
                 'permission' => 'hr.organization.manage',
                 'editable' => false,
+            ],
+            'leave.calendar.drafts.index' => [
+                'label' => 'Draf Kalendar Cuti', 'href' => '/leave/calendar-drafts', 'icon' => 'menu',
+                'permission' => 'leave.calendar.manage', 'editable' => false,
             ],
         ] : []),
         'users.index' => [
