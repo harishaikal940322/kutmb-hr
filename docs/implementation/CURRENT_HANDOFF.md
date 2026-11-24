@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P02 reversible draft-version cancellation
+
+- Added audited cancellation/restoration of unconfirmed calendar and policy versions. Cancelled versions and their contents remain visible but are locked against edits and excluded from draft overlap warnings; restoration reinstates warnings. Confirmed/partially confirmed versions cannot be cancelled. Fixed edit/cancel presentation guards for cancelled child drafts. Future version selection must explicitly exclude cancelled and inconsistent states; no confirmation or operational selection exists.
+- Applied only additive nullable cancellation fields/actor FKs after local target and SQL preview. Focused rollback-isolated integration/unit checks passed (4 tests, 189 assertions) for cancellation, restoration, child lock, overlap changes and confirmed lock. Targeted Pint/PHPStan, frontend formatting/lint, Vue type check, build and `git diff --check` passed. Browser and concurrent-worker acceptance of this slice remain outstanding; no HR values or permissions granted.
+- Next: assess dependency readiness and remaining scoped security/requirements checks. CT-P03 posting needs resolved policy/rate mapping and upstream confirmation; CT-P04–09 remain dependent and operational approval remains absent.
+
 ## 24 November 2026 — CT-P02 explicit working-session counter
 
 - Added an unexposed, pure half-day session counter. It accepts explicitly supplied working weekdays and complete holiday dates, counts integer half-day units, rejects missing inputs, invalid dates/sessions and duplicate slots, and has no defaults, database access or route. It does not select a policy/calendar or prove calendar completeness; any future integration must first establish confirmed versions, coverage, cancellation handling and request-impact safety.

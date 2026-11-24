@@ -52,6 +52,12 @@ class CalendarDraftTest extends TestCase
         $this->assertDatabaseHas('audit_events', ['action_code' => 'leave.calendar.day_restored', 'target_ref' => 'calendar_day:'.$day->id]);
         $other = DB::table('leave_calendar_versions')->insertGetId(['label' => 'Other synthetic '.$suffix, 'effective_from' => '2026-01-01']);
         $this->get('/leave/calendar-drafts')->assertOk()->assertInertia(fn (Assert $page) => $page->where('versions.0.overlapping_ids', [$version->id]));
+        $this->patch('/leave/calendar-drafts/'.$other.'/cancellation', ['cancelled' => true])->assertRedirect();
+        $this->get('/leave/calendar-drafts')->assertOk()->assertInertia(fn (Assert $page) => $page->where('versions.0.overlapping_ids', [])->where('versions.1.overlapping_ids', []));
+        $this->post('/leave/calendar-drafts/'.$other.'/days', $holiday)->assertSessionHasErrors('date');
+        $this->assertDatabaseHas('audit_events', ['action_code' => 'leave.calendar.version_cancelled', 'target_ref' => 'calendar_version:'.$other]);
+        $this->patch('/leave/calendar-drafts/'.$other.'/cancellation', ['cancelled' => false])->assertRedirect();
+
         $this->post('/leave/calendar-drafts/'.$other.'/days', ['date' => '2026-03-02', 'name' => 'Invalid', 'kind' => 'replacement', 'original_day_id' => $day->id])->assertSessionHasErrors('original_day_id');
         $editPath = $path.'/'.$day->id;
         $this->patch($editPath, ['date' => '2026-03-02', 'name' => 'Collision'])->assertSessionHasErrors('date');
@@ -65,6 +71,7 @@ class CalendarDraftTest extends TestCase
         $this->patch($editPath, ['date' => '2026-03-05', 'name' => 'Denied'])->assertSessionHasErrors('date');
         $this->patch($cancelHoliday, ['cancelled' => true])->assertSessionHasErrors('cancelled');
         $this->post($path, [...$holiday, 'date' => '2026-04-01'])->assertSessionHasErrors('date');
+        $this->patch('/leave/calendar-drafts/'.$version->id.'/cancellation', ['cancelled' => true])->assertSessionHasErrors('cancelled');
         $this->app['env'] = 'production';
         try {
             $this->get('/leave/calendar-drafts')->assertNotFound();

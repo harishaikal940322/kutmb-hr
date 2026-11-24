@@ -70,7 +70,7 @@ class LeavePolicyDraftController extends Controller
         DB::transaction(function () use ($request, $versionId, $data): void {
             $version = DB::table('leave_policy_versions')->where('id', $versionId)->lockForUpdate()->first();
             abort_if($version === null, 404);
-            if ($version->confirmed_at !== null || $version->confirmed_by !== null) {
+            if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null) {
                 throw ValidationException::withMessages(['label' => 'Dasar yang disahkan tidak boleh diubah.']);
             }
             $previous = [
@@ -110,7 +110,7 @@ class LeavePolicyDraftController extends Controller
             DB::transaction(function () use ($request, $versionId, $data): void {
                 $version = DB::table('leave_policy_versions')->where('id', $versionId)->lockForUpdate()->first();
                 abort_if($version === null, 404);
-                if ($version->confirmed_at !== null || $version->confirmed_by !== null) {
+                if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null) {
                     throw ValidationException::withMessages(['band_description' => 'Dasar yang disahkan tidak boleh diubah.']);
                 }
                 $category = DB::table('employment_categories')->where('id', $data['category_id'])->lockForUpdate()->first();
@@ -141,7 +141,7 @@ class LeavePolicyDraftController extends Controller
             DB::transaction(function () use ($request, $versionId, $ruleId, $data): void {
                 $version = DB::table('leave_policy_versions')->where('id', $versionId)->lockForUpdate()->first();
                 abort_if($version === null, 404);
-                if ($version->confirmed_at !== null || $version->confirmed_by !== null) {
+                if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null) {
                     throw ValidationException::withMessages(['band_description' => 'Dasar yang disahkan tidak boleh diubah.']);
                 }
                 $rule = DB::table('leave_entitlement_rule_drafts')->where('id', $ruleId)->where('policy_version_id', $versionId)->lockForUpdate()->first();
@@ -182,7 +182,7 @@ class LeavePolicyDraftController extends Controller
         DB::transaction(function () use ($request, $versionId, $ruleId, $cancelled): void {
             $version = DB::table('leave_policy_versions')->where('id', $versionId)->lockForUpdate()->first();
             abort_if($version === null, 404);
-            if ($version->confirmed_at !== null || $version->confirmed_by !== null) {
+            if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null) {
                 throw ValidationException::withMessages(['cancelled' => 'Dasar yang disahkan tidak boleh diubah.']);
             }
             $rule = DB::table('leave_entitlement_rule_drafts')->where('id', $ruleId)->where('policy_version_id', $versionId)->lockForUpdate()->first();
@@ -204,6 +204,35 @@ class LeavePolicyDraftController extends Controller
         }, 3);
 
         return to_route('leave.policy.drafts.index')->with('success', 'Status cadangan dikemas kini.');
+    }
+
+    public function setVersionCancellation(Request $request, int $versionId): RedirectResponse
+    {
+        $data = $request->validate(['cancelled' => ['required', 'boolean']]);
+        $cancelled = (bool) $data['cancelled'];
+        DB::transaction(function () use ($request, $versionId, $cancelled): void {
+            $version = DB::table('leave_policy_versions')->where('id', $versionId)->lockForUpdate()->first();
+            abort_if($version === null, 404);
+            if ($version->confirmed_at !== null || $version->confirmed_by !== null) {
+                throw ValidationException::withMessages(['cancelled' => 'Versi yang disahkan tidak boleh diubah.']);
+            }
+            $isCancelled = $version->cancelled_at !== null || $version->cancelled_by !== null;
+            if ($isCancelled === $cancelled) {
+                throw ValidationException::withMessages(['cancelled' => 'Status versi ini telah berubah.']);
+            }
+            DB::table('leave_policy_versions')->where('id', $versionId)->update([
+                'cancelled_at' => $cancelled ? now() : null, 'cancelled_by' => $cancelled ? $request->user()->getKey() : null,
+                'updated_at' => now(),
+            ]);
+            AuditEvent::query()->create([
+                'occurred_at' => now(), 'actor_id' => $request->user()->getKey(),
+                'action_code' => $cancelled ? 'leave.policy.version_cancelled' : 'leave.policy.version_restored',
+                'target_ref' => 'policy_version:'.$versionId, 'outcome' => 'SUCCESS',
+                'metadata' => ['source' => 'policy_draft_ui', 'changed_fields' => ['policy_version']],
+            ]);
+        }, 3);
+
+        return to_route('leave.policy.drafts.index')->with('success', 'Status draf dikemas kini.');
     }
 
     /** @return array<string, mixed> */

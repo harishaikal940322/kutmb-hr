@@ -18,7 +18,8 @@ class VersionPeriodOverlap
     public function annotate(Collection $versions): Collection
     {
         return $versions->map(function (\stdClass $version) use ($versions): \stdClass {
-            $version->overlapping_ids = $versions->filter(fn (\stdClass $other): bool => $other->id !== $version->id
+            $version->overlapping_ids = $versions->filter(fn (\stdClass $other): bool => ($version->cancelled_at ?? null) === null && ($version->cancelled_by ?? null) === null
+                && ($other->cancelled_at ?? null) === null && ($other->cancelled_by ?? null) === null && $other->id !== $version->id
                 && $this->overlaps($version->effective_from, $version->effective_to, $other->effective_from, $other->effective_to))
                 ->pluck('id')->values()->all();
 

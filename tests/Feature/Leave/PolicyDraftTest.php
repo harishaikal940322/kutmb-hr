@@ -38,6 +38,12 @@ class PolicyDraftTest extends TestCase
         $this->assertSame([1, 5], json_decode($configured->working_weekdays, true));
         $this->assertNull($configured->confirmed_at);
         $this->get('/leave/policy-drafts')->assertOk()->assertInertia(fn (Assert $page) => $page->where('versions.0.overlapping_ids', [$draft->id]));
+        $this->patch('/leave/policy-drafts/'.$configured->id.'/cancellation', ['cancelled' => true])->assertRedirect();
+        $this->get('/leave/policy-drafts')->assertOk()->assertInertia(fn (Assert $page) => $page->where('versions.0.overlapping_ids', [])->where('versions.1.overlapping_ids', []));
+        $this->patch('/leave/policy-drafts/'.$configured->id, $base)->assertSessionHasErrors('label');
+        $this->assertDatabaseHas('audit_events', ['action_code' => 'leave.policy.version_cancelled', 'target_ref' => 'policy_version:'.$configured->id]);
+        $this->patch('/leave/policy-drafts/'.$configured->id.'/cancellation', ['cancelled' => false])->assertRedirect();
+
         $this->patch('/leave/policy-drafts/'.$draft->id, [...$base, 'label' => 'Revised '.$suffix, 'working_weekdays' => [1, 2], 'work_start' => '08:00'])->assertRedirect();
         $previous = DB::table('leave_policy_history')->where('policy_version_id', $draft->id)->sole();
         $state = json_decode($previous->previous_state, true);
@@ -47,6 +53,7 @@ class PolicyDraftTest extends TestCase
         $this->assertDatabaseHas('audit_events', ['actor_id' => $actor->id, 'action_code' => 'leave.policy.draft_updated', 'target_ref' => 'policy_version:'.$draft->id]);
         DB::table('leave_policy_versions')->where('id', $draft->id)->update(['confirmed_by' => $actor->id, 'confirmed_at' => now()]);
         $this->patch('/leave/policy-drafts/'.$draft->id, $base)->assertSessionHasErrors('label');
+        $this->patch('/leave/policy-drafts/'.$draft->id.'/cancellation', ['cancelled' => true])->assertSessionHasErrors('cancelled');
         $this->patch('/leave/policy-drafts/999999999', $base)->assertNotFound();
 
         $this->app['env'] = 'production';

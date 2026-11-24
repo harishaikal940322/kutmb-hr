@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
+import VersionCancellationForm from './VersionCancellationForm.vue';
 import CalendarCancellationForm from './CalendarCancellationForm.vue';
 import CalendarDayEditForm from './CalendarDayEditForm.vue';
 import CalendarDayForm from './CalendarDayForm.vue';
@@ -11,6 +12,8 @@ type Version = {
     confirmed_at: string | null;
     confirmed_by: number | null;
     overlapping_ids: number[];
+    cancelled_at: string | null;
+    cancelled_by: number | null;
 };
 type Day = {
     id: number;
@@ -109,6 +112,21 @@ function submit() {
             >
                 <h3 class="font-semibold">{{ version.label }}</h3>
                 <p
+                    v-if="version.cancelled_at || version.cancelled_by"
+                    class="text-sm text-muted-foreground"
+                >
+                    Versi draf dibatalkan dan tidak termasuk dalam semakan
+                    pertindihan.
+                </p>
+                <VersionCancellationForm
+                    v-if="!version.confirmed_at && !version.confirmed_by"
+                    kind="calendar"
+                    :version-id="version.id"
+                    :is-cancelled="
+                        Boolean(version.cancelled_at || version.cancelled_by)
+                    "
+                />
+                <p
                     v-if="version.overlapping_ids.length"
                     class="text-sm text-destructive"
                 >
@@ -171,7 +189,10 @@ function submit() {
                         </p>
                         <CalendarCancellationForm
                             v-if="
-                                !version.confirmed_at && !version.confirmed_by
+                                !version.confirmed_at &&
+                                !version.confirmed_by &&
+                                !version.cancelled_at &&
+                                !version.cancelled_by
                             "
                             :version-id="version.id"
                             :day-id="day.id"
@@ -183,6 +204,8 @@ function submit() {
                             v-if="
                                 !version.confirmed_at &&
                                 !version.confirmed_by &&
+                                !version.cancelled_at &&
+                                !version.cancelled_by &&
                                 !day.cancelled_at &&
                                 !day.cancelled_by
                             "
@@ -192,7 +215,12 @@ function submit() {
                     </li>
                 </ul>
                 <CalendarDayForm
-                    v-if="!version.confirmed_at && !version.confirmed_by"
+                    v-if="
+                        !version.confirmed_at &&
+                        !version.confirmed_by &&
+                        !version.cancelled_at &&
+                        !version.cancelled_by
+                    "
                     :version-id="version.id"
                     :effective-from="version.effective_from"
                     :effective-to="version.effective_to"

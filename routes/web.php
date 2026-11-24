@@ -101,6 +101,7 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:lea
     ->prefix('leave/calendar-drafts')->name('leave.calendar.drafts.')->group(function (): void {
         Route::get('/', [LeaveCalendarDraftController::class, 'index'])->name('index');
         Route::post('/', [LeaveCalendarDraftController::class, 'storeVersion'])->name('store');
+        Route::patch('/{versionId}/cancellation', [LeaveCalendarDraftController::class, 'setVersionCancellation'])->whereNumber('versionId')->name('cancellation');
         Route::post('/{versionId}/days', [LeaveCalendarDraftController::class, 'storeDay'])->whereNumber('versionId')->name('days.store');
         Route::patch('/{versionId}/days/{dayId}', [LeaveCalendarDraftController::class, 'updateDay'])->whereNumber(['versionId', 'dayId'])->name('days.update');
         Route::patch('/{versionId}/days/{dayId}/cancellation', [LeaveCalendarDraftController::class, 'setDayCancellation'])->whereNumber(['versionId', 'dayId'])->name('days.cancellation');
@@ -110,6 +111,7 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:lea
     ->prefix('leave/policy-drafts')->name('leave.policy.drafts.')->group(function (): void {
         Route::get('/', [LeavePolicyDraftController::class, 'index'])->name('index');
         Route::post('/', [LeavePolicyDraftController::class, 'store'])->name('store');
+        Route::patch('/{versionId}/cancellation', [LeavePolicyDraftController::class, 'setVersionCancellation'])->whereNumber('versionId')->name('cancellation');
         Route::patch('/{versionId}', [LeavePolicyDraftController::class, 'update'])->whereNumber('versionId')->name('update');
         Route::post('/{versionId}/entitlements', [LeavePolicyDraftController::class, 'storeEntitlementDraft'])->whereNumber('versionId')->name('entitlements.store');
         Route::patch('/{versionId}/entitlements/{ruleId}', [LeavePolicyDraftController::class, 'updateEntitlementDraft'])->whereNumber(['versionId', 'ruleId'])->name('entitlements.update');

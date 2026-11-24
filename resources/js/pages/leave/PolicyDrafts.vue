@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
+import VersionCancellationForm from './VersionCancellationForm.vue';
 import EntitlementCancellationForm from './EntitlementCancellationForm.vue';
 import EntitlementDraftEditForm from './EntitlementDraftEditForm.vue';
 import EntitlementDraftForm from './EntitlementDraftForm.vue';
@@ -16,13 +17,20 @@ type Version = {
     confirmed_at: string | null;
     confirmed_by: number | null;
     overlapping_ids: number[];
+    cancelled_at: string | null;
+    cancelled_by: number | null;
 };
 type History = {
     id: number;
     policy_version_id: number;
     previous_state: Omit<
         Version,
-        'id' | 'confirmed_at' | 'confirmed_by' | 'overlapping_ids'
+        | 'id'
+        | 'confirmed_at'
+        | 'confirmed_by'
+        | 'overlapping_ids'
+        | 'cancelled_at'
+        | 'cancelled_by'
     >;
     created_at: string;
 };
@@ -196,6 +204,23 @@ function submit() {
                 >
                     <p class="font-semibold">{{ version.label }}</p>
                     <p
+                        v-if="version.cancelled_at || version.cancelled_by"
+                        class="text-sm text-muted-foreground"
+                    >
+                        Versi draf dibatalkan dan tidak termasuk dalam semakan
+                        pertindihan.
+                    </p>
+                    <VersionCancellationForm
+                        v-if="!version.confirmed_at && !version.confirmed_by"
+                        kind="policy"
+                        :version-id="version.id"
+                        :is-cancelled="
+                            Boolean(
+                                version.cancelled_at || version.cancelled_by,
+                            )
+                        "
+                    />
+                    <p
                         v-if="version.overlapping_ids.length"
                         class="text-sm text-destructive"
                     >
@@ -335,7 +360,9 @@ function submit() {
                                 <EntitlementCancellationForm
                                     v-if="
                                         !version.confirmed_at &&
-                                        !version.confirmed_by
+                                        !version.confirmed_by &&
+                                        !version.cancelled_at &&
+                                        !version.cancelled_by
                                     "
                                     :version-id="version.id"
                                     :rule-id="rule.id"
@@ -349,7 +376,11 @@ function submit() {
                                 <EntitlementDraftEditForm
                                     v-if="
                                         !version.confirmed_at &&
-                                        !version.confirmed_by
+                                        !version.confirmed_by &&
+                                        !version.cancelled_at &&
+                                        !version.cancelled_by &&
+                                        !rule.cancelled_at &&
+                                        !rule.cancelled_by
                                     "
                                     :version-id="version.id"
                                     :rule="rule"
@@ -359,12 +390,22 @@ function submit() {
                         </ul>
                     </div>
                     <EntitlementDraftForm
-                        v-if="!version.confirmed_at && !version.confirmed_by"
+                        v-if="
+                            !version.confirmed_at &&
+                            !version.confirmed_by &&
+                            !version.cancelled_at &&
+                            !version.cancelled_by
+                        "
                         :version-id="version.id"
                         :categories="categories"
                     />
                     <PolicyEditForm
-                        v-if="!version.confirmed_at && !version.confirmed_by"
+                        v-if="
+                            !version.confirmed_at &&
+                            !version.confirmed_by &&
+                            !version.cancelled_at &&
+                            !version.cancelled_by
+                        "
                         :version="version"
                     />
                 </li>
