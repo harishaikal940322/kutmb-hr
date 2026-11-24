@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm } from '@inertiajs/vue3';
+import { ref } from 'vue';
 import AccountLinkForm from './AccountLinkForm.vue';
 import AssignmentForm from './AssignmentForm.vue';
 import EmployeeEditForm from './EmployeeEditForm.vue';
@@ -20,8 +21,9 @@ type Assignment = {
     unit_name: string;
     category_name: string;
 };
-defineProps<{
+const props = defineProps<{
     employees: Employee[];
+    filters: { search: string };
     units: Reference[];
     categories: Reference[];
     canCreate: boolean;
@@ -30,6 +32,14 @@ defineProps<{
     accounts: { id: number; username: string }[];
     assignments: Assignment[];
 }>();
+const search = ref(props.filters.search);
+function searchEmployees() {
+    router.get(
+        '/employees',
+        { search: search.value },
+        { preserveState: true, replace: true },
+    );
+}
 const form = useForm({
     employee_no: '',
     display_name: '',
@@ -181,6 +191,25 @@ function submit() {
             <h2 id="employees-list" class="text-xl font-semibold">
                 Senarai pekerja
             </h2>
+            <form
+                class="flex flex-wrap items-end gap-3"
+                role="search"
+                @submit.prevent="searchEmployees"
+            >
+                <label class="grid flex-1 gap-1 text-sm"
+                    >Cari nama atau nombor pekerja<input
+                        v-model="search"
+                        type="search"
+                        maxlength="100"
+                        class="min-h-10 rounded-md border bg-background px-3"
+                /></label>
+                <button
+                    type="submit"
+                    class="min-h-10 rounded-md border px-4 text-sm"
+                >
+                    Cari
+                </button>
+            </form>
             <p v-if="!employees.length" class="text-sm text-muted-foreground">
                 Tiada rekod.
             </p>

@@ -1,3 +1,9 @@
+## 24 November 2026 — CT-P01 employee directory search
+
+- Added server-side name/employee-number search to the local authorized employee directory. The query remains behind existing active-account and employee-view checks, and assignment props are limited to returned employee IDs. This adds no broader directory permission or account data exposure.
+- Focused rollback-isolated MySQL test passed (1 test, 33 assertions) for denied access, name/number filtering, assignment prop scope and input length. Targeted Pint/PHPStan, frontend formatting/lint, Vue type check, build and `git diff --check` passed. No browser search submission or real data used.
+- Next: continue dependency-ready work; CT-P02 entitlement rule meaning and CT-P03–09 operational workflows remain gated as described below.
+
 ## 24 November 2026 — working-schedule lookup naming
 
 - Renamed the unexposed technical policy lookup to `workingScheduleFor` and clarified its incomplete-data error: it validates schedule fields only, not entitlement bands, rates or whole-policy approval. No caller gains authorization or operational behavior from this helper.
