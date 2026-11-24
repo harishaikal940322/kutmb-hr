@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
+import EntitlementDraftForm from './EntitlementDraftForm.vue';
 import PolicyEditForm from './PolicyEditForm.vue';
 type Version = {
     id: number;
@@ -23,7 +24,20 @@ type History = {
     >;
     created_at: string;
 };
-defineProps<{ versions: Version[]; history: History[] }>();
+type Category = { id: number; code: string; name: string };
+type EntitlementDraft = {
+    id: number;
+    policy_version_id: number;
+    category_name: string;
+    band_description: string;
+    annual_half_day_units: number | null;
+};
+defineProps<{
+    versions: Version[];
+    history: History[];
+    categories: Category[];
+    entitlementDrafts: EntitlementDraft[];
+}>();
 const weekdays = [
     'Isnin',
     'Selasa',
@@ -240,6 +254,34 @@ function submit() {
                             </li>
                         </ul>
                     </details>
+                    <div class="mt-3 text-sm">
+                        <p class="font-medium">
+                            Cadangan kelayakan (tidak boleh digunakan untuk
+                            pengiraan)
+                        </p>
+                        <ul class="mt-1 space-y-1">
+                            <li
+                                v-for="rule in entitlementDrafts.filter(
+                                    (item) =>
+                                        item.policy_version_id === version.id,
+                                )"
+                                :key="rule.id"
+                            >
+                                {{ rule.category_name }} ·
+                                {{ rule.band_description }} ·
+                                {{
+                                    rule.annual_half_day_units ??
+                                    'Belum ditetapkan'
+                                }}
+                                unit separuh hari
+                            </li>
+                        </ul>
+                    </div>
+                    <EntitlementDraftForm
+                        v-if="!version.confirmed_at && !version.confirmed_by"
+                        :version-id="version.id"
+                        :categories="categories"
+                    />
                     <PolicyEditForm
                         v-if="!version.confirmed_at && !version.confirmed_by"
                         :version="version"

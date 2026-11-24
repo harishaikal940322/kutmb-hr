@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditEvent;
 use App\Services\Leave\VersionPeriodOverlap;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +31,11 @@ class LeavePolicyDraftController extends Controller
             return $entry;
         });
 
-        return Inertia::render('leave/PolicyDrafts', ['versions' => $overlap->annotate($versions), 'history' => $history]);
+        return Inertia::render('leave/PolicyDrafts', [
+            'versions' => $overlap->annotate($versions), 'history' => $history,
+            'categories' => DB::table('employment_categories')->where('active', true)->orderBy('name')->get(['id', 'code', 'name']),
+            'entitlementDrafts' => DB::table('leave_entitlement_rule_drafts')->join('employment_categories', 'employment_categories.id', '=', 'leave_entitlement_rule_drafts.category_id')->orderBy('band_description')->get(['leave_entitlement_rule_drafts.id', 'policy_version_id', 'category_id', 'band_description', 'annual_half_day_units', 'employment_categories.name as category_name']),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -95,6 +100,42 @@ class LeavePolicyDraftController extends Controller
         }, 3);
 
         return to_route('leave.policy.drafts.index')->with('success', 'Draf dasar dikemas kini.');
+    }
+
+    public function storeEntitlementDraft(Request $request, int $versionId): RedirectResponse
+    {
+        $request->merge(['band_description' => is_string($request->input('band_description')) ? trim($request->input('band_description')) : $request->input('band_description')]);
+        $data = $request->validate([
+            'category_id' => ['required', 'integer'],
+            'band_description' => ['required', 'string', 'max:255'],
+            'annual_half_day_units' => ['present', 'nullable', 'integer', 'min:0', 'max:4294967295'],
+        ]);
+        try {
+            DB::transaction(function () use ($request, $versionId, $data): void {
+                $version = DB::table('leave_policy_versions')->where('id', $versionId)->lockForUpdate()->first();
+                abort_if($version === null, 404);
+                if ($version->confirmed_at !== null || $version->confirmed_by !== null) {
+                    throw ValidationException::withMessages(['band_description' => 'Dasar yang disahkan tidak boleh diubah.']);
+                }
+                $category = DB::table('employment_categories')->where('id', $data['category_id'])->lockForUpdate()->first();
+                if (! $category || ! $category->active) {
+                    throw ValidationException::withMessages(['category_id' => 'Pilih kategori aktif.']);
+                }
+                $id = DB::table('leave_entitlement_rule_drafts')->insertGetId([
+                    'policy_version_id' => $versionId, 'category_id' => $category->id, 'band_description' => $data['band_description'],
+                    'annual_half_day_units' => $data['annual_half_day_units'], 'created_at' => now(), 'updated_at' => now(),
+                ]);
+                AuditEvent::query()->create([
+                    'occurred_at' => now(), 'actor_id' => $request->user()->getKey(), 'action_code' => 'leave.entitlement.drafted',
+                    'target_ref' => 'entitlement_draft:'.$id, 'outcome' => 'SUCCESS',
+                    'metadata' => ['source' => 'policy_draft_ui', 'changed_fields' => ['entitlement_rule']],
+                ]);
+            }, 3);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['band_description' => 'Label ini telah wujud bagi kategori dan versi tersebut.']);
+        }
+
+        return to_route('leave.policy.drafts.index')->with('success', 'Cadangan kelayakan ditambah ke draf.');
     }
 
     /** @return array<string, mixed> */
