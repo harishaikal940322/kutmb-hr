@@ -1,3 +1,8 @@
+## 24 November 2026 — MOD-004 minimum fields and account link accepted
+
+- Requestor accepted eight minimum profile fields (employee no, full name, service start, unit, category required; confirmation date, service end and linked user optional), explicit manual nullable unique employee/account association. DOC-007 v0.2 records acceptance and proposed least-privilege permission matrix based on current IAM catalogue/menu/protected routes. Employee and required initial assignment created atomically in proposed design; user lifecycle remains MOD-001.
+- Q-005 partially resolved at requestor level. CT-P01 scope and field decisions resolved; remaining gate: permission ownership (DOC-007 section 4A), formal HR requirements approval, explicit development authorization, local preflight. Actual unit/category/employee reference values and appointments before real use. No source, DB, permission grants, Docker or normative SRS/RTM changes; no tests run.
+
 ## 24 November 2026 — MOD-004 Option A accepted as independent module
 
 - Requestor selected minimum foundation and explicitly retained Employee & Organization as a major module, not a Cuti Tahunan submodule. Existing MOD-004/F-009 IDs unchanged. Filled reserved DOC-007 with independent scope, proposed submodules, minimum fields, role boundaries and delivery plan; physical schema stays in existing technical plan section 6A. Updated scope and planning records only.

@@ -1,5 +1,5 @@
 # DOC-007 | MOD-004 Employee & Organization
-> v0.1 DRAFT · 24 November 2026 · Requestor selected Option A: minimum foundation, retained as independent major HR Core module.
+> v0.2 DRAFT · 24 November 2026 · Requestor accepted Option A and minimum employee fields, including optional manual account link; independent major HR Core module.
 > F-009 · Existing MOD-004 registry ID · Implementation HOLD pending HR requirements approval and explicit development authorization.
 
 ## 1. Module boundary and release direction
@@ -21,27 +21,46 @@ Source: existing F-009 module registry; requestor choice A on 24 November 2026; 
 
 These areas belong to MOD-004. Leave requests, balance/entitlement policy, leave approvals and adjustments belong to MOD-005 and consume MOD-004 data. MOD-001 owns account lifecycle and role/permission grants; MOD-003 audit remains shared.
 
-## 3. Minimum field proposal for review
+## 3. Minimum field baseline accepted by requestor
 
 | Record | Proposed fields | Notes |
 |---|---|---|
-| Employee | employee number, display name, service start date | Required; actual number format/authority to confirm; no IC, home address or personal contact collection by default |
+| Employee | employee number, full name (display_name), service start date | Required; actual number format/authority to confirm; no IC, home address or personal contact collection by default |
 | Employee | confirmation date, service end date | Nullable when not yet confirmed/not ended; dates chronological; HR-confirmed actual values |
 | Employee | linked user ID | Nullable unique FK; explicit association; no forced account for every staff record; no automatic link by email/name |
 | Unit | code, name, active status | Required; approved reference values maintained by HR |
 | Employment category | code, name, active status | Required; real category/level mapping HR to supply; no guessed entitlement |
-| Assignment | employee, unit, category, effective from/to | From required, to nullable; no overlapping active period; transfer history retained |
+| Assignment | employee, unit, category, effective from/to | Unit, category and from required for complete employee foundation record; to nullable; no overlapping active period; transfer history retained |
 | Approval office | existing user, office code, unit where applicable, effective from/to | Explicit scope; PU requires unit; PB/Secretary organization-wide; no self-support/approval; Secretary may be nonemployee |
 
-Actual schema follows MOD-005 technical plan section 6A (five proposed tables). No duplication of physical design or schema migrations here. Employee number is an organizational reference, not username. Missing mandatory assignment blocks affected leave submission rather than granting a default approver.
+Actual schema follows MOD-005 technical plan section 6A (five proposed tables). No duplication of physical design or schema migrations here. Employee number is an organizational reference, not username. Create an employee and initial required unit/category assignment atomically; no incomplete employee published to leave workflow. Missing mandatory current assignment blocks affected leave submission rather than granting a default approver. A record can exist before an account is created; without explicit account link it cannot use own self-service. Account disablement does not delete or terminate employee records; employment end does not silently change account status (MOD-001 controls account lifecycle). Record association changes with authorized actor and reason; avoid reassigning historical leave identity.
 
 ## 4. Access and UI proposal
 
 Independent main menu Employee & Organization (BM display: Pekerja & Organisasi), with Directory, Units, Categories and Assignments. Account linking is an explicitly authorized action, not a public directory feature. Authorized HR manages employee/organization records and effective dates; IT keeps IAM management without HR-data access by default. Role permission and office assignment are distinct checks. HR Executive/HR Manager adjustment distinction is consumed by MOD-005; no automatic ordinary leave approval for HR. Actual actor/permission owners and sensitive field scope require HR/IT approval. UI follows existing shared Vue components, Bahasa Melayu, light default/dark, responsive desktop/tablet/mobile; no new navigation framework or role switcher in functional UI.
 
+## 4A. Proposed least-privilege permission baseline (approval pending)
+
+Inspected existing `config/iam.php`, PermissionCatalog, NavigationMenuService, protected routes and AppServiceProvider active-account Gate. Currently IAM catalogue contains iam.rbac.manage and iam.users.view; HR permissions do not yet exist. Reuse existing permission catalogue, menu configuration and Spatie assignment process; candidate codes below are not grants. Each operation also checks active user, target and effective assignment; a visible menu or role title is not authorization.
+
+| Candidate permission | Proposed holder / scope |
+|---|---|
+| hr.employees.view | Authorized HR Executive and HR Manager, employee directory and minimum profile only |
+| hr.employees.manage | Authorized HR Executive and HR Manager, register/update minimum employee records and employment dates |
+| hr.organization.manage | HR Manager; unit/category reference maintenance; Executive views approved references for employee work |
+| hr.assignments.manage | Authorized HR Executive and HR Manager; record effective unit/category history |
+| hr.accounts.link | HR Manager, explicit employee-to-existing-account link/unlink; IT supplies/manages account in MOD-001, no general HR-data access or link grant by IT role |
+| hr.offices.manage | HR Manager, record formally appointed office holders and effective scope; no implicit grant of IAM roles, self-appointment or delegation |
+| hr.profile.self.view | Linked active employee only, own minimum profile; read-only |
+| hr.organization.scoped.view | Relevant office holder only, minimum names/unit/assignment data needed for assigned leave responsibility; not unrestricted directory |
+
+HR Manager and Executive names are role descriptions, not automatically assigned accounts. Existing authorized System Admin manages Spatie role/permission grants, not business data by default. Separate business appointment data from permission grants: assigning a PU/PB/Secretary office does not grant system permission, and granting a role does not create office authority. Manager's own office assignment or account link must be handled by an independently authorized actor, never self-authorized; if no such actor is approved, block that operation pending HR/IT instruction. No additional approval workflow for routine employee maintenance proposed; no broad directory for Staf, PU, PB, Secretary or IT. Do not introduce HR leave adjustment approval in MOD-004; CT-DEC-040 belongs to MOD-005.
+
+Use proposed `Pekerja & Organisasi` menu with Profil Staf, Unit, Kategori Pekerjaan, Penempatan and Penetapan Pegawai; only authorized screens visible. Link/unlink is a protected profile action, not an open user lookup. Limit candidate account results to necessary non-sensitive identifiers and only authorized actors; never expose credentials/MFA fields. Server denies direct unauthorized routes even if menu mappings change. Audit action/target/actor/date and safe structured change references; keep reasons and sensitive data within authorized records, not general logs.
+
 ## 5. Delivery sequence (CT-P01 dependency)
 
-1. Confirm minimum data, permission owners and authorization; document actual approved categories/unit values or synthetic fixtures for development.
+1. Requestor minimum fields/link accepted; confirm proposed permission ownership and formal HR requirements/development authorization. Use synthetic configurable unit/category values for development only; actual HR-approved values and named appointments before real usage.
 2. Add authorized schema/models and constraints, no production import.
 3. Implement employee/unit/category lists/forms and effective-dated assignments, link controls and office mapping using Laravel/Inertia/Vue patterns.
 4. Verify positive and negative scoped access, duplicate employee number/account link, invalid date/overlap, inactive account, nonemployee Secretary, transfer history, audit and rollback; focus checks then consolidated phase review.
@@ -49,4 +68,4 @@ Independent main menu Employee & Organization (BM display: Pekerja & Organisasi)
 
 ## 6. Interaction gate
 
-Choice A and independent module declaration are accepted by requestor. Remaining required confirmations: employee number and mandatory/nullable field proposal; optional one-to-one account association and HR/IT ownership of linking; actual unit/category taxonomy and authority to assign office/HR permissions; formal HR requirements approval and explicit development authorization. Do not treat requestor choice of scope as HR/IT sign-off or code permission. Existing module registry lifecycle stays HOLD until controlled approval. Full employee-management requirements remain deferred, not rejected. No implementation tests run.
+Choice A, independent module declaration, eight minimum profile fields (five required, three optional), and optional manual one-to-one account association accepted by requestor. Required: employee number, full name, service start date, unit, category; optional: confirmation date, service end date, user link. Remaining pre-coding gate: approve proposed permission ownership and record formal HR requirements approval and explicit development authorization. Actual employee number format, real unit/category values and named appointments remain HR inputs before real-data setup; no need to delay synthetic configurable CRUD design for those values if explicitly authorized. Q-005 partially resolved at requestor level; HR formal confirmation remains. Do not treat requestor choice of scope as HR/IT sign-off or code permission. Existing module registry lifecycle stays HOLD until controlled approval. Full employee-management requirements remain deferred, not rejected. No implementation tests run.
