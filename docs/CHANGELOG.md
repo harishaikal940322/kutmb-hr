@@ -137,3 +137,5 @@ No application features were implemented as part of the initial documentation ba
 | 2026-11-25 | CT-P03 blocker reconciliation | Review current HR answer fields and distinguish settled balance/reservation/cap rules from genuine unresolved policy; record conditional safe technical continuation and existing safeguards in plan §8B. | DEVELOPMENT DIRECTION; NO NEW BUSINESS APPROVAL OR TEST EVIDENCE |
 
 - 2026-11-25: Added internal pure P04/P05 approval-route and transition planners from the detailed CT-DEC-001/007/008/019/050 answers; no request storage, routes, UI or workflow activation. See CURRENT_HANDOFF.
+
+- 2026-11-25: Correct latest CT-DEC interpretations using current written HR answers; restore internal workflow and consent/pre-credit reservation contracts (f54b2396), preserve transaction safeguards, and prioritize a usable same-year AL vertical slice. Remote source correction; revised tests not run, no production activation.

@@ -333,7 +333,7 @@ Next: continue the internal CT-DEC-034 per-date multi-account reservation and le
 
 ## 8M. Detailed answer recheck and same-year transaction safeguards (25 November 2026)
 
-This section supersedes inaccurate CT-DEC interpretations in §8B–§8L and in earlier 25 November entries of `CURRENT_HANDOFF.md`. The detailed answer fields in the tracked 56-issue register DOCX were inspected directly. The draft SRS contains later prose that conflicts with those answer fields; it does not change the recorded choices or authorize a new normative requirement.
+**HISTORICAL / INTERPRETATIONS SUPERSEDED BY §8N.** The following entry records the previous agent's report at 90396d6 and its verification evidence; its business-rule interpretations are incorrect where contradicted by §8N. The detailed answer fields in the tracked 56-issue register DOCX were inspected directly. The draft SRS contains later prose that conflicts with those answer fields; it does not change the recorded choices or authorize a new normative requirement.
 
 ### Answer corrections and resulting scope
 
@@ -360,6 +360,25 @@ The consolidated focused regression passed with synthetic fixtures and `Database
 There was no simultaneous-worker stress run, browser/UI acceptance, UAT, recovery acceptance or production verification. No dependency or UI package changed. The prior P09 two-test calendar result was not repeated because its source did not change. Formal HR/IT approval, actual authority mapping, real calendar data and operational release remain unapproved.
 
 The current genuine HR question list and affected functions are in the latest entry at the top of `CURRENT_HANDOFF.md`. No further state-changing P03/P04/P05 slice is independent of those decisions. Continue only with policy-independent review/checks until HR/IT resolves a scoped question; do not expose the workflow or infer values.
+
+## 8N. Correction to §8M and next functional delivery (25 November 2026)
+
+The current HR answer fields in the tracked 56-issue DOCX (blob f396cdd53480caff34cb0fe0225c44729ad31ab0) take precedence over the historical choices. §8M and the previous top handoff entry misread those choices and are superseded for business interpretation, not for historical test evidence. Source correction commit: f54b2396efa9bfa2564d108f2141d9e883abd738.
+
+| Decision | Current written HR answer | Corrected implementation / remaining technical limit |
+|---|---|---|
+| 034 | Split by calendar year of each leave date, not period start year; December AL then Tabung then permitted next-year use under 015 | Existing per-session source map retained; cross-year multi-account reservation remains unintegrated and fail-closed; exact Dec 25 inclusion still open |
+| 037 | Future-year request permitted on HR-confirmed registered entitlement before actual Jan 1 credit; approved use before credit must become a commitment, not pending or posted use | Restored internal confirmed pre-credit reservation within projected AL only; no speculative future Tabung/deficit; final pre-credit commitment remains unintegrated and explicitly blocked; Jan 1 credit unchanged |
+| 051 | Authorized HR may submit for staff with recorded prior consent/confirmation, reason, separate actor/applicant; no impersonation | Restored internal consent-bound submission and reserve authorization with explicit permission; no routes or real grants |
+| 008 | Not-support with mandatory reason forwards to GM/Secretary as applicable, not automatic rejection | Restored previous transition planner and regression cases |
+| 027/029 | No current maximum retrospective EL window; EL reason required, normal route; rejected actual retrospective EL debit AL then Tabung with HR review and no payroll automation | Restored prior internal EL and retrospective rejection behavior; current-day EL rejection remains held if actual absence not verified |
+| 046 | Pending hold remains until actual decision; late approval converts once, late rejection records HR review; no automatic payroll/absence classification | Restored prior internal late-decision behavior |
+| 050 | PU own AL/EL ≤5 days direct GM final, >5 GM support then Secretary final; no self action | Restored PU route resolution |
+| 032 | Before effective transfer old PU remains; after transfer unsupported future leave moves to new PU; completed support retained; mixed-period HR review | Existing transfer guard narrowed to pending PU support so completed support survives; immutable-step reassignment remains a technical integration dependency; no unauthorized old or substitute action |
+
+Do not claim the remaining integration limits are unanswered policy. Other documented decisions in §8 and §8B remain valid where supported by the current written answers; specifically CT-DEC-004/018/020/056, CT-DEC-010's state-aware calendar impacts, and CT-DEC-040's maker/checker separation. Genuine outstanding inputs include exact service band boundaries and mapping, termination/promotion partial-month and tie handling, Dec 25 inclusion, changed-cap reconciliation and actual authority. Do not reopen all 56. Existing same-year source maps, lock ordering, aggregate reversal constraints, snapshot/impact guards and production restrictions stay in place. No applied migration source altered and no workflow endpoint or actual permission grant added by this remote corrective commit.
+
+Next scope: one end-to-end same-year AL local/testing vertical slice with explicit synthetic entitlement and approved route, utilizing existing service contracts and frozen Vue design. Authenticate, authorize, submit, support/decide, show history/balance and verify one complete scenario. Keep actual unresolved policy branches fail closed. Do not loop through more planning, speculative safeguards or unrelated tasks. The requestor explicitly authorized remote correction; required local checkout/MySQL is unavailable in this chat, so revised tests are committed but not executed. Previous results refer to the previous source only. Verify locally before any functional exposure.
 
 ## 9. Verification & implementation handoff
 
