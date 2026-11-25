@@ -328,6 +328,40 @@ class LeaveRequestWorkflowServiceTest extends TestCase
         $this->assertSame(0, DB::table('leave_request_cancellation_actions')->where('request_id', $submitted['request_id'])->where('action_code', 'CONFIRMED')->count());
     }
 
+    public function test_current_reviewer_can_return_future_annual_leave_for_correction_once(): void
+    {
+        $fixture = $this->fixture('correction');
+        $approvers = $this->staffApprovers($fixture);
+        $service = app(LeaveRequestWorkflowService::class);
+        $submitted = $service->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'correction-submit-'.$fixture['suffix'], 'AL', [['date' => '2026-03-06', 'session' => 'AM']]);
+        $key = 'correction-return-'.$fixture['suffix'];
+
+        $returned = $service->decide($approvers['pu']->id, $submitted['request_id'], $key, 'RETURN_FOR_CORRECTION', 'Synthetic missing information');
+        $replay = $service->decide($approvers['pu']->id, $submitted['request_id'], $key, 'RETURN_FOR_CORRECTION', 'Synthetic missing information');
+
+        $this->assertSame('DRAFT', $returned['status']);
+        $this->assertTrue($replay['replayed']);
+        $this->assertSame('DRAFT', DB::table('leave_requests')->where('id', $submitted['request_id'])->value('status'));
+        $this->assertNull(DB::table('leave_requests')->where('id', $submitted['request_id'])->value('current_step_order'));
+        $this->assertSame('RELEASED', DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('status'));
+        $this->assertSame(1, DB::table('leave_reservation_events')->where('reservation_id', $submitted['reservation_id'])->where('event_code', 'RELEASED')->count());
+        $this->assertSame(1, DB::table('leave_workflow_actions')->where('revision_id', DB::table('leave_request_revisions')->where('request_id', $submitted['request_id'])->value('id'))->where('action_code', 'RETURN_FOR_CORRECTION')->count());
+    }
+
+    public function test_correction_return_does_not_release_a_hold_after_leave_starts(): void
+    {
+        $fixture = $this->fixture('correctionstarted');
+        $approvers = $this->staffApprovers($fixture);
+        $service = app(LeaveRequestWorkflowService::class);
+        $submitted = $service->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'correction-started-'.$fixture['suffix'], 'AL', [['date' => '2026-03-02', 'session' => 'AM']], 'Synthetic same-day reason');
+
+        $this->assertDomainException(fn () => $service->decide($approvers['pu']->id, $submitted['request_id'], 'correction-started-return-'.$fixture['suffix'], 'RETURN_FOR_CORRECTION', 'Synthetic correction reason'));
+
+        $this->assertSame('WAITING_UNIT_MANAGER_SUPPORT', DB::table('leave_requests')->where('id', $submitted['request_id'])->value('status'));
+        $this->assertSame('ACTIVE', DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('status'));
+        $this->assertSame(0, DB::table('leave_workflow_actions')->where('operation_key', 'correction-started-return-'.$fixture['suffix'])->count());
+    }
+
     public function test_rejected_retrospective_el_posts_the_documented_debit_and_opens_hr_review(): void
     {
         $fixture = $this->fixture('retroel');
@@ -369,7 +403,7 @@ class LeaveRequestWorkflowServiceTest extends TestCase
         $this->assertSame(2, (int) $revision->notice_working_days_max);
     }
 
-    public function test_wrong_assignee_and_changed_submission_replay_are_rejected_without_side_effects(): void
+    public function test_wrong_assignee_missing_correction_reason_and_changed_submission_replay_are_rejected_without_side_effects(): void
     {
         $fixture = $this->fixture('security');
         $approvers = $this->staffApprovers($fixture);
@@ -378,7 +412,8 @@ class LeaveRequestWorkflowServiceTest extends TestCase
         $submitted = $service->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'security-'.$fixture['suffix'], 'AL', $slots);
 
         $this->assertDomainException(fn () => $service->decide($approvers['pb']->id, $submitted['request_id'], 'wrong-assignee-'.$fixture['suffix'], 'SUPPORT'));
-        $this->assertDomainException(fn () => $service->decide($approvers['pu']->id, $submitted['request_id'], 'unsupported-correction-'.$fixture['suffix'], 'RETURN_FOR_CORRECTION', 'Synthetic correction request'));
+        $this->assertDomainException(fn () => $service->decide($approvers['pu']->id, $submitted['request_id'], 'correction-missing-reason-'.$fixture['suffix'], 'RETURN_FOR_CORRECTION'));
+        $this->assertDomainException(fn () => $service->decide($approvers['pb']->id, $submitted['request_id'], 'correction-wrong-assignee-'.$fixture['suffix'], 'RETURN_FOR_CORRECTION', 'Synthetic correction request'));
         $this->assertDomainException(fn () => $service->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'security-'.$fixture['suffix'], 'AL', [['date' => '2026-03-06', 'session' => 'PM']]));
         $this->assertSame(0, DB::table('leave_workflow_actions')->count());
         $this->assertSame(1, DB::table('leave_requests')->count());

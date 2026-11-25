@@ -24,6 +24,18 @@ class LeaveWorkflowTransitionPlanner
 
         $current = $route[$currentStepOrder - 1];
         $hasReason = is_string($reason) && trim($reason) !== '';
+        if ($action === 'RETURN_FOR_CORRECTION') {
+            if (! $hasReason) {
+                throw new DomainException('A reason is required when a request is returned for correction.');
+            }
+
+            return [
+                'action_code' => $action,
+                'request_status' => 'DRAFT',
+                'next_step_order' => null,
+                'terminal' => true,
+            ];
+        }
         if (! $current['is_final']) {
             if (! in_array($action, ['SUPPORT', 'NOT_SUPPORT'], true)) {
                 throw new DomainException('A support stage only accepts support or not-support decisions.');
@@ -47,13 +59,9 @@ class LeaveWorkflowTransitionPlanner
         $terminalStatuses = [
             'APPROVE' => 'APPROVED',
             'REJECT' => 'REJECTED',
-            'RETURN_FOR_CORRECTION' => 'RETURNED_FOR_CORRECTION',
         ];
         if (! isset($terminalStatuses[$action])) {
             throw new DomainException('A final stage only accepts an approval, rejection, or correction request.');
-        }
-        if ($action === 'RETURN_FOR_CORRECTION' && ! $hasReason) {
-            throw new DomainException('A reason is required when a request is returned for correction.');
         }
 
         return [

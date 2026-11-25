@@ -44,7 +44,8 @@ class LeaveWorkflowTransitionPlannerTest extends TestCase
 
         $this->assertSame('APPROVED', $planner->plan($route, 2, 'APPROVE')['request_status']);
         $this->assertSame('REJECTED', $planner->plan($route, 2, 'REJECT', 'Synthetic final reason')['request_status']);
-        $this->assertSame('RETURNED_FOR_CORRECTION', $planner->plan($route, 2, 'RETURN_FOR_CORRECTION', 'Synthetic correction request')['request_status']);
+        $this->assertSame('DRAFT', $planner->plan($route, 2, 'RETURN_FOR_CORRECTION', 'Synthetic correction request')['request_status']);
+        $this->assertSame('DRAFT', $planner->plan($route, 1, 'RETURN_FOR_CORRECTION', 'Synthetic support-stage correction')['request_status']);
     }
 
     public function test_missing_reason_invalid_stage_action_or_malformed_route_fails_closed(): void

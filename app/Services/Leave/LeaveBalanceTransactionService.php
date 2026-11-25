@@ -206,8 +206,8 @@ class LeaveBalanceTransactionService
     {
         $this->assertLocal();
         $this->validateKeys((string) $reservationId, $operationKey);
-        if (! in_array($reason, ['FINAL_REJECTION', 'WITHDRAWAL'], true)) {
-            throw new DomainException('Only final rejection or employee withdrawal releases a pending reservation.');
+        if (! in_array($reason, ['FINAL_REJECTION', 'WITHDRAWAL', 'CORRECTION_RETURN'], true)) {
+            throw new DomainException('Only final rejection, employee withdrawal, or authorized correction return releases a pending reservation.');
         }
 
         /** @var array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int} $result */
@@ -229,6 +229,8 @@ class LeaveBalanceTransactionService
                 if ((int) $employee->user_id !== $actorId) {
                     throw new DomainException('Only the linked employee can withdraw their own pending request.');
                 }
+            } elseif ($reason === 'CORRECTION_RETURN') {
+                $this->assertAssignedReviewer($actorId, $employee, $finalAssignmentId);
             } else {
                 $this->assertFinalApprover($actorId, $employee, $finalAssignmentId);
             }
@@ -606,6 +608,22 @@ class LeaveBalanceTransactionService
         $assignment = $activeGeneralManagers->firstWhere('id', $assignmentId);
         if ($activeGeneralManagers->count() !== 1 || $assignment === null || (int) $assignment->user_id !== $actorId) {
             throw new DomainException('Exactly one current General Manager assignment is required to confirm cancellation.');
+        }
+    }
+
+    private function assertAssignedReviewer(int $actorId, stdClass $employee, ?int $assignmentId): void
+    {
+        $this->assertActiveActor($actorId);
+        if ($assignmentId === null || (int) $employee->user_id === $actorId) {
+            throw new DomainException('A distinct, assigned reviewer is required to return leave for correction.');
+        }
+        $today = now('Asia/Kuala_Lumpur')->toDateString();
+        $assignment = DB::table('approval_assignments')->where('id', $assignmentId)->where('user_id', $actorId)
+            ->whereIn('office_code', ['PU', 'PB', 'SECRETARY_ALK'])->where('effective_from', '<=', $today)
+            ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', $today))
+            ->lockForUpdate()->first();
+        if ($assignment === null) {
+            throw new DomainException('The current assigned reviewer is required to return leave for correction.');
         }
     }
 

@@ -179,8 +179,8 @@ class LeaveRequestWorkflowService
     {
         $this->assertLocal();
         $this->assertOperationKey($operationKey);
-        if (! in_array($decision, ['SUPPORT', 'NOT_SUPPORT', 'APPROVE', 'REJECT'], true)) {
-            throw new DomainException('Correction and cancellation actions require their later integrated workflow contracts.');
+        if (! in_array($decision, ['SUPPORT', 'NOT_SUPPORT', 'APPROVE', 'REJECT', 'RETURN_FOR_CORRECTION'], true)) {
+            throw new DomainException('The requested leave workflow action is not supported.');
         }
         if ($requestId < 1 || $actorId < 1) {
             throw new DomainException('A request and active actor are required.');
@@ -242,6 +242,12 @@ class LeaveRequestWorkflowService
                         $reviewCode = 'LATE_AL_REJECTION';
                     }
                 }
+            } elseif ($plan['terminal'] && $decision === 'RETURN_FOR_CORRECTION') {
+                if ($request->leave_type !== 'AL') {
+                    throw new DomainException('Only Annual Leave correction is included in this internal workflow slice.');
+                }
+                $this->assertAllDatesAreFuture((int) $revision->id, 'Correction return is held for HR review once any requested leave date has started.');
+                $this->balances->release($actorId, (int) $revision->reservation_id, 'CORRECTION_RETURN', $operationKey.':r', (int) $currentStep->assignment_id);
             }
 
             $actionId = DB::table('leave_workflow_actions')->insertGetId([
