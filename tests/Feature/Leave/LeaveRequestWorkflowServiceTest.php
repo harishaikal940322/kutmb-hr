@@ -234,6 +234,100 @@ class LeaveRequestWorkflowServiceTest extends TestCase
         $this->assertSame(0, DB::table('leave_request_withdrawals')->where('request_id', $submitted['request_id'])->count());
     }
 
+    public function test_pre_start_annual_only_cancellation_is_gm_confirmed_reversible_and_idempotent(): void
+    {
+        $fixture = $this->fixture('cancel');
+        $approvers = $this->staffApprovers($fixture);
+        $service = app(LeaveRequestWorkflowService::class);
+        $submitted = $service->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'cancel-submit-'.$fixture['suffix'], 'AL', [['date' => '2026-03-06', 'session' => 'AM']]);
+        $service->decide($approvers['pu']->id, $submitted['request_id'], 'cancel-support-'.$fixture['suffix'], 'SUPPORT');
+        $service->decide($approvers['pb']->id, $submitted['request_id'], 'cancel-approve-'.$fixture['suffix'], 'APPROVE');
+        $original = DB::table('leave_ledger_entries')->where('kind', 'approved_leave_use')->sole();
+        $this->assertDomainException(fn () => $service->requestApprovedAnnualLeaveCancellation($fixture['user']->id, $submitted['request_id'], 'cancel-missing-reason-'.$fixture['suffix'], null));
+        $this->assertSame('APPROVED', DB::table('leave_requests')->where('id', $submitted['request_id'])->value('status'));
+
+        $requestKey = 'cancel-request-'.$fixture['suffix'];
+        $requested = $service->requestApprovedAnnualLeaveCancellation($fixture['user']->id, $submitted['request_id'], $requestKey, 'Synthetic change of plan');
+        $requestReplay = $service->requestApprovedAnnualLeaveCancellation($fixture['user']->id, $submitted['request_id'], $requestKey, 'Synthetic change of plan');
+        $this->assertSame('WAITING_CANCELLATION', $requested['status']);
+        $this->assertTrue($requestReplay['replayed']);
+        $this->assertSame('COMMITTED', DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('status'));
+        $this->assertSame(-1, (int) DB::table('leave_ledger_entries')->where('id', $original->id)->value('signed_half_day_units'));
+
+        $declined = $service->decideApprovedAnnualLeaveCancellation($approvers['pb']->id, $submitted['request_id'], 'cancel-decline-'.$fixture['suffix'], 'REJECT', 'Synthetic cancellation not accepted');
+        $this->assertSame('APPROVED', $declined['status']);
+        $this->assertSame('COMMITTED', DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('status'));
+        $this->assertSame(0, DB::table('leave_ledger_entries')->where('kind', 'approved_leave_cancellation')->count());
+        $requestedAgain = $service->requestApprovedAnnualLeaveCancellation($fixture['user']->id, $submitted['request_id'], 'cancel-request-retry-'.$fixture['suffix'], 'Synthetic revised reason');
+        $this->assertSame('WAITING_CANCELLATION', $requestedAgain['status']);
+
+        $decisionKey = 'cancel-confirm-'.$fixture['suffix'];
+        $cancelled = $service->decideApprovedAnnualLeaveCancellation($approvers['pb']->id, $submitted['request_id'], $decisionKey, 'CONFIRM');
+        $replay = $service->decideApprovedAnnualLeaveCancellation($approvers['pb']->id, $submitted['request_id'], $decisionKey, 'CONFIRM');
+        $reversal = DB::table('leave_ledger_entries')->where('reverses_entry_id', $original->id)->sole();
+
+        $this->assertSame('CANCELLED', $cancelled['status']);
+        $this->assertTrue($replay['replayed']);
+        $this->assertSame('CANCELLED', DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('status'));
+        $this->assertSame(1, (int) $reversal->signed_half_day_units);
+        $this->assertSame($original->annual_account_id, $reversal->annual_account_id);
+        $this->assertSame(1, DB::table('leave_ledger_reversal_totals')->where('original_entry_id', $original->id)->where('reversed_units', 1)->count());
+        $this->assertSame(1, DB::table('leave_active_slots')->where('reservation_id', $submitted['reservation_id'])->where('status', 'RELEASED')->whereNull('active_slot_key')->count());
+        $this->assertSame(1, DB::table('leave_request_cancellation_actions')->where('request_id', $submitted['request_id'])->where('action_code', 'CONFIRMED')->count());
+
+        $again = $service->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'cancel-reuse-slot-'.$fixture['suffix'], 'AL', [['date' => '2026-03-06', 'session' => 'AM']]);
+        $this->assertSame('WAITING_UNIT_MANAGER_SUPPORT', $again['status']);
+    }
+
+    public function test_current_day_and_tabung_funded_cancellations_fail_closed_without_releasing_usage(): void
+    {
+        $currentDay = $this->fixture('cancelday');
+        $currentDayApprovers = $this->staffApprovers($currentDay);
+        $service = app(LeaveRequestWorkflowService::class);
+        $todayRequest = $service->submit($currentDay['user']->id, $currentDay['annual_id'], $currentDay['tabung_id'], 'cancel-today-'.$currentDay['suffix'], 'AL', [['date' => '2026-03-02', 'session' => 'AM']], 'Synthetic same-day reason');
+        $service->decide($currentDayApprovers['pu']->id, $todayRequest['request_id'], 'cancel-today-support-'.$currentDay['suffix'], 'SUPPORT');
+        $service->decide($currentDayApprovers['pb']->id, $todayRequest['request_id'], 'cancel-today-approve-'.$currentDay['suffix'], 'APPROVE');
+        $this->assertDomainException(fn () => $service->requestApprovedAnnualLeaveCancellation($currentDay['user']->id, $todayRequest['request_id'], 'cancel-today-request-'.$currentDay['suffix'], 'Synthetic reason'));
+        $this->assertSame('APPROVED', DB::table('leave_requests')->where('id', $todayRequest['request_id'])->value('status'));
+        $this->assertSame(0, DB::table('leave_request_cancellation_actions')->where('request_id', $todayRequest['request_id'])->count());
+
+    }
+
+    public function test_tabung_funded_cancellation_stays_isolated_without_a_verified_cap(): void
+    {
+        $tabung = $this->fixture('canceltabung');
+        $tabungApprovers = $this->staffApprovers($tabung);
+        $this->seedAnnualDeficitAndTabungCredit($tabung);
+        $service = app(LeaveRequestWorkflowService::class);
+        $tabungRequest = $service->submit($tabung['user']->id, $tabung['annual_id'], $tabung['tabung_id'], 'cancel-tabung-'.$tabung['suffix'], 'AL', [['date' => '2026-03-06', 'session' => 'AM']]);
+        $this->assertSame(0, (int) DB::table('leave_reservations')->where('id', $tabungRequest['reservation_id'])->value('annual_units'));
+        $this->assertSame(1, (int) DB::table('leave_reservations')->where('id', $tabungRequest['reservation_id'])->value('tabung_units'));
+        $service->decide($tabungApprovers['pu']->id, $tabungRequest['request_id'], 'cancel-tabung-support-'.$tabung['suffix'], 'SUPPORT');
+        $service->decide($tabungApprovers['pb']->id, $tabungRequest['request_id'], 'cancel-tabung-approve-'.$tabung['suffix'], 'APPROVE');
+
+        $this->assertDomainException(fn () => $service->requestApprovedAnnualLeaveCancellation($tabung['user']->id, $tabungRequest['request_id'], 'cancel-tabung-request-'.$tabung['suffix'], 'Synthetic reason'));
+        $this->assertSame('APPROVED', DB::table('leave_requests')->where('id', $tabungRequest['request_id'])->value('status'));
+        $this->assertSame('COMMITTED', DB::table('leave_reservations')->where('id', $tabungRequest['reservation_id'])->value('status'));
+        $this->assertSame(0, DB::table('leave_request_cancellation_actions')->where('request_id', $tabungRequest['request_id'])->count());
+    }
+
+    public function test_only_the_current_general_manager_can_confirm_cancellation(): void
+    {
+        $fixture = $this->fixture('cancelactor');
+        $approvers = $this->staffApprovers($fixture);
+        $service = app(LeaveRequestWorkflowService::class);
+        $submitted = $service->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'cancel-actor-submit-'.$fixture['suffix'], 'AL', [['date' => '2026-03-06', 'session' => 'AM']]);
+        $service->decide($approvers['pu']->id, $submitted['request_id'], 'cancel-actor-support-'.$fixture['suffix'], 'SUPPORT');
+        $service->decide($approvers['pb']->id, $submitted['request_id'], 'cancel-actor-approve-'.$fixture['suffix'], 'APPROVE');
+        $service->requestApprovedAnnualLeaveCancellation($fixture['user']->id, $submitted['request_id'], 'cancel-actor-request-'.$fixture['suffix'], 'Synthetic reason');
+
+        $this->assertDomainException(fn () => $service->decideApprovedAnnualLeaveCancellation($approvers['secretary']->id, $submitted['request_id'], 'cancel-actor-wrong-'.$fixture['suffix'], 'CONFIRM'));
+
+        $this->assertSame('WAITING_CANCELLATION', DB::table('leave_requests')->where('id', $submitted['request_id'])->value('status'));
+        $this->assertSame(1, DB::table('leave_request_cancellation_actions')->where('request_id', $submitted['request_id'])->where('action_code', 'REQUESTED')->count());
+        $this->assertSame(0, DB::table('leave_request_cancellation_actions')->where('request_id', $submitted['request_id'])->where('action_code', 'CONFIRMED')->count());
+    }
+
     public function test_rejected_retrospective_el_posts_the_documented_debit_and_opens_hr_review(): void
     {
         $fixture = $this->fixture('retroel');
@@ -363,6 +457,32 @@ class LeaveRequestWorkflowServiceTest extends TestCase
             'unit_id' => $unitId,
             'effective_from' => '2020-01-01',
         ]);
+    }
+
+    /** @param array{suffix:string,user:User,employee_id:int,unit_id:int,annual_id:int,tabung_id:int} $fixture */
+    private function seedAnnualDeficitAndTabungCredit(array $fixture): void
+    {
+        foreach ([['annual', -1, $fixture['annual_id'], null], ['tabung', 1, null, $fixture['tabung_id']]] as [$label, $units, $annualId, $tabungId]) {
+            $key = 'synthetic-'.$label.'-'.$fixture['suffix'];
+            $operationId = DB::table('leave_balance_operations')->insertGetId([
+                'employee_id' => $fixture['employee_id'],
+                'actor_id' => $fixture['user']->id,
+                'operation_key' => $key,
+                'operation_type' => 'SYNTHETIC',
+                'payload_hash' => hash('sha256', $key),
+                'created_at' => now(),
+            ]);
+            DB::table('leave_ledger_entries')->insert([
+                'annual_account_id' => $annualId,
+                'tabung_account_id' => $tabungId,
+                'balance_operation_id' => $operationId,
+                'signed_half_day_units' => $units,
+                'kind' => 'synthetic_fixture',
+                'source_year' => $tabungId === null ? null : 2026,
+                'operation_key' => $key,
+                'actor_id' => $fixture['user']->id,
+            ]);
+        }
     }
 
     private function assertDomainException(callable $action): void

@@ -370,6 +370,275 @@ class LeaveRequestWorkflowService
         }, 3);
     }
 
+    /** @return array{request_id:int,status:string,current_step_order:null,reservation_id:int,replayed:bool} */
+    public function requestApprovedAnnualLeaveCancellation(int $requesterUserId, int $requestId, string $operationKey, ?string $reason): array
+    {
+        $this->assertLocal();
+        $this->assertOperationKey($operationKey);
+        $reason = $this->normalizeReason($reason);
+        if ($requesterUserId < 1 || $requestId < 1 || $reason === null) {
+            throw new DomainException('A linked employee, approved Annual Leave request, and cancellation reason are required.');
+        }
+
+        return DB::transaction(function () use ($requesterUserId, $requestId, $operationKey, $reason): array {
+            $this->lockCancellationGuards();
+            $candidate = DB::table('leave_requests')->where('id', $requestId)->first(['employee_id']);
+            if ($candidate === null) {
+                throw new DomainException('The leave request does not exist.');
+            }
+            $employee = DB::table('employees')->where('id', $candidate->employee_id)->lockForUpdate()->first();
+            $request = DB::table('leave_requests')->where('id', $requestId)->lockForUpdate()->first();
+            $actor = DB::table('users')->where('id', $requesterUserId)->lockForUpdate()->first(['status', 'username']);
+            if ($employee === null || $request === null || (int) $employee->user_id !== $requesterUserId
+                || (int) $request->requester_user_id !== $requesterUserId || $actor === null
+                || $actor->status !== 'ACTIVE' || $actor->username === null) {
+                throw new DomainException('Only the linked active employee can request cancellation of their own leave.');
+            }
+
+            $existing = DB::table('leave_request_cancellation_actions')->where('operation_key', $operationKey)->lockForUpdate()->first();
+            if ($existing !== null) {
+                $expectedHash = $this->cancellationPayloadHash('REQUESTED', $requesterUserId, $requestId, (int) $existing->revision_id, (int) $existing->cycle, null, $reason);
+                if ((int) $existing->request_id !== $requestId || $existing->action_code !== 'REQUESTED'
+                    || (int) $existing->actor_id !== $requesterUserId || ! hash_equals($existing->payload_hash, $expectedHash)) {
+                    throw new DomainException('The cancellation request key was already used for a different action.');
+                }
+
+                return [
+                    'request_id' => $requestId,
+                    'status' => (string) $request->status,
+                    'current_step_order' => null,
+                    'reservation_id' => $this->currentReservationId($requestId, (int) $request->current_revision),
+                    'replayed' => true,
+                ];
+            }
+            $this->assertCancellationOperationKeyAvailable($operationKey);
+            if ($request->leave_type !== 'AL' || $request->status !== 'APPROVED' || $request->current_step_order !== null) {
+                throw new DomainException('Only an approved Annual Leave request can enter the cancellation process.');
+            }
+
+            $revision = DB::table('leave_request_revisions')->where('request_id', $requestId)
+                ->where('revision', $request->current_revision)->lockForUpdate()->first();
+            if ($revision === null) {
+                throw new RuntimeException('The current leave request revision is missing.');
+            }
+            $this->assertAllDatesAreFuture((int) $revision->id, 'An approved leave cancellation can be requested only before its first leave date starts.');
+            $reservation = DB::table('leave_reservations')->where('id', $revision->reservation_id)->lockForUpdate()->first();
+            if ($reservation === null || $reservation->status !== 'COMMITTED') {
+                throw new DomainException('The approved leave must have a committed reservation before cancellation.');
+            }
+            if ((int) $reservation->tabung_units !== 0) {
+                throw new DomainException('Tabung-funded cancellation is deferred until the current annual entitlement cap can be verified.');
+            }
+
+            $cycle = (int) DB::table('leave_request_cancellation_actions')->where('request_id', $requestId)->max('cycle') + 1;
+            $payloadHash = $this->cancellationPayloadHash('REQUESTED', $requesterUserId, $requestId, (int) $revision->id, $cycle, null, $reason);
+            DB::table('leave_request_cancellation_actions')->insert([
+                'request_id' => $requestId,
+                'revision_id' => $revision->id,
+                'cycle' => $cycle,
+                'action_code' => 'REQUESTED',
+                'actor_id' => $requesterUserId,
+                'reason' => $reason,
+                'operation_key' => $operationKey,
+                'payload_hash' => $payloadHash,
+                'created_at' => now(),
+            ]);
+            DB::table('leave_requests')->where('id', $requestId)->update([
+                'status' => 'WAITING_CANCELLATION',
+                'current_step_order' => null,
+                'updated_at' => now(),
+            ]);
+            $this->audit('hr.leave.cancellation_requested', $requestId, $requesterUserId, $operationKey);
+
+            return [
+                'request_id' => $requestId,
+                'status' => 'WAITING_CANCELLATION',
+                'current_step_order' => null,
+                'reservation_id' => (int) $reservation->id,
+                'replayed' => false,
+            ];
+        }, 3);
+    }
+
+    /** @return array{request_id:int,status:string,current_step_order:null,reservation_id:int,replayed:bool} */
+    public function decideApprovedAnnualLeaveCancellation(int $actorId, int $requestId, string $operationKey, string $decision, ?string $reason = null): array
+    {
+        $this->assertLocal();
+        $this->assertOperationKey($operationKey);
+        if (! in_array($decision, ['CONFIRM', 'REJECT'], true) || $actorId < 1 || $requestId < 1) {
+            throw new DomainException('A current General Manager and a valid cancellation decision are required.');
+        }
+        $reason = $this->normalizeReason($reason);
+
+        return DB::transaction(function () use ($actorId, $requestId, $operationKey, $decision, $reason): array {
+            $this->lockCancellationGuards();
+            $candidate = DB::table('leave_requests')->where('id', $requestId)->first(['employee_id']);
+            if ($candidate === null) {
+                throw new DomainException('The leave request does not exist.');
+            }
+            $employee = DB::table('employees')->where('id', $candidate->employee_id)->lockForUpdate()->first();
+            $request = DB::table('leave_requests')->where('id', $requestId)->lockForUpdate()->first();
+            if ($employee === null || $request === null) {
+                throw new DomainException('A consistent employee request is required.');
+            }
+            $existing = DB::table('leave_request_cancellation_actions')->where('operation_key', $operationKey)->lockForUpdate()->first();
+            if ($existing !== null) {
+                $expectedCode = $decision === 'CONFIRM' ? 'CONFIRMED' : 'REJECTED';
+                $expectedHash = $this->cancellationPayloadHash($expectedCode, $actorId, $requestId, (int) $existing->revision_id,
+                    (int) $existing->cycle, (int) $existing->assignment_id, $reason);
+                if ((int) $existing->request_id !== $requestId || $existing->action_code !== $expectedCode
+                    || (int) $existing->actor_id !== $actorId || $existing->assignment_id === null
+                    || ! hash_equals($existing->payload_hash, $expectedHash)) {
+                    throw new DomainException('The cancellation decision key was already used for a different action.');
+                }
+
+                return [
+                    'request_id' => $requestId,
+                    'status' => (string) $request->status,
+                    'current_step_order' => null,
+                    'reservation_id' => $this->currentReservationId($requestId, (int) $request->current_revision),
+                    'replayed' => true,
+                ];
+            }
+            $this->assertCancellationOperationKeyAvailable($operationKey);
+            if ($request->leave_type !== 'AL' || $request->status !== 'WAITING_CANCELLATION'
+                || $request->current_step_order !== null || (int) $employee->user_id === $actorId) {
+                throw new DomainException('Only a pending pre-start Annual Leave cancellation can be decided by a distinct General Manager.');
+            }
+            $this->assertActiveGeneralManager($actorId);
+            $revision = DB::table('leave_request_revisions')->where('request_id', $requestId)
+                ->where('revision', $request->current_revision)->lockForUpdate()->first();
+            if ($revision === null) {
+                throw new RuntimeException('The current leave request revision is missing.');
+            }
+            $this->assertAllDatesAreFuture((int) $revision->id, 'Cancellation confirmation is held for HR review once any leave date has started.');
+            $requestAction = DB::table('leave_request_cancellation_actions')->where('request_id', $requestId)
+                ->where('revision_id', $revision->id)->where('action_code', 'REQUESTED')
+                ->orderByDesc('cycle')->lockForUpdate()->first();
+            if ($requestAction === null || DB::table('leave_request_cancellation_actions')->where('request_id', $requestId)
+                ->where('cycle', $requestAction->cycle)->whereIn('action_code', ['CONFIRMED', 'REJECTED'])->exists()) {
+                throw new DomainException('A current undecided employee cancellation request is required.');
+            }
+            $assignment = $this->currentGeneralManagerAssignment($actorId);
+            $actionCode = $decision === 'CONFIRM' ? 'CONFIRMED' : 'REJECTED';
+            $payloadHash = $this->cancellationPayloadHash($actionCode, $actorId, $requestId, (int) $revision->id,
+                (int) $requestAction->cycle, (int) $assignment->id, $reason);
+            $actionId = DB::table('leave_request_cancellation_actions')->insertGetId([
+                'request_id' => $requestId,
+                'revision_id' => $revision->id,
+                'cycle' => $requestAction->cycle,
+                'action_code' => $actionCode,
+                'actor_id' => $actorId,
+                'assignment_id' => $assignment->id,
+                'reason' => $reason,
+                'operation_key' => $operationKey,
+                'payload_hash' => $payloadHash,
+                'created_at' => now(),
+            ]);
+
+            if ($decision === 'REJECT') {
+                DB::table('leave_requests')->where('id', $requestId)->update([
+                    'status' => 'APPROVED',
+                    'current_step_order' => null,
+                    'updated_at' => now(),
+                ]);
+                $this->audit('hr.leave.cancellation_rejected', $requestId, $actorId, $operationKey);
+
+                return [
+                    'request_id' => $requestId,
+                    'status' => 'APPROVED',
+                    'current_step_order' => null,
+                    'reservation_id' => (int) $revision->reservation_id,
+                    'replayed' => false,
+                ];
+            }
+
+            $this->balances->cancelApprovedAnnualLeave($actorId, (int) $revision->reservation_id, $actionId, (int) $assignment->id, $operationKey.':balance');
+            DB::table('leave_requests')->where('id', $requestId)->update([
+                'status' => 'IN_PROCESS_CANCELLATION',
+                'current_step_order' => null,
+                'updated_at' => now(),
+            ]);
+            DB::table('leave_requests')->where('id', $requestId)->update([
+                'status' => 'CANCELLED',
+                'current_step_order' => null,
+                'updated_at' => now(),
+            ]);
+            $this->audit('hr.leave.cancellation_confirmed', $requestId, $actorId, $operationKey);
+
+            return [
+                'request_id' => $requestId,
+                'status' => 'CANCELLED',
+                'current_step_order' => null,
+                'reservation_id' => (int) $revision->reservation_id,
+                'replayed' => false,
+            ];
+        }, 3);
+    }
+
+    private function lockCancellationGuards(): void
+    {
+        foreach (['leave_calendar_confirmation_guard', 'leave_working_schedule_guard', 'office_assignment_guard'] as $table) {
+            if (! Schema::hasTable($table) || DB::table($table)->where('id', 1)->lockForUpdate()->first() === null) {
+                throw new RuntimeException('Leave calendar, schedule, and office assignment guards are required for cancellation.');
+            }
+        }
+    }
+
+    private function assertAllDatesAreFuture(int $revisionId, string $message): void
+    {
+        $dates = DB::table('leave_request_days')->where('revision_id', $revisionId)->pluck('leave_date')->all();
+        $today = now('Asia/Kuala_Lumpur')->toDateString();
+        if ($dates === [] || collect($dates)->contains(fn (string $date): bool => $date <= $today)) {
+            throw new DomainException($message);
+        }
+    }
+
+    private function assertActiveGeneralManager(int $actorId): void
+    {
+        $actor = DB::table('users')->where('id', $actorId)->lockForUpdate()->first(['status', 'username']);
+        if ($actor === null || $actor->status !== 'ACTIVE' || $actor->username === null) {
+            throw new DomainException('An active General Manager account is required for cancellation.');
+        }
+    }
+
+    private function currentGeneralManagerAssignment(int $actorId): stdClass
+    {
+        $today = now('Asia/Kuala_Lumpur')->toDateString();
+        $assignments = DB::table('approval_assignments')->where('office_code', 'PB')
+            ->where('effective_from', '<=', $today)
+            ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', $today))
+            ->orderBy('id')->lockForUpdate()->get(['id', 'user_id']);
+        $assignment = $assignments->firstWhere('user_id', $actorId);
+        if ($assignments->count() !== 1 || $assignment === null) {
+            throw new DomainException('Exactly one current General Manager assignment is required for cancellation.');
+        }
+
+        return $assignment;
+    }
+
+    private function assertCancellationOperationKeyAvailable(string $operationKey): void
+    {
+        if (DB::table('leave_workflow_actions')->where('operation_key', $operationKey)->exists()
+            || DB::table('leave_request_withdrawals')->where('operation_key', $operationKey)->exists()
+            || DB::table('leave_balance_operations')->where('operation_key', $operationKey)->exists()) {
+            throw new DomainException('The operation key was already used for a different leave transaction.');
+        }
+    }
+
+    private function cancellationPayloadHash(string $actionCode, int $actorId, int $requestId, int $revisionId, int $cycle, ?int $assignmentId, ?string $reason): string
+    {
+        return $this->hash([
+            'action_code' => $actionCode,
+            'actor_id' => $actorId,
+            'assignment_id' => $assignmentId,
+            'cycle' => $cycle,
+            'reason' => $reason,
+            'request_id' => $requestId,
+            'revision_id' => $revisionId,
+        ]);
+    }
+
     /** @return array{short_notice:bool,min_days:?int,max_days:?int} */
     private function assessShortNotice(string $firstLeaveDate, string $today): array
     {
