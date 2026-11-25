@@ -3,6 +3,7 @@
 namespace App\Services\Leave;
 
 use App\Models\AuditEvent;
+use App\Models\User;
 use DateTimeImmutable;
 use DateTimeZone;
 use DomainException;
@@ -25,9 +26,10 @@ class LeaveBalanceTransactionService
     ) {}
 
     /** @param list<array{date:string,session:string}> $requestedSlots
+     * @param  null|array{request_id:int,applicant_user_id:int,submission_key:string,payload_hash:string}  $onBehalfSubmission
      * @return array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int}
      */
-    public function reserve(int $actorId, string $requestKey, int $revision, int $annualAccountId, int $tabungAccountId, array $requestedSlots, string $operationKey): array
+    public function reserve(int $actorId, string $requestKey, int $revision, int $annualAccountId, int $tabungAccountId, array $requestedSlots, string $operationKey, ?array $onBehalfSubmission = null): array
     {
         $this->assertLocal();
         $this->validateKeys($requestKey, $operationKey);
@@ -38,7 +40,7 @@ class LeaveBalanceTransactionService
         $requestedUnits = count($slots);
 
         /** @var array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int} $result */
-        $result = DB::transaction(function () use ($actorId, $requestKey, $revision, $annualAccountId, $tabungAccountId, $requestedUnits, $slots, $operationKey): array {
+        $result = DB::transaction(function () use ($actorId, $requestKey, $revision, $annualAccountId, $tabungAccountId, $requestedUnits, $slots, $operationKey, $onBehalfSubmission): array {
             $this->lockRequestImpactGuards();
             $annualCandidate = DB::table('leave_annual_accounts')->where('id', $annualAccountId)->first(['employee_id']);
             if ($annualCandidate === null) {
@@ -52,15 +54,31 @@ class LeaveBalanceTransactionService
                 throw new DomainException('Annual and Tabung accounts must exist and belong to the same employee.');
             }
             $this->assertActiveActor($actorId);
-            if ((int) $employee->user_id !== $actorId) {
-                throw new DomainException('Only the linked staff member may reserve their own leave request.');
+            if ((int) $employee->user_id === $actorId) {
+                if ($onBehalfSubmission !== null) {
+                    throw new DomainException('An employee self-submission cannot include an HR-assisted consent record.');
+                }
+            } else {
+                $this->assertAuthorizedHrRecorder($actorId);
+                if ($onBehalfSubmission === null || (int) $onBehalfSubmission['applicant_user_id'] !== (int) $employee->user_id) {
+                    throw new DomainException('Only the linked applicant or an explicitly authorized HR recorder with recorded staff confirmation can reserve leave.');
+                }
+                $request = DB::table('leave_requests')->where('id', $onBehalfSubmission['request_id'])
+                    ->where('request_key', $requestKey)->where('requester_user_id', $onBehalfSubmission['applicant_user_id'])->first();
+                $consent = DB::table('leave_request_on_behalf_submissions')->where('request_id', $onBehalfSubmission['request_id'])
+                    ->where('applicant_user_id', $onBehalfSubmission['applicant_user_id'])->where('hr_actor_user_id', $actorId)
+                    ->where('operation_key', $onBehalfSubmission['submission_key'])->first();
+                if ($request === null || $consent === null || ! hash_equals($request->payload_hash, $onBehalfSubmission['payload_hash'])
+                    || ! hash_equals($consent->payload_hash, $onBehalfSubmission['payload_hash'])) {
+                    throw new DomainException('A matching immutable applicant consent record is required before creating the balance reservation.');
+                }
             }
             if (count(array_filter($slots, fn (array $slot): bool => (int) substr($slot['date'], 0, 4) !== (int) $annual->leave_year)) > 0) {
-                throw new DomainException('This transaction slice accepts dates from one calendar year matching the Annual Leave account.');
+                throw new DomainException('Cross-year allocation requires the per-leave-date multi-account transaction (CT-DEC-034); this internal slice supports a single calendar year only.');
             }
             $currentYear = (int) now('Asia/Kuala_Lumpur')->format('Y');
-            if ((int) $annual->leave_year > $currentYear) {
-                throw new DomainException('Annual Leave for a future year is unavailable until its entitlement has been credited on 1 January.');
+            if ((int) $annual->leave_year > $currentYear + 1) {
+                throw new DomainException('Only the current or immediately following year is supported by the documented future-year policy.');
             }
             $registeredEntitlement = DB::table('leave_annual_entitlement_confirmations')
                 ->where('annual_account_id', $annualAccountId)
@@ -68,11 +86,20 @@ class LeaveBalanceTransactionService
                 ->where('leave_year', $annual->leave_year)
                 ->lockForUpdate()
                 ->first(['confirmed_half_day_units']);
+            if ((int) $annual->leave_year > $currentYear && $registeredEntitlement === null) {
+                throw new DomainException('A future-year Annual Leave entitlement must be registered and HR-confirmed before submission.');
+            }
 
             $payload = [
                 'actor_id' => $actorId,
                 'annual_account_id' => $annualAccountId,
                 'employee_id' => (int) $employee->id,
+                ...($onBehalfSubmission === null ? [] : ['on_behalf_submission' => [
+                    'applicant_user_id' => $onBehalfSubmission['applicant_user_id'],
+                    'payload_hash' => $onBehalfSubmission['payload_hash'],
+                    'request_id' => $onBehalfSubmission['request_id'],
+                    'submission_key' => $onBehalfSubmission['submission_key'],
+                ]]),
                 'request_key' => $requestKey,
                 'requested_slots' => $slots,
                 'revision' => $revision,
@@ -90,14 +117,20 @@ class LeaveBalanceTransactionService
 
             $historyMarkerId = $this->recordUsageSnapshots((int) $employee->id, $actorId, $requestKey, $revision, $slots);
             $posted = $this->totals->forAccounts($annualAccountId, $tabungAccountId);
-            if ($registeredEntitlement !== null && (int) $annual->leave_year === $currentYear) {
+            if ($registeredEntitlement !== null && (int) $annual->leave_year >= $currentYear) {
                 $creditEntry = DB::table('leave_ledger_entries')->where('annual_account_id', $annualAccountId)
                     ->where('kind', 'annual_entitlement_credit')->first(['signed_half_day_units']);
                 if ($creditEntry === null) {
-                    throw new DomainException('A confirmed annual entitlement must be posted before it can be reserved.');
-                }
-                if ((int) $creditEntry->signed_half_day_units !== (int) $registeredEntitlement->confirmed_half_day_units) {
-                    throw new DomainException('The posted annual credit does not match its registered entitlement.');
+                    if ((int) $annual->leave_year === $currentYear) {
+                        throw new DomainException('The current-year confirmed entitlement must be officially credited before use.');
+                    }
+                    $confirmedUnits = (int) $registeredEntitlement->confirmed_half_day_units;
+                    if ($posted['annual_half_day_units'] > PHP_INT_MAX - $confirmedUnits) {
+                        throw new OverflowException('The confirmed future-year entitlement exceeds the supported integer range.');
+                    }
+                    $posted['annual_half_day_units'] += $confirmedUnits;
+                } elseif ((int) $creditEntry->signed_half_day_units !== (int) $registeredEntitlement->confirmed_half_day_units) {
+                    throw new DomainException('The posted annual credit does not match its registered future-year entitlement.');
                 }
             }
             $pendingAnnual = $this->sumFor('annual_units', 'annual_account_id', $annualAccountId);
@@ -106,6 +139,9 @@ class LeaveBalanceTransactionService
             $after = $this->projection->project($posted['annual_half_day_units'], $posted['tabung_half_day_units'], $pendingAnnual, $pendingTabung, $requestedUnits);
             $annualUnits = $before['projected_annual'] - $after['projected_annual'];
             $tabungUnits = $before['projected_tabung'] - $after['projected_tabung'];
+            if ((int) $annual->leave_year > $currentYear && ($tabungUnits > 0 || $after['projected_annual'] < 0)) {
+                throw new DomainException('Pre-credit reservations requiring future Tabung or a negative balance await the year-transition transaction contract.');
+            }
             $tabungSourceYear = $tabungUnits > 0 ? $this->singleAvailableTabungSourceYear($tabungAccountId, $tabungUnits) : null;
             $annualPositiveUnits = min(max($before['annual_available'], 0), $requestedUnits);
             $allocationRows = [];
@@ -194,6 +230,12 @@ class LeaveBalanceTransactionService
             }
             if ($reservation->status !== 'ACTIVE') {
                 throw new DomainException('Only an active pending reservation can be committed.');
+            }
+            // CT-DEC-037: pre-credit approval requires a distinct commitment, not posted use.
+            if ((int) $reservation->leave_year > (int) now('Asia/Kuala_Lumpur')->format('Y')
+                || (DB::table('leave_annual_entitlement_confirmations')->where('annual_account_id', $reservation->annual_account_id)->exists()
+                    && ! DB::table('leave_ledger_entries')->where('annual_account_id', $reservation->annual_account_id)->where('kind', 'annual_entitlement_credit')->exists())) {
+                throw new DomainException('Pre-credit final approval requires the separate approved-use commitment transaction (CT-DEC-037).');
             }
 
             if ($allocations->isEmpty()) {
@@ -851,6 +893,20 @@ class LeaveBalanceTransactionService
         $actor = DB::table('users')->where('id', $actorId)->first(['status', 'username']);
         if ($actor === null || $actor->status !== 'ACTIVE' || $actor->username === null) {
             throw new DomainException('An active account is required for leave balance operations.');
+        }
+    }
+
+    private function assertAuthorizedHrRecorder(int $actorId): void
+    {
+        if (! DB::table('permissions')->where('name', 'leave.request.record-on-behalf')->where('guard_name', 'web')->exists()) {
+            throw new DomainException('The local-only HR-assisted submission permission is not configured.');
+        }
+        $lockedActor = DB::table('users')->where('id', $actorId)->lockForUpdate()->first(['status', 'username']);
+        $actor = User::query()->find($actorId);
+        if ($lockedActor === null || $lockedActor->status !== 'ACTIVE' || $lockedActor->username === null
+            || $actor === null || $actor->status !== 'ACTIVE' || $actor->username === null
+            || ! $actor->hasPermissionTo('leave.request.record-on-behalf', 'web')) {
+            throw new DomainException('An active account with explicit HR-assisted submission authority is required.');
         }
     }
 

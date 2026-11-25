@@ -40,12 +40,14 @@ class LeaveRequestWorkflowService
     ): array {
         return $this->submitInternal(
             $requesterUserId,
+            $requesterUserId,
             $annualAccountId,
             $tabungAccountId,
             $submissionKey,
             $leaveType,
             $requestedSlots,
             $reason,
+            null,
         );
     }
 
@@ -65,13 +67,39 @@ class LeaveRequestWorkflowService
         ?string $consentEvidenceReference,
         ?string $staffConfirmedAt,
     ): array {
-        throw new DomainException('CT-DEC-051 permits staff to submit only their own leave request; HR account support is a separate process.');
+        $recordingReason = $this->normalizeReason($recordingReason);
+        $consentEvidenceReference = $consentEvidenceReference === null ? null : trim($consentEvidenceReference);
+        if ($hrActorUserId < 1 || $applicantUserId < 1 || $hrActorUserId === $applicantUserId
+            || $recordingReason === null || $consentEvidenceReference === null || $consentEvidenceReference === ''
+            || strlen($consentEvidenceReference) > 120 || $staffConfirmedAt === null) {
+            throw new DomainException('A distinct authorized HR recorder, reason, consent evidence reference, and prior staff confirmation are required.');
+        }
+
+        $confirmedAt = $this->parseConsentConfirmationTimestamp($staffConfirmedAt);
+
+        return $this->submitInternal(
+            $hrActorUserId,
+            $applicantUserId,
+            $annualAccountId,
+            $tabungAccountId,
+            $submissionKey,
+            $leaveType,
+            $requestedSlots,
+            $reason,
+            [
+                'recording_reason' => $recordingReason,
+                'consent_evidence_reference' => $consentEvidenceReference,
+                'staff_confirmed_at' => $confirmedAt,
+            ],
+        );
     }
 
     /** @param list<array{date:string,session:string}> $requestedSlots
+     * @param  null|array{recording_reason:string,consent_evidence_reference:string,staff_confirmed_at:string}  $onBehalf
      * @return array{request_id:int,request_key:string,status:string,current_step_order:?int,reservation_id:int,replayed:bool}
      */
     private function submitInternal(
+        int $actorUserId,
         int $requesterUserId,
         int $annualAccountId,
         int $tabungAccountId,
@@ -79,22 +107,19 @@ class LeaveRequestWorkflowService
         string $leaveType,
         array $requestedSlots,
         ?string $reason,
+        ?array $onBehalf,
     ): array {
         $this->assertLocal();
         $this->assertSubmissionKey($submissionKey);
         if (! in_array($leaveType, ['AL', 'EL'], true) || $annualAccountId < 1 || $tabungAccountId < 1
-            || $requesterUserId < 1) {
+            || $actorUserId < 1 || $requesterUserId < 1 || (($onBehalf === null) !== ($actorUserId === $requesterUserId))) {
             throw new DomainException('A valid leave type, linked requester, and explicit account IDs are required.');
         }
-        $actorUserId = $requesterUserId;
 
         $slots = $this->normalizeSlots($requestedSlots);
         $reason = $this->normalizeReason($reason);
         if ($leaveType === 'EL' && $reason === null) {
             throw new DomainException('An emergency reason is required for every EL request.');
-        }
-        if ($leaveType === 'EL') {
-            throw new DomainException('CT-DEC-027 has no HR-confirmed submission window; Emergency Leave submission is held.');
         }
 
         $today = now('Asia/Kuala_Lumpur')->toDateString();
@@ -102,21 +127,26 @@ class LeaveRequestWorkflowService
         $lastDate = $slots[count($slots) - 1]['date'];
         $leaveYear = (int) substr($firstDate, 0, 4);
         if ((int) substr($lastDate, 0, 4) !== $leaveYear) {
-            throw new DomainException('This internal transaction slice accepts one calendar year per request.');
+            throw new DomainException('Cross-year requests must allocate each leave date to its calendar year (CT-DEC-034); the multi-account transaction is not yet integrated.');
         }
-        if ($firstDate < $today) {
+        if ($leaveType === 'AL' && $firstDate < $today) {
             throw new DomainException('Past-date leave must use the separate retrospective EL request type.');
         }
+        if ($leaveType === 'EL' && $lastDate > $today) {
+            throw new DomainException('EL requests are limited to the current or already elapsed absence dates.');
+        }
 
-        $notice = $this->assessShortNotice($firstDate, $today);
-        if ($notice['short_notice'] && $reason === null) {
+        $notice = $leaveType === 'AL' ? $this->assessShortNotice($firstDate, $today) : null;
+        if ($notice !== null && $notice['short_notice'] && $reason === null) {
             throw new DomainException('An emergency reason is required when AL notice is unambiguously under three working days.');
         }
 
         $payloadHash = $this->hash([
+            ...($onBehalf === null ? [] : ['actor_id' => $actorUserId]),
             'annual_account_id' => $annualAccountId,
             'applicant_user_id' => $requesterUserId,
             'leave_type' => $leaveType,
+            ...($onBehalf === null ? [] : ['on_behalf' => $onBehalf]),
             'reason' => $reason,
             'requested_slots' => $slots,
             'tabung_account_id' => $tabungAccountId,
@@ -124,7 +154,7 @@ class LeaveRequestWorkflowService
         $requestKey = 'leave-'.Str::uuid()->toString();
         $reserveKey = 'reserve:'.Str::uuid()->toString();
 
-        return DB::transaction(function () use ($actorUserId, $requesterUserId, $annualAccountId, $tabungAccountId, $submissionKey, $leaveType, $slots, $reason, $leaveYear, $notice, $payloadHash, $requestKey, $reserveKey): array {
+        return DB::transaction(function () use ($actorUserId, $requesterUserId, $annualAccountId, $tabungAccountId, $submissionKey, $leaveType, $slots, $reason, $leaveYear, $notice, $payloadHash, $requestKey, $reserveKey, $onBehalf): array {
             $this->lockSubmissionGuards();
             $existingCandidate = DB::table('leave_requests')->where('submission_key', $submissionKey)->first(['id', 'employee_id']);
             if ($existingCandidate !== null) {
@@ -138,6 +168,20 @@ class LeaveRequestWorkflowService
                 if ((int) $existing->requester_user_id !== $requesterUserId || ! hash_equals($existing->payload_hash, $payloadHash)) {
                     throw new DomainException('The submission key was already used for a different request payload.');
                 }
+                if ($onBehalf !== null) {
+                    $this->assertAuthorizedHrRecorder($actorUserId);
+                    $consent = DB::table('leave_request_on_behalf_submissions')->where('request_id', $existing->id)->first();
+                    if ($consent === null || (int) $consent->applicant_user_id !== $requesterUserId
+                        || (int) $consent->hr_actor_user_id !== $actorUserId
+                        || $consent->operation_key !== $submissionKey || ! hash_equals($consent->payload_hash, $payloadHash)
+                        || $consent->recording_reason !== $onBehalf['recording_reason']
+                        || $consent->consent_evidence_reference !== $onBehalf['consent_evidence_reference']
+                        || (string) $consent->staff_confirmed_at !== $onBehalf['staff_confirmed_at']) {
+                        throw new DomainException('The original applicant, HR recorder, consent record, and payload are required to replay this assisted submission.');
+                    }
+                } elseif ($actorUserId !== $requesterUserId) {
+                    throw new DomainException('The submission key belongs to a different recording path.');
+                }
 
                 return $this->submissionResult($existing, true);
             }
@@ -150,6 +194,9 @@ class LeaveRequestWorkflowService
             $linkedApplicant = DB::table('employees')->where('id', $employeeId)->where('user_id', $requesterUserId)->exists();
             if (! $linkedApplicant) {
                 throw new DomainException('The annual account must belong to the linked leave applicant.');
+            }
+            if ($onBehalf !== null) {
+                $this->assertAuthorizedHrRecorder($actorUserId);
             }
             $route = $this->assignments->resolveForEmployee($requesterUserId, $employeeId, count($slots), $slots);
             $firstStep = $route[0];
@@ -170,6 +217,20 @@ class LeaveRequestWorkflowService
                 'updated_at' => now(),
             ]);
 
+            if ($onBehalf !== null) {
+                DB::table('leave_request_on_behalf_submissions')->insert([
+                    'request_id' => $requestId,
+                    'applicant_user_id' => $requesterUserId,
+                    'hr_actor_user_id' => $actorUserId,
+                    'recording_reason' => $onBehalf['recording_reason'],
+                    'consent_evidence_reference' => $onBehalf['consent_evidence_reference'],
+                    'staff_confirmed_at' => $onBehalf['staff_confirmed_at'],
+                    'operation_key' => $submissionKey,
+                    'payload_hash' => $payloadHash,
+                    'created_at' => now(),
+                ]);
+            }
+
             $reservation = $this->balances->reserve(
                 $actorUserId,
                 $requestKey,
@@ -178,6 +239,12 @@ class LeaveRequestWorkflowService
                 $tabungAccountId,
                 $slots,
                 $reserveKey,
+                $onBehalf === null ? null : [
+                    'request_id' => $requestId,
+                    'applicant_user_id' => $requesterUserId,
+                    'submission_key' => $submissionKey,
+                    'payload_hash' => $payloadHash,
+                ],
             );
             $revisionId = DB::table('leave_request_revisions')->insertGetId([
                 'request_id' => $requestId,
@@ -188,9 +255,9 @@ class LeaveRequestWorkflowService
                 'reservation_id' => $reservation['reservation_id'],
                 'created_by' => $actorUserId,
                 'created_at' => now(),
-                'is_short_notice_emergency' => $notice['short_notice'],
-                'notice_working_days_min' => $notice['min_days'],
-                'notice_working_days_max' => $notice['max_days'],
+                'is_short_notice_emergency' => $notice['short_notice'] ?? false,
+                'notice_working_days_min' => $notice['min_days'] ?? null,
+                'notice_working_days_max' => $notice['max_days'] ?? null,
             ]);
             DB::table('leave_request_days')->insert(array_map(fn (array $slot): array => [
                 'revision_id' => $revisionId,
@@ -210,7 +277,7 @@ class LeaveRequestWorkflowService
                 'created_at' => now(),
             ], $route));
 
-            $this->audit('hr.leave.request_submitted', $requestId, $actorUserId, $submissionKey);
+            $this->audit($onBehalf === null ? 'hr.leave.request_submitted' : 'hr.leave.request_submitted_on_behalf', $requestId, $actorUserId, $submissionKey);
 
             return [
                 'request_id' => $requestId,
@@ -265,7 +332,7 @@ class LeaveRequestWorkflowService
             $steps = DB::table('leave_approval_steps')->where('revision_id', $revision->id)->orderBy('step_order')->get();
             $route = $this->routeFromRows($steps);
             $unitSupportStep = $steps->firstWhere('stage_code', 'UNIT_MANAGER_SUPPORT');
-            if ($unitSupportStep !== null) {
+            if ($unitSupportStep !== null && (int) $request->current_step_order === (int) $unitSupportStep->step_order) {
                 $today = now('Asia/Kuala_Lumpur')->toDateString();
                 $currentUnits = DB::table('employee_assignments')->where('employee_id', $employee->id)
                     ->where('effective_from', '<=', $today)
@@ -273,7 +340,7 @@ class LeaveRequestWorkflowService
                     ->lockForUpdate()->get(['unit_id']);
                 if ($currentUnits->count() !== 1 || $currentUnits[0]->unit_id === null
                     || (int) $currentUnits[0]->unit_id !== (int) $unitSupportStep->unit_id) {
-                    throw new DomainException('CT-DEC-032 is unresolved; a pending request cannot use an old or inferred unit route after transfer.');
+                    throw new DomainException('CT-DEC-032 requires reassignment of unsupported future leave after effective transfer; the immutable step reassignment transaction is not yet integrated.');
                 }
             }
             $currentStep = $steps->firstWhere('step_order', (int) $request->current_step_order);
@@ -281,22 +348,28 @@ class LeaveRequestWorkflowService
                 throw new RuntimeException('The current approval step is missing.');
             }
             $this->assertPersistedAssignee($currentStep, $actorId, (int) $request->requester_user_id);
-            $dates = DB::table('leave_request_days')->where('revision_id', $revision->id)->orderBy('leave_date')->pluck('leave_date')->all();
-            $today = now('Asia/Kuala_Lumpur')->toDateString();
-            if ($request->leave_type === 'EL' && $decision === 'REJECT'
-                && collect($dates)->contains(fn (string $date): bool => $date < $today)) {
-                throw new DomainException('CT-DEC-029 leaves attendance, balance and payroll outcomes of a rejected retrospective EL to HR.');
-            }
-            if ($dates === [] || collect($dates)->contains(fn (string $date): bool => $date <= $today)) {
-                throw new DomainException('CT-DEC-046 is unresolved; a pending leave request cannot be acted on after a requested date starts.');
-            }
             $plan = $this->transitions->plan($route, (int) $request->current_step_order, $decision, $reason);
             $payloadHash = $this->actionPayloadHash($requestId, (int) $revision->id, $currentStep, $actorId, $decision, $reason);
 
+            $reviewCode = null;
             if ($plan['terminal'] && $decision === 'APPROVE') {
                 $this->balances->commitUsage($actorId, (int) $revision->reservation_id, (int) $currentStep->assignment_id, $operationKey.':c');
             } elseif ($plan['terminal'] && $decision === 'REJECT') {
-                $this->balances->release($actorId, (int) $revision->reservation_id, 'FINAL_REJECTION', $operationKey.':r', (int) $currentStep->assignment_id);
+                $dates = DB::table('leave_request_days')->where('revision_id', $revision->id)->orderBy('leave_date')->pluck('leave_date')->all();
+                $today = now('Asia/Kuala_Lumpur')->toDateString();
+                $hasStarted = collect($dates)->contains(fn (string $date): bool => $date <= $today);
+                if ($request->leave_type === 'EL') {
+                    if ($dates === [] || collect($dates)->contains(fn (string $date): bool => $date >= $today)) {
+                        throw new DomainException('Final rejection of current-day EL requires HR confirmation of actual absence.');
+                    }
+                    $this->balances->debitRetrospectiveElRejection($actorId, (int) $revision->reservation_id, (int) $currentStep->assignment_id, $operationKey.':e');
+                    $reviewCode = 'RETROSPECTIVE_EL_REJECTION';
+                } else {
+                    $this->balances->release($actorId, (int) $revision->reservation_id, 'FINAL_REJECTION', $operationKey.':r', (int) $currentStep->assignment_id);
+                    if ($hasStarted) {
+                        $reviewCode = 'LATE_AL_REJECTION';
+                    }
+                }
             } elseif ($plan['terminal'] && $decision === 'RETURN_FOR_CORRECTION') {
                 if ($request->leave_type !== 'AL') {
                     throw new DomainException('Only Annual Leave correction is included in this internal workflow slice.');
@@ -321,7 +394,19 @@ class LeaveRequestWorkflowService
                 'current_step_order' => $plan['next_step_order'],
                 'updated_at' => now(),
             ];
+            if ($reviewCode !== null) {
+                $update['attendance_review_required'] = true;
+            }
             DB::table('leave_requests')->where('id', $requestId)->update($update);
+            if ($reviewCode !== null) {
+                DB::table('leave_attendance_reviews')->insert([
+                    'revision_id' => $revision->id,
+                    'workflow_action_id' => $actionId,
+                    'review_code' => $reviewCode,
+                    'opened_by' => $actorId,
+                    'opened_at' => now(),
+                ]);
+            }
             $this->audit('hr.leave.request_action_taken', $requestId, $actorId, $operationKey);
 
             return [
@@ -1277,6 +1362,39 @@ class LeaveRequestWorkflowService
         $trimmed = trim($reason);
 
         return $trimmed === '' ? null : $trimmed;
+    }
+
+    private function parseConsentConfirmationTimestamp(string $timestamp): string
+    {
+        if (preg_match('/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})\z/D', $timestamp) !== 1) {
+            throw new DomainException('Staff confirmation must have an explicit ISO-8601 timezone and seconds.');
+        }
+        $canonical = str_ends_with($timestamp, 'Z') ? substr($timestamp, 0, -1).'+00:00' : $timestamp;
+        $confirmed = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:sP', $canonical);
+        $errors = DateTimeImmutable::getLastErrors();
+        if ($confirmed === false || ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))
+            || $confirmed->format('Y-m-d\TH:i:sP') !== $canonical) {
+            throw new DomainException('Staff confirmation must be a valid ISO-8601 timestamp.');
+        }
+        if ($confirmed > now('Asia/Kuala_Lumpur')->toDateTimeImmutable()) {
+            throw new DomainException('Staff confirmation must predate the assisted submission.');
+        }
+
+        return $confirmed->setTimezone(new DateTimeZone('Asia/Kuala_Lumpur'))->format('Y-m-d H:i:s');
+    }
+
+    private function assertAuthorizedHrRecorder(int $actorId): void
+    {
+        if (! DB::table('permissions')->where('name', 'leave.request.record-on-behalf')->where('guard_name', 'web')->exists()) {
+            throw new DomainException('The local-only HR-assisted submission permission is not configured.');
+        }
+        $lockedActor = DB::table('users')->where('id', $actorId)->lockForUpdate()->first(['status', 'username']);
+        $actor = User::query()->find($actorId);
+        if ($lockedActor === null || $lockedActor->status !== 'ACTIVE' || $lockedActor->username === null
+            || $actor === null || $actor->status !== 'ACTIVE' || $actor->username === null
+            || ! $actor->hasPermissionTo('leave.request.record-on-behalf', 'web')) {
+            throw new DomainException('An active account with explicit HR-assisted submission authority is required.');
+        }
     }
 
     /** @param array<string, mixed> $payload */

@@ -117,7 +117,7 @@ class AnnualEntitlementCreditServiceTest extends TestCase
         $this->assertSame(0, DB::table('leave_ledger_entries')->where('annual_account_id', $fixture['annual_id'])->count());
     }
 
-    public function test_future_year_reservation_waits_for_the_actual_january_credit(): void
+    public function test_future_year_reservation_requires_confirmed_entitlement_and_uses_it_before_credit(): void
     {
         Carbon::setTestNow('2026-12-15T09:00:00+08:00');
         $fixture = $this->fixture('future', 2027);
@@ -183,45 +183,34 @@ class AnnualEntitlementCreditServiceTest extends TestCase
             'SYNTHETIC-FUTURE-ENTITLEMENT-'.$fixture['suffix'],
             'future-confirm-'.$fixture['suffix'],
         );
-        $this->assertSame(10, $confirmation['confirmed_half_day_units']);
-        $this->assertDomainException(fn () => $balances->reserve(
-            $fixture['employee_user']->id,
-            'future-request-before-credit-'.$fixture['suffix'],
-            1,
-            $fixture['annual_id'],
-            $fixture['tabung_id'],
-            $slots,
-            'future-reserve-before-credit-'.$fixture['suffix'],
-        ));
-        $this->assertSame(0, DB::table('leave_reservations')->count());
-        $this->assertSame(0, DB::table('leave_balance_operations')->where('operation_type', 'RESERVE')->count());
-
-        Carbon::setTestNow('2027-01-01T00:00:00+08:00');
-        $entitlements->creditConfirmedEntitlementOnJanuaryFirst($hrActor->id, $confirmation['confirmation_id']);
         $reservation = $balances->reserve(
             $fixture['employee_user']->id,
-            'future-request-after-credit-'.$fixture['suffix'],
+            'future-request-'.$fixture['suffix'],
             1,
             $fixture['annual_id'],
             $fixture['tabung_id'],
             $slots,
-            'future-reserve-after-credit-'.$fixture['suffix'],
+            'future-reserve-'.$fixture['suffix'],
         );
         $replay = $balances->reserve(
             $fixture['employee_user']->id,
-            'future-request-after-credit-'.$fixture['suffix'],
+            'future-request-'.$fixture['suffix'],
             1,
             $fixture['annual_id'],
             $fixture['tabung_id'],
             $slots,
-            'future-reserve-after-credit-'.$fixture['suffix'],
+            'future-reserve-'.$fixture['suffix'],
         );
 
+        $this->assertSame(10, $confirmation['confirmed_half_day_units']);
         $this->assertSame(2, $reservation['annual_units']);
         $this->assertSame(0, $reservation['tabung_units']);
         $this->assertSame($reservation, $replay);
         $this->assertSame(1, DB::table('leave_reservations')->where('id', $reservation['reservation_id'])->count());
-        $this->assertSame(1, DB::table('leave_ledger_entries')->where('annual_account_id', $fixture['annual_id'])->where('kind', 'annual_entitlement_credit')->count());
+        $this->assertSame(0, DB::table('leave_ledger_entries')->where('annual_account_id', $fixture['annual_id'])->count());
+
+        Carbon::setTestNow('2027-01-01T00:00:00+08:00');
+        $entitlements->creditConfirmedEntitlementOnJanuaryFirst($hrActor->id, $confirmation['confirmation_id']);
         $afterCreditSlots = [];
         foreach (['2027-01-05', '2027-01-06', '2027-01-07', '2027-01-08'] as $date) {
             $afterCreditSlots[] = ['date' => $date, 'session' => 'AM'];
@@ -230,12 +219,12 @@ class AnnualEntitlementCreditServiceTest extends TestCase
         $afterCreditSlots[] = ['date' => '2027-01-11', 'session' => 'AM'];
         $afterCreditReservation = $balances->reserve(
             $fixture['employee_user']->id,
-            'future-request-later-after-credit-'.$fixture['suffix'],
+            'future-request-after-credit-'.$fixture['suffix'],
             1,
             $fixture['annual_id'],
             $fixture['tabung_id'],
             $afterCreditSlots,
-            'future-reserve-later-after-credit-'.$fixture['suffix'],
+            'future-reserve-after-credit-'.$fixture['suffix'],
         );
 
         $this->assertSame(8, $afterCreditReservation['annual_units']);

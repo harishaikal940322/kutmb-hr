@@ -8,11 +8,22 @@ use PHPUnit\Framework\TestCase;
 
 class LeaveWorkflowTransitionPlannerTest extends TestCase
 {
-    public function test_not_support_is_held_until_ct_dec_008_hr_decision(): void
+    public function test_unit_manager_non_support_forwards_with_reason_and_does_not_reject(): void
     {
-        $planner = new LeaveWorkflowTransitionPlanner;
-        $this->assertThrows(fn () => $planner->plan($this->route(10), 1, 'NOT_SUPPORT', 'Synthetic operational reason'));
-        $this->assertThrows(fn () => $planner->plan($this->route(11), 2, 'NOT_SUPPORT', 'Synthetic recommendation'));
+        $result = (new LeaveWorkflowTransitionPlanner)->plan($this->route(10), 1, 'NOT_SUPPORT', 'Synthetic operational reason');
+
+        $this->assertSame('WAITING_GENERAL_MANAGER_FINAL', $result['request_status']);
+        $this->assertSame(2, $result['next_step_order']);
+        $this->assertFalse($result['terminal']);
+    }
+
+    public function test_general_manager_non_support_on_long_request_forwards_to_secretary(): void
+    {
+        $result = (new LeaveWorkflowTransitionPlanner)->plan($this->route(11), 2, 'NOT_SUPPORT', 'Synthetic recommendation');
+
+        $this->assertSame('WAITING_SECRETARY_FINAL', $result['request_status']);
+        $this->assertSame(3, $result['next_step_order']);
+        $this->assertFalse($result['terminal']);
     }
 
     public function test_every_planned_stage_maps_to_its_persisted_waiting_status(): void
