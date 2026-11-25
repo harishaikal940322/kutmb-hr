@@ -1,3 +1,9 @@
+## 25 November 2026 — post-P03 targeted blocker reconciliation
+
+- Remote main verified at 376e2c25; latest local report/record: 23 focused tests, 334 assertions, three empty ledger tables. No CT-P03–09 completion claimed. Reopened current 56-issue DOCX (f396cdd53480caff34cb0fe0225c44729ad31ab0) and recorded section 8B of existing technical plan: separate already documented AL/Tabung/pending/posting/cap/prorata rules from actual unresolved service-band edges, mappings, partial-month/tie rules, Dec 25 boundary, post-close basis and formal authority.
+- Local Codex should reassess safe unexposed same-year synthetic transaction/invariant work with explicit fixture entitlement amounts, resolve technical impact/snapshot/history design without weakening current guards, and keep P04/P05 integrated. Only implement if prerequisites can actually be satisfied; no request storage before guard replacement/review, no unapproved actual rates, operational posting/route, shared grants or production activation. Do not substitute speculative policy for HR decisions. If still blocked, consolidate exact residual questions; continue independent work where safe.
+- Remote documentation only. No new runtime verification, schema or implementation changes; no formal HR sign-off or release.
+
 ## 25 November 2026 — CT-P02/P03 regression and dependency gate
 
 - Ran all `tests/Feature/Leave` cases plus the two leave arithmetic/calendar unit files on the existing local database with rollback-isolated feature tests: **23 tests, 334 assertions passed**. Afterwards, `kutmb_hr_dev` still had zero rows in all three ledger tables; all three append-only/reversal triggers were present. This is focused P02/P03 evidence, not the full suite or P09 acceptance.
