@@ -139,3 +139,5 @@ No application features were implemented as part of the initial documentation ba
 - 2026-11-25: Added internal pure P04/P05 approval-route and transition planners from the detailed CT-DEC-001/007/008/019/050 answers; no request storage, routes, UI or workflow activation. See CURRENT_HANDOFF.
 
 - 2026-11-25: Correct latest CT-DEC interpretations using current written HR answers; restore internal workflow and consent/pre-credit reservation contracts (f54b2396), preserve transaction safeguards, and prioritize a usable same-year AL vertical slice. Remote source correction; revised tests not run, no production activation.
+
+- 2026-11-25: Integrate accepted Cuti Tahunan design directly into existing local admin dashboard, use system layout and responsive submodule navigation, retain clear synthetic-only review boundary. No functional leave endpoint or permission grant. Local verification pending.

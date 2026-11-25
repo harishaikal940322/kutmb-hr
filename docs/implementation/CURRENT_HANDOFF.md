@@ -1,3 +1,9 @@
+## 25 November 2026 — Cuti Tahunan integrated into main dashboard (UI-only)
+
+- Requestor authorized the accepted Cuti Tahunan UI/UX directly on the main dashboard. Reused the frozen Vue design in the existing system layout, removed the former preview entry button/full-screen overlay, and consolidated desktop/mobile submodule navigation into one responsive content-area nav. Kept all accepted design screens and explicit simulation-role controls for authorized design review, with a prominent synthetic-data/no-write notice; fixed half-day end-date control.
+- Dashboard returns a server-computed design-review capability only for local/testing authenticated active protected accounts with existing iam.rbac.manage. Other accounts and production retain the existing account dashboard. No new permissions, grants, data, migration, mutation route or workflow exposure. This is not a live role-based HR dashboard; actual staff data and authenticated submission/approval integration remain pending.
+- Direct remote source change authorized by requestor; local checkout unavailable, so no local build, browser, PHP lint or MySQL feature tests run. Added focused rollback-only dashboard capability coverage. Verify local before further integration. Prior implementation/test evidence unchanged.
+
 ## 25 November 2026 — corrective source update / vertical delivery (latest)
 
 - Requestor directed the assistant to fix the regressions and push directly to Git. Actual written HR answer fields (not historical choice letters) were reopened and compared with 90396d6. Previous top entry and plan §8M contain incorrect interpretations; see authoritative correction in plan §8N. Source commit f54b2396efa9bfa2564d108f2141d9e883abd738; retain prior test results only as historical evidence.

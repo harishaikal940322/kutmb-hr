@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, defineComponent, h, ref, watch, type Component } from 'vue';
 import {
-    ArrowLeft,
     ArrowRight,
     Bell,
     CalendarDays,
@@ -50,7 +49,6 @@ type Screen =
     | 'notifications'
     | 'coverage';
 
-const emit = defineEmits<{ close: [] }>();
 const role = ref<Role>('Staf');
 const screen = ref<Screen>('overview');
 const selectedRequest = ref('AL-2026-052');
@@ -1047,20 +1045,12 @@ const CalendarRow = defineComponent({
 
 <template>
     <div
-        class="fixed inset-0 z-50 flex min-h-0 flex-col bg-background text-foreground"
+        class="mx-auto flex w-full min-w-0 max-w-7xl flex-col bg-background text-foreground"
     >
         <header
-            class="z-10 flex min-h-16 items-center justify-between gap-4 border-b border-border bg-card px-4 sm:px-6"
+            class="flex flex-col gap-3 border-b border-border bg-card px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"
         >
             <div class="flex min-w-0 items-center gap-3">
-                <button
-                    type="button"
-                    class="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label="Kembali ke papan pemuka sistem"
-                    @click="emit('close')"
-                >
-                    <ArrowLeft class="size-4" aria-hidden="true" />
-                </button>
                 <div class="min-w-0">
                     <p
                         class="truncate text-xs font-semibold tracking-[0.12em] text-primary uppercase"
@@ -1068,15 +1058,15 @@ const CalendarRow = defineComponent({
                         KUTMB · MOD-005
                     </p>
                     <p class="truncate text-sm font-semibold">
-                        Ruang UI/UX Cuti Tahunan
+                        Cuti Tahunan
                     </p>
                 </div>
             </div>
-            <div class="flex shrink-0 items-center gap-3">
+            <div class="flex min-w-0 flex-wrap items-center gap-3">
                 <label
                     for="preview-role"
-                    class="hidden text-xs font-medium text-muted-foreground sm:block"
-                    >Pratonton peranan</label
+                    class="text-xs font-medium text-muted-foreground"
+                    >Simulasi peranan</label
                 >
                 <select
                     id="preview-role"
@@ -1101,76 +1091,38 @@ const CalendarRow = defineComponent({
                 ><Info class="size-3.5" aria-hidden="true" />REKA BENTUK
                 SAHAJA</span
             >
-            Paparan peranan ini bukan kebenaran akaun. Semua rekod contoh adalah
-            sintetik; tiada data dihantar, disimpan, diluluskan atau dilaras.
+            Semakan reka bentuk admin dalam persekitaran pembangunan sahaja.
+            Simulasi peranan bukan kebenaran akaun. Semua rekod dan baki adalah
+            contoh sintetik; tiada permohonan, kelulusan atau pelarasan sebenar.
         </div>
 
-        <div class="flex min-h-0 flex-1">
-            <aside
-                class="hidden w-64 shrink-0 flex-col border-r border-border bg-card lg:flex"
+        <nav
+            class="flex flex-wrap gap-1.5 border-b border-border bg-card px-4 py-3 sm:px-6"
+            aria-label="Submodul Cuti Tahunan (simulasi)"
+        >
+            <button
+                v-for="item in visibleNav"
+                :key="item"
+                type="button"
+                class="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+                :class="
+                    screen === item
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                "
+                :aria-current="screen === item ? 'page' : undefined"
+                @click="navigate(item)"
             >
-                <div class="border-b border-border px-5 py-5">
-                    <p
-                        class="text-xs font-semibold tracking-[0.13em] text-muted-foreground uppercase"
-                    >
-                        {{ role }}
-                    </p>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                        {{
-                            role === 'Setiausaha ALK'
-                                ? 'Ruang keputusan akhir'
-                                : role === 'Pentadbir IT'
-                                  ? 'Sempadan teknikal'
-                                  : 'Pengurusan cuti'
-                        }}
-                    </p>
-                </div>
-                <nav
-                    class="flex-1 space-y-1 overflow-y-auto p-3"
-                    aria-label="Navigasi pratonton Cuti Tahunan"
-                >
-                    <button
-                        v-for="item in visibleNav"
-                        :key="item"
-                        type="button"
-                        class="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
-                        :class="
-                            screen === item
-                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                        "
-                        :aria-current="screen === item ? 'page' : undefined"
-                        @click="navigate(item)"
-                    >
-                        <component
-                            :is="icons[item] ?? FileText"
-                            class="size-4 shrink-0"
-                            aria-hidden="true"
-                        />
-                        <span class="truncate">{{ screens[item].label }}</span>
-                        <span
-                            v-if="item === 'approvals' && isApprover"
-                            class="ml-auto rounded-full bg-background/20 px-2 py-0.5 text-[10px]"
-                            >{{ role === 'Setiausaha ALK' ? '2' : '3' }}</span
-                        >
-                    </button>
-                </nav>
-                <div class="border-t border-border p-4">
-                    <button
-                        type="button"
-                        class="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-                        @click="emit('close')"
-                    >
-                        <ArrowLeft class="size-4" aria-hidden="true" /> Kembali
-                        ke Papan Pemuka
-                    </button>
-                </div>
-            </aside>
+                <component
+                    :is="icons[item] ?? FileText"
+                    class="size-4 shrink-0"
+                    aria-hidden="true"
+                />
+                <span>{{ screens[item].label }}</span>
+            </button>
+        </nav>
 
-            <main
-                class="min-w-0 flex-1 overflow-y-auto"
-                aria-labelledby="page-heading"
-            >
+        <section class="min-w-0" aria-labelledby="page-heading">
                 <div
                     class="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
                 >
@@ -1190,7 +1142,7 @@ const CalendarRow = defineComponent({
                                 {{
                                     screen === 'overview'
                                         ? role === 'Staf'
-                                            ? 'Selamat pagi, Nadia'
+                                            ? 'Ringkasan Cuti Tahunan'
                                             : role === 'HR'
                                               ? 'Ringkasan pengurusan cuti'
                                               : role === 'Setiausaha ALK'
@@ -1749,7 +1701,8 @@ const CalendarRow = defineComponent({
                                                 v-model="endDate"
                                                 type="date"
                                                 :min="startDate"
-                                                class="block h-11 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                                                :disabled="leaveLength === 'Separuh hari'"
+                                                class="block h-11 w-full rounded-lg border border-input bg-background px-3 text-sm disabled:opacity-60"
                                         /></label>
                                     </div>
                                     <div class="grid gap-3 sm:grid-cols-2">
@@ -3631,34 +3584,7 @@ const CalendarRow = defineComponent({
                         tiada sambungan backend, API atau pangkalan data.
                     </footer>
                 </div>
-            </main>
-        </div>
-
-        <nav
-            class="flex shrink-0 items-center gap-1 overflow-x-auto border-t border-border bg-card px-2 py-2 lg:hidden"
-            aria-label="Navigasi pratonton mudah alih"
-        >
-            <button
-                v-for="item in visibleNav"
-                :key="item"
-                type="button"
-                class="flex min-w-20 flex-col items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-medium"
-                :class="
-                    screen === item
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground'
-                "
-                @click="navigate(item)"
-            >
-                <component
-                    :is="icons[item] ?? FileText"
-                    class="size-4"
-                    aria-hidden="true"
-                /><span class="max-w-20 truncate">{{
-                    screens[item].label
-                }}</span>
-            </button>
-        </nav>
+        </section>
 
         <Transition
             enter-active-class="transition duration-200 motion-reduce:transition-none"

@@ -10,6 +10,10 @@
 
 Open [MOD-005 Annual Leave UI/UX prototype v0.3](MOD-005_Annual_Leave_UI_UX_Prototype_v0.3.html) for the standalone design index. In the main system, **Papan Pemuka → Pratonton UI/UX Cuti Tahunan** opens the Vue review surface. Its role selector and navigation are review controls only; the main system menu will be organized after this design review.
 
+## 25 November 2026 — integrated dashboard design surface
+
+The requestor authorized integrating the accepted UI directly into the existing Papan Pemuka. The authenticated system admin with `iam.rbac.manage` in local/testing opens the Cuti Tahunan design surface directly at /dashboard, without the former preview button or full-screen overlay. Existing system sidebar/header and profile links remain; the module uses compact responsive content-area navigation. The server supplies a Boolean design-review capability; no new permissions or grants. Other accounts and production retain the normal account dashboard. The simulation role selector is explicitly labelled and available only inside this authorized design review; it never represents the actual account's HR authorization. All example balances, dates, records, and actions remain synthetic and non-persistent. No real submission/decision routes, API, ledger writes or notifications are added by this UI integration. Functional role-scoped dashboard and AL transaction integration remain separate next work. Source review only, browser/build/feature tests not yet run remotely.
+
 ## SRS coverage map
 
 | Prototype view | SRS coverage | Main design content |
