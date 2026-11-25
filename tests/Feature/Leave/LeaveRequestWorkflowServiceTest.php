@@ -59,6 +59,107 @@ class LeaveRequestWorkflowServiceTest extends TestCase
         $this->assertNotSame($approvers['secretary']->id, $approvers['pb']->id);
     }
 
+    public function test_hr_assisted_submission_keeps_employee_as_applicant_and_records_hr_actor_and_confirmation(): void
+    {
+        $fixture = $this->fixture('assisted');
+        $approvers = $this->staffApprovers($fixture);
+        $hrActor = $this->user('hr-recorder');
+        $hrActor->givePermissionTo('leave.request.record-on-behalf');
+        $service = app(LeaveRequestWorkflowService::class);
+        $submissionKey = 'assisted-'.$fixture['suffix'];
+        $confirmedAt = '2026-03-02T08:45:00+08:00';
+        $slots = [['date' => '2026-03-06', 'session' => 'AM']];
+
+        $submitted = $service->submitOnBehalf(
+            $hrActor->id,
+            $fixture['user']->id,
+            $fixture['annual_id'],
+            $fixture['tabung_id'],
+            $submissionKey,
+            'AL',
+            $slots,
+            'Synthetic leave reason',
+            'Synthetic HR assistance reason',
+            'SYNTHETIC-CONSENT-'.$fixture['suffix'],
+            $confirmedAt,
+        );
+        $replay = $service->submitOnBehalf(
+            $hrActor->id,
+            $fixture['user']->id,
+            $fixture['annual_id'],
+            $fixture['tabung_id'],
+            $submissionKey,
+            'AL',
+            $slots,
+            'Synthetic leave reason',
+            'Synthetic HR assistance reason',
+            'SYNTHETIC-CONSENT-'.$fixture['suffix'],
+            $confirmedAt,
+        );
+
+        $request = DB::table('leave_requests')->where('id', $submitted['request_id'])->sole();
+        $revision = DB::table('leave_request_revisions')->where('request_id', $submitted['request_id'])->sole();
+        $consent = DB::table('leave_request_on_behalf_submissions')->where('request_id', $submitted['request_id'])->sole();
+        $reservation = DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->sole();
+
+        $this->assertSame($fixture['user']->id, (int) $request->requester_user_id);
+        $this->assertSame($fixture['employee_id'], (int) $request->employee_id);
+        $this->assertSame($hrActor->id, (int) $revision->created_by);
+        $this->assertSame($hrActor->id, (int) $consent->hr_actor_user_id);
+        $this->assertSame($fixture['user']->id, (int) $consent->applicant_user_id);
+        $this->assertSame($hrActor->id, (int) $reservation->created_by);
+        $this->assertSame($submissionKey, $consent->operation_key);
+        $this->assertSame(1, DB::table('leave_request_on_behalf_submissions')->where('request_id', $submitted['request_id'])->count());
+        $this->assertSame(1, DB::table('leave_balance_operations')->where('actor_id', $hrActor->id)->where('operation_type', 'RESERVE')->count());
+        $this->assertSame(1, DB::table('audit_events')->where('actor_id', $hrActor->id)
+            ->where('action_code', 'hr.leave.request_submitted_on_behalf')->where('target_ref', 'leave_request:'.$submitted['request_id'])->count());
+        $this->assertSame($submitted['request_id'], $replay['request_id']);
+        $this->assertTrue($replay['replayed']);
+        $this->assertDomainException(fn () => $service->submitOnBehalf(
+            $hrActor->id,
+            $fixture['user']->id,
+            $fixture['annual_id'],
+            $fixture['tabung_id'],
+            $submissionKey,
+            'AL',
+            $slots,
+            'Synthetic leave reason',
+            'Synthetic HR assistance reason',
+            'SYNTHETIC-DIFFERENT-CONSENT-'.$fixture['suffix'],
+            $confirmedAt,
+        ));
+        $this->assertNotSame($approvers['pu']->id, $hrActor->id);
+    }
+
+    public function test_hr_assisted_submission_fails_closed_without_permission_or_prior_confirmation(): void
+    {
+        $fixture = $this->fixture('assisteddeny');
+        $hrActor = $this->user('hr-unprivileged');
+        $service = app(LeaveRequestWorkflowService::class);
+        $slots = [['date' => '2026-03-06', 'session' => 'AM']];
+        $args = [
+            $hrActor->id,
+            $fixture['user']->id,
+            $fixture['annual_id'],
+            $fixture['tabung_id'],
+            'assisted-deny-'.$fixture['suffix'],
+            'AL',
+            $slots,
+            'Synthetic leave reason',
+            'Synthetic assistance reason',
+            'SYNTHETIC-CONSENT-'.$fixture['suffix'],
+        ];
+
+        $this->assertDomainException(fn () => $service->submitOnBehalf(...[...$args, '2026-03-02T08:45:00+08:00']));
+        $hrActor->givePermissionTo('leave.request.record-on-behalf');
+        $this->assertDomainException(fn () => $service->submitOnBehalf(...[...$args, '2026-03-02T09:01:00+08:00']));
+        $this->assertDomainException(fn () => $service->submitOnBehalf(...[...$args, '2026-03-02 08:45:00']));
+
+        $this->assertSame(0, DB::table('leave_requests')->count());
+        $this->assertSame(0, DB::table('leave_request_on_behalf_submissions')->count());
+        $this->assertSame(0, DB::table('leave_reservations')->count());
+    }
+
     public function test_support_and_not_support_forward_without_releasing_the_pending_hold(): void
     {
         $fixture = $this->fixture('forward');

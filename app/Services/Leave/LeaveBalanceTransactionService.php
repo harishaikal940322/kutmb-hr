@@ -3,6 +3,7 @@
 namespace App\Services\Leave;
 
 use App\Models\AuditEvent;
+use App\Models\User;
 use DateTimeImmutable;
 use DateTimeZone;
 use DomainException;
@@ -24,9 +25,10 @@ class LeaveBalanceTransactionService
     ) {}
 
     /** @param list<array{date:string,session:string}> $requestedSlots
+     * @param  null|array{request_id:int,applicant_user_id:int,submission_key:string,payload_hash:string}  $onBehalfSubmission
      * @return array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int}
      */
-    public function reserve(int $actorId, string $requestKey, int $revision, int $annualAccountId, int $tabungAccountId, array $requestedSlots, string $operationKey): array
+    public function reserve(int $actorId, string $requestKey, int $revision, int $annualAccountId, int $tabungAccountId, array $requestedSlots, string $operationKey, ?array $onBehalfSubmission = null): array
     {
         $this->assertLocal();
         $this->validateKeys($requestKey, $operationKey);
@@ -37,7 +39,7 @@ class LeaveBalanceTransactionService
         $requestedUnits = count($slots);
 
         /** @var array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int} $result */
-        $result = DB::transaction(function () use ($actorId, $requestKey, $revision, $annualAccountId, $tabungAccountId, $requestedUnits, $slots, $operationKey): array {
+        $result = DB::transaction(function () use ($actorId, $requestKey, $revision, $annualAccountId, $tabungAccountId, $requestedUnits, $slots, $operationKey, $onBehalfSubmission): array {
             $this->lockRequestImpactGuards();
             $annualCandidate = DB::table('leave_annual_accounts')->where('id', $annualAccountId)->first(['employee_id']);
             if ($annualCandidate === null) {
@@ -51,8 +53,24 @@ class LeaveBalanceTransactionService
                 throw new DomainException('Annual and Tabung accounts must exist and belong to the same employee.');
             }
             $this->assertActiveActor($actorId);
-            if ((int) $employee->user_id !== $actorId) {
-                throw new DomainException('Only the linked active employee can reserve leave for themselves.');
+            if ((int) $employee->user_id === $actorId) {
+                if ($onBehalfSubmission !== null) {
+                    throw new DomainException('An employee self-submission cannot include an HR-assisted consent record.');
+                }
+            } else {
+                $this->assertAuthorizedHrRecorder($actorId);
+                if ($onBehalfSubmission === null || (int) $onBehalfSubmission['applicant_user_id'] !== (int) $employee->user_id) {
+                    throw new DomainException('Only the linked applicant or an explicitly authorized HR recorder with recorded staff confirmation can reserve leave.');
+                }
+                $request = DB::table('leave_requests')->where('id', $onBehalfSubmission['request_id'])
+                    ->where('request_key', $requestKey)->where('requester_user_id', $onBehalfSubmission['applicant_user_id'])->first();
+                $consent = DB::table('leave_request_on_behalf_submissions')->where('request_id', $onBehalfSubmission['request_id'])
+                    ->where('applicant_user_id', $onBehalfSubmission['applicant_user_id'])->where('hr_actor_user_id', $actorId)
+                    ->where('operation_key', $onBehalfSubmission['submission_key'])->first();
+                if ($request === null || $consent === null || ! hash_equals($request->payload_hash, $onBehalfSubmission['payload_hash'])
+                    || ! hash_equals($consent->payload_hash, $onBehalfSubmission['payload_hash'])) {
+                    throw new DomainException('A matching immutable applicant consent record is required before creating the balance reservation.');
+                }
             }
             if (count(array_filter($slots, fn (array $slot): bool => (int) substr($slot['date'], 0, 4) !== (int) $annual->leave_year)) > 0) {
                 throw new DomainException('This transaction slice accepts dates from one calendar year matching the Annual Leave account.');
@@ -62,6 +80,12 @@ class LeaveBalanceTransactionService
                 'actor_id' => $actorId,
                 'annual_account_id' => $annualAccountId,
                 'employee_id' => (int) $employee->id,
+                'on_behalf_submission' => $onBehalfSubmission === null ? null : [
+                    'applicant_user_id' => $onBehalfSubmission['applicant_user_id'],
+                    'payload_hash' => $onBehalfSubmission['payload_hash'],
+                    'request_id' => $onBehalfSubmission['request_id'],
+                    'submission_key' => $onBehalfSubmission['submission_key'],
+                ],
                 'request_key' => $requestKey,
                 'requested_slots' => $slots,
                 'revision' => $revision,
@@ -743,6 +767,20 @@ class LeaveBalanceTransactionService
         $actor = DB::table('users')->where('id', $actorId)->first(['status', 'username']);
         if ($actor === null || $actor->status !== 'ACTIVE' || $actor->username === null) {
             throw new DomainException('An active account is required for leave balance operations.');
+        }
+    }
+
+    private function assertAuthorizedHrRecorder(int $actorId): void
+    {
+        if (! DB::table('permissions')->where('name', 'leave.request.record-on-behalf')->where('guard_name', 'web')->exists()) {
+            throw new DomainException('The local-only HR-assisted submission permission is not configured.');
+        }
+        $lockedActor = DB::table('users')->where('id', $actorId)->lockForUpdate()->first(['status', 'username']);
+        $actor = User::query()->find($actorId);
+        if ($lockedActor === null || $lockedActor->status !== 'ACTIVE' || $lockedActor->username === null
+            || $actor === null || $actor->status !== 'ACTIVE' || $actor->username === null
+            || ! $actor->hasPermissionTo('leave.request.record-on-behalf', 'web')) {
+            throw new DomainException('An active account with explicit HR-assisted submission authority is required.');
         }
     }
 

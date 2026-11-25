@@ -38,9 +38,81 @@ class LeaveRequestWorkflowService
         array $requestedSlots,
         ?string $reason = null,
     ): array {
+        return $this->submitInternal(
+            $requesterUserId,
+            $requesterUserId,
+            $annualAccountId,
+            $tabungAccountId,
+            $submissionKey,
+            $leaveType,
+            $requestedSlots,
+            $reason,
+            null,
+        );
+    }
+
+    /** @param list<array{date:string,session:string}> $requestedSlots
+     * @return array{request_id:int,request_key:string,status:string,current_step_order:?int,reservation_id:int,replayed:bool}
+     */
+    public function submitOnBehalf(
+        int $hrActorUserId,
+        int $applicantUserId,
+        int $annualAccountId,
+        int $tabungAccountId,
+        string $submissionKey,
+        string $leaveType,
+        array $requestedSlots,
+        ?string $reason,
+        ?string $recordingReason,
+        ?string $consentEvidenceReference,
+        ?string $staffConfirmedAt,
+    ): array {
+        $recordingReason = $this->normalizeReason($recordingReason);
+        $consentEvidenceReference = $consentEvidenceReference === null ? null : trim($consentEvidenceReference);
+        if ($hrActorUserId < 1 || $applicantUserId < 1 || $hrActorUserId === $applicantUserId
+            || $recordingReason === null || $consentEvidenceReference === null || $consentEvidenceReference === ''
+            || strlen($consentEvidenceReference) > 120 || $staffConfirmedAt === null) {
+            throw new DomainException('A distinct authorized HR recorder, reason, consent evidence reference, and prior staff confirmation are required.');
+        }
+
+        $confirmedAt = $this->parseConsentConfirmationTimestamp($staffConfirmedAt);
+
+        return $this->submitInternal(
+            $hrActorUserId,
+            $applicantUserId,
+            $annualAccountId,
+            $tabungAccountId,
+            $submissionKey,
+            $leaveType,
+            $requestedSlots,
+            $reason,
+            [
+                'recording_reason' => $recordingReason,
+                'consent_evidence_reference' => $consentEvidenceReference,
+                'staff_confirmed_at' => $confirmedAt,
+            ],
+        );
+    }
+
+    /** @param list<array{date:string,session:string}> $requestedSlots
+     * @param  null|array{recording_reason:string,consent_evidence_reference:string,staff_confirmed_at:string}  $onBehalf
+     * @return array{request_id:int,request_key:string,status:string,current_step_order:?int,reservation_id:int,replayed:bool}
+     */
+    private function submitInternal(
+        int $actorUserId,
+        int $requesterUserId,
+        int $annualAccountId,
+        int $tabungAccountId,
+        string $submissionKey,
+        string $leaveType,
+        array $requestedSlots,
+        ?string $reason,
+        ?array $onBehalf,
+    ): array {
         $this->assertLocal();
         $this->assertSubmissionKey($submissionKey);
-        if (! in_array($leaveType, ['AL', 'EL'], true) || $annualAccountId < 1 || $tabungAccountId < 1 || $requesterUserId < 1) {
+        if (! in_array($leaveType, ['AL', 'EL'], true) || $annualAccountId < 1 || $tabungAccountId < 1
+            || $actorUserId < 1 || $requesterUserId < 1 || (($onBehalf === null) !== ($actorUserId === $requesterUserId))) {
             throw new DomainException('A valid leave type, linked requester, and explicit account IDs are required.');
         }
 
@@ -70,9 +142,11 @@ class LeaveRequestWorkflowService
         }
 
         $payloadHash = $this->hash([
-            'actor_id' => $requesterUserId,
+            'actor_id' => $actorUserId,
             'annual_account_id' => $annualAccountId,
+            'applicant_user_id' => $requesterUserId,
             'leave_type' => $leaveType,
+            'on_behalf' => $onBehalf,
             'reason' => $reason,
             'requested_slots' => $slots,
             'tabung_account_id' => $tabungAccountId,
@@ -80,19 +154,33 @@ class LeaveRequestWorkflowService
         $requestKey = 'leave-'.Str::uuid()->toString();
         $reserveKey = 'reserve:'.Str::uuid()->toString();
 
-        return DB::transaction(function () use ($requesterUserId, $annualAccountId, $tabungAccountId, $submissionKey, $leaveType, $slots, $reason, $leaveYear, $notice, $payloadHash, $requestKey, $reserveKey): array {
+        return DB::transaction(function () use ($actorUserId, $requesterUserId, $annualAccountId, $tabungAccountId, $submissionKey, $leaveType, $slots, $reason, $leaveYear, $notice, $payloadHash, $requestKey, $reserveKey, $onBehalf): array {
             $this->lockSubmissionGuards();
             $existingCandidate = DB::table('leave_requests')->where('submission_key', $submissionKey)->first(['id', 'employee_id']);
             if ($existingCandidate !== null) {
                 $employee = DB::table('employees')->where('id', $existingCandidate->employee_id)->lockForUpdate()->first();
                 $existing = DB::table('leave_requests')->where('id', $existingCandidate->id)->lockForUpdate()->first();
-                $actor = DB::table('users')->where('id', $requesterUserId)->lockForUpdate()->first();
+                $actor = DB::table('users')->where('id', $actorUserId)->lockForUpdate()->first();
                 if ($employee === null || $existing === null || (int) $employee->user_id !== $requesterUserId
                     || $actor === null || $actor->status !== 'ACTIVE' || $actor->username === null) {
-                    throw new DomainException('Only the linked active employee can replay their submitted request.');
+                    throw new DomainException('The linked active applicant and original active recorder are required to replay a submitted request.');
                 }
                 if ((int) $existing->requester_user_id !== $requesterUserId || ! hash_equals($existing->payload_hash, $payloadHash)) {
                     throw new DomainException('The submission key was already used for a different request payload.');
+                }
+                if ($onBehalf !== null) {
+                    $this->assertAuthorizedHrRecorder($actorUserId);
+                    $consent = DB::table('leave_request_on_behalf_submissions')->where('request_id', $existing->id)->first();
+                    if ($consent === null || (int) $consent->applicant_user_id !== $requesterUserId
+                        || (int) $consent->hr_actor_user_id !== $actorUserId
+                        || $consent->operation_key !== $submissionKey || ! hash_equals($consent->payload_hash, $payloadHash)
+                        || $consent->recording_reason !== $onBehalf['recording_reason']
+                        || $consent->consent_evidence_reference !== $onBehalf['consent_evidence_reference']
+                        || (string) $consent->staff_confirmed_at !== $onBehalf['staff_confirmed_at']) {
+                        throw new DomainException('The original applicant, HR recorder, consent record, and payload are required to replay this assisted submission.');
+                    }
+                } elseif ($actorUserId !== $requesterUserId) {
+                    throw new DomainException('The submission key belongs to a different recording path.');
                 }
 
                 return $this->submissionResult($existing, true);
@@ -103,6 +191,13 @@ class LeaveRequestWorkflowService
                 throw new DomainException('The annual account must match the requested calendar year.');
             }
             $employeeId = (int) $annualCandidate->employee_id;
+            $linkedApplicant = DB::table('employees')->where('id', $employeeId)->where('user_id', $requesterUserId)->exists();
+            if (! $linkedApplicant) {
+                throw new DomainException('The annual account must belong to the linked leave applicant.');
+            }
+            if ($onBehalf !== null) {
+                $this->assertAuthorizedHrRecorder($actorUserId);
+            }
             $route = $this->assignments->resolveForEmployee($requesterUserId, $employeeId, count($slots), $slots);
             $firstStep = $route[0];
             $status = $this->transitions->statusForStage($firstStep['stage_code']);
@@ -122,14 +217,34 @@ class LeaveRequestWorkflowService
                 'updated_at' => now(),
             ]);
 
+            if ($onBehalf !== null) {
+                DB::table('leave_request_on_behalf_submissions')->insert([
+                    'request_id' => $requestId,
+                    'applicant_user_id' => $requesterUserId,
+                    'hr_actor_user_id' => $actorUserId,
+                    'recording_reason' => $onBehalf['recording_reason'],
+                    'consent_evidence_reference' => $onBehalf['consent_evidence_reference'],
+                    'staff_confirmed_at' => $onBehalf['staff_confirmed_at'],
+                    'operation_key' => $submissionKey,
+                    'payload_hash' => $payloadHash,
+                    'created_at' => now(),
+                ]);
+            }
+
             $reservation = $this->balances->reserve(
-                $requesterUserId,
+                $actorUserId,
                 $requestKey,
                 1,
                 $annualAccountId,
                 $tabungAccountId,
                 $slots,
                 $reserveKey,
+                $onBehalf === null ? null : [
+                    'request_id' => $requestId,
+                    'applicant_user_id' => $requesterUserId,
+                    'submission_key' => $submissionKey,
+                    'payload_hash' => $payloadHash,
+                ],
             );
             $revisionId = DB::table('leave_request_revisions')->insertGetId([
                 'request_id' => $requestId,
@@ -138,7 +253,7 @@ class LeaveRequestWorkflowService
                 'requested_units' => count($slots),
                 'reason' => $reason,
                 'reservation_id' => $reservation['reservation_id'],
-                'created_by' => $requesterUserId,
+                'created_by' => $actorUserId,
                 'created_at' => now(),
                 'is_short_notice_emergency' => $notice['short_notice'] ?? false,
                 'notice_working_days_min' => $notice['min_days'] ?? null,
@@ -162,7 +277,7 @@ class LeaveRequestWorkflowService
                 'created_at' => now(),
             ], $route));
 
-            $this->audit('hr.leave.request_submitted', $requestId, $requesterUserId, $submissionKey);
+            $this->audit($onBehalf === null ? 'hr.leave.request_submitted' : 'hr.leave.request_submitted_on_behalf', $requestId, $actorUserId, $submissionKey);
 
             return [
                 'request_id' => $requestId,
@@ -1235,6 +1350,39 @@ class LeaveRequestWorkflowService
         $trimmed = trim($reason);
 
         return $trimmed === '' ? null : $trimmed;
+    }
+
+    private function parseConsentConfirmationTimestamp(string $timestamp): string
+    {
+        if (preg_match('/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})\z/D', $timestamp) !== 1) {
+            throw new DomainException('Staff confirmation must have an explicit ISO-8601 timezone and seconds.');
+        }
+        $canonical = str_ends_with($timestamp, 'Z') ? substr($timestamp, 0, -1).'+00:00' : $timestamp;
+        $confirmed = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:sP', $canonical);
+        $errors = DateTimeImmutable::getLastErrors();
+        if ($confirmed === false || ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))
+            || $confirmed->format('Y-m-d\TH:i:sP') !== $canonical) {
+            throw new DomainException('Staff confirmation must be a valid ISO-8601 timestamp.');
+        }
+        if ($confirmed > now('Asia/Kuala_Lumpur')->toDateTimeImmutable()) {
+            throw new DomainException('Staff confirmation must predate the assisted submission.');
+        }
+
+        return $confirmed->setTimezone(new DateTimeZone('Asia/Kuala_Lumpur'))->format('Y-m-d H:i:s');
+    }
+
+    private function assertAuthorizedHrRecorder(int $actorId): void
+    {
+        if (! DB::table('permissions')->where('name', 'leave.request.record-on-behalf')->where('guard_name', 'web')->exists()) {
+            throw new DomainException('The local-only HR-assisted submission permission is not configured.');
+        }
+        $lockedActor = DB::table('users')->where('id', $actorId)->lockForUpdate()->first(['status', 'username']);
+        $actor = User::query()->find($actorId);
+        if ($lockedActor === null || $lockedActor->status !== 'ACTIVE' || $lockedActor->username === null
+            || $actor === null || $actor->status !== 'ACTIVE' || $actor->username === null
+            || ! $actor->hasPermissionTo('leave.request.record-on-behalf', 'web')) {
+            throw new DomainException('An active account with explicit HR-assisted submission authority is required.');
+        }
     }
 
     /** @param array<string, mixed> $payload */
