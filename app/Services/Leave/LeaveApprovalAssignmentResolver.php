@@ -94,7 +94,7 @@ class LeaveApprovalAssignmentResolver
             if ($applicantUnitOffices->count() !== 1 || (int) $applicantUnitOffices[0]->unit_id !== $unitId) {
                 throw new DomainException('The applicant Unit Manager assignment does not match the employee unit for every leave date.');
             }
-            $applicantOffice = 'PU';
+            throw new DomainException('CT-DEC-050 is unresolved; a Unit Manager self-request has no approved support or approval route.');
         } else {
             $applicantOffice = 'STAFF';
         }

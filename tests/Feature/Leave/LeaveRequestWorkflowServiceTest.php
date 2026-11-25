@@ -59,148 +59,62 @@ class LeaveRequestWorkflowServiceTest extends TestCase
         $this->assertNotSame($approvers['secretary']->id, $approvers['pb']->id);
     }
 
-    public function test_hr_assisted_submission_keeps_employee_as_applicant_and_records_hr_actor_and_confirmation(): void
+    public function test_ct_dec_051_rejects_hr_submitting_on_behalf_even_with_permission(): void
     {
-        $fixture = $this->fixture('assisted');
-        $approvers = $this->staffApprovers($fixture);
+        $fixture = $this->fixture('assisted-denied');
         $hrActor = $this->user('hr-recorder');
         $hrActor->givePermissionTo('leave.request.record-on-behalf');
         $service = app(LeaveRequestWorkflowService::class);
-        $submissionKey = 'assisted-'.$fixture['suffix'];
-        $confirmedAt = '2026-03-02T08:45:00+08:00';
-        $slots = [['date' => '2026-03-06', 'session' => 'AM']];
 
-        $submitted = $service->submitOnBehalf(
-            $hrActor->id,
-            $fixture['user']->id,
-            $fixture['annual_id'],
-            $fixture['tabung_id'],
-            $submissionKey,
-            'AL',
-            $slots,
-            'Synthetic leave reason',
-            'Synthetic HR assistance reason',
-            'SYNTHETIC-CONSENT-'.$fixture['suffix'],
-            $confirmedAt,
-        );
-        $replay = $service->submitOnBehalf(
-            $hrActor->id,
-            $fixture['user']->id,
-            $fixture['annual_id'],
-            $fixture['tabung_id'],
-            $submissionKey,
-            'AL',
-            $slots,
-            'Synthetic leave reason',
-            'Synthetic HR assistance reason',
-            'SYNTHETIC-CONSENT-'.$fixture['suffix'],
-            $confirmedAt,
-        );
-
-        $request = DB::table('leave_requests')->where('id', $submitted['request_id'])->sole();
-        $revision = DB::table('leave_request_revisions')->where('request_id', $submitted['request_id'])->sole();
-        $consent = DB::table('leave_request_on_behalf_submissions')->where('request_id', $submitted['request_id'])->sole();
-        $reservation = DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->sole();
-
-        $this->assertSame($fixture['user']->id, (int) $request->requester_user_id);
-        $this->assertSame($fixture['employee_id'], (int) $request->employee_id);
-        $this->assertSame($hrActor->id, (int) $revision->created_by);
-        $this->assertSame($hrActor->id, (int) $consent->hr_actor_user_id);
-        $this->assertSame($fixture['user']->id, (int) $consent->applicant_user_id);
-        $this->assertSame($hrActor->id, (int) $reservation->created_by);
-        $this->assertSame($submissionKey, $consent->operation_key);
-        $this->assertSame(1, DB::table('leave_request_on_behalf_submissions')->where('request_id', $submitted['request_id'])->count());
-        $this->assertSame(1, DB::table('leave_balance_operations')->where('actor_id', $hrActor->id)->where('operation_type', 'RESERVE')->count());
-        $this->assertSame(1, DB::table('audit_events')->where('actor_id', $hrActor->id)
-            ->where('action_code', 'hr.leave.request_submitted_on_behalf')->where('target_ref', 'leave_request:'.$submitted['request_id'])->count());
-        $this->assertSame($submitted['request_id'], $replay['request_id']);
-        $this->assertTrue($replay['replayed']);
         $this->assertDomainException(fn () => $service->submitOnBehalf(
             $hrActor->id,
             $fixture['user']->id,
             $fixture['annual_id'],
             $fixture['tabung_id'],
-            $submissionKey,
+            'assisted-'.$fixture['suffix'],
             'AL',
-            $slots,
+            [['date' => '2026-03-06', 'session' => 'AM']],
             'Synthetic leave reason',
             'Synthetic HR assistance reason',
-            'SYNTHETIC-DIFFERENT-CONSENT-'.$fixture['suffix'],
-            $confirmedAt,
-        ));
-        $this->assertNotSame($approvers['pu']->id, $hrActor->id);
-    }
-
-    public function test_hr_assisted_submission_fails_closed_without_permission_or_prior_confirmation(): void
-    {
-        $fixture = $this->fixture('assisteddeny');
-        $hrActor = $this->user('hr-unprivileged');
-        $service = app(LeaveRequestWorkflowService::class);
-        $slots = [['date' => '2026-03-06', 'session' => 'AM']];
-        $args = [
-            $hrActor->id,
-            $fixture['user']->id,
-            $fixture['annual_id'],
-            $fixture['tabung_id'],
-            'assisted-deny-'.$fixture['suffix'],
-            'AL',
-            $slots,
-            'Synthetic leave reason',
-            'Synthetic assistance reason',
             'SYNTHETIC-CONSENT-'.$fixture['suffix'],
-        ];
-
-        $this->assertDomainException(fn () => $service->submitOnBehalf(...[...$args, '2026-03-02T08:45:00+08:00']));
-        $hrActor->givePermissionTo('leave.request.record-on-behalf');
-        $this->assertDomainException(fn () => $service->submitOnBehalf(...[...$args, '2026-03-02T09:01:00+08:00']));
-        $this->assertDomainException(fn () => $service->submitOnBehalf(...[...$args, '2026-03-02 08:45:00']));
+            '2026-03-02T08:45:00+08:00',
+        ));
 
         $this->assertSame(0, DB::table('leave_requests')->count());
         $this->assertSame(0, DB::table('leave_request_on_behalf_submissions')->count());
         $this->assertSame(0, DB::table('leave_reservations')->count());
+        $this->assertSame(0, DB::table('leave_balance_operations')->count());
+        $this->assertSame(0, DB::table('leave_active_slots')->count());
     }
 
-    public function test_support_and_not_support_forward_without_releasing_the_pending_hold(): void
+    public function test_ct_dec_008_not_support_does_not_advance_or_release_the_pending_hold(): void
     {
         $fixture = $this->fixture('forward');
         $approvers = $this->staffApprovers($fixture);
         $service = app(LeaveRequestWorkflowService::class);
         $submitted = $service->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'forward-'.$fixture['suffix'], 'AL', [['date' => '2026-03-06', 'session' => 'AM']]);
 
-        $first = $service->decide($approvers['pu']->id, $submitted['request_id'], 'forward-support-'.$fixture['suffix'], 'NOT_SUPPORT', 'Synthetic reason');
+        $actionKey = 'forward-not-support-'.$fixture['suffix'];
+        $this->assertDomainException(fn () => $service->decide($approvers['pu']->id, $submitted['request_id'], $actionKey, 'NOT_SUPPORT', 'Synthetic reason'));
         $reservation = DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->first();
-        $this->assertSame('WAITING_GENERAL_MANAGER_FINAL', $first['status']);
+        $this->assertSame('WAITING_UNIT_MANAGER_SUPPORT', DB::table('leave_requests')->where('id', $submitted['request_id'])->value('status'));
         $this->assertSame('ACTIVE', $reservation->status);
         $this->assertSame(1, DB::table('leave_reservation_events')->where('reservation_id', $reservation->id)->where('event_code', 'RESERVED')->count());
-        $this->assertSame(1, DB::table('leave_workflow_actions')->where('revision_id', DB::table('leave_request_revisions')->where('request_id', $submitted['request_id'])->value('id'))->count());
+        $this->assertSame(0, DB::table('leave_workflow_actions')->where('operation_key', $actionKey)->count());
     }
 
-    public function test_unit_manager_self_application_skips_unit_support_and_routes_directly_to_general_manager(): void
+    public function test_ct_dec_050_holds_unit_manager_self_application_without_an_approved_route(): void
     {
         $fixture = $this->fixture('selfpu');
         $this->assignOffice($fixture['user'], 'PU', $fixture['unit_id']);
-        $pb = $this->user('self-pb');
-        $secretary = $this->user('self-secretary');
-        $this->assignOffice($pb, 'PB');
-        $this->assignOffice($secretary, 'SECRETARY_ALK');
 
-        $submitted = app(LeaveRequestWorkflowService::class)->submit(
-            $fixture['user']->id,
-            $fixture['annual_id'],
-            $fixture['tabung_id'],
-            'self-pu-'.$fixture['suffix'],
-            'AL',
-            [['date' => '2026-03-06', 'session' => 'AM']],
-        );
+        $this->assertDomainException(fn () => app(LeaveRequestWorkflowService::class)->submit(
+            $fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'self-pu-'.$fixture['suffix'], 'AL', [['date' => '2026-03-06', 'session' => 'AM']],
+        ));
 
-        $steps = DB::table('leave_approval_steps')->where('revision_id', DB::table('leave_request_revisions')->where('request_id', $submitted['request_id'])->value('id'))
-            ->orderBy('step_order')->get();
-        $this->assertSame('WAITING_GENERAL_MANAGER_FINAL', $submitted['status']);
-        $this->assertCount(1, $steps);
-        $this->assertSame('GENERAL_MANAGER_FINAL', $steps[0]->stage_code);
-        $this->assertSame($pb->id, (int) $steps[0]->assignee_user_id);
-        $this->assertNotSame($fixture['user']->id, (int) $steps[0]->assignee_user_id);
-        $this->assertNotSame($secretary->id, (int) $steps[0]->assignee_user_id);
+        $this->assertSame(0, DB::table('leave_requests')->count());
+        $this->assertSame(0, DB::table('leave_reservations')->count());
+        $this->assertSame(0, DB::table('leave_balance_operations')->count());
     }
 
     public function test_requests_over_five_days_persist_general_manager_support_then_secretary_final(): void
@@ -284,21 +198,48 @@ class LeaveRequestWorkflowServiceTest extends TestCase
         $this->assertSame(0, DB::table('leave_ledger_entries')->where('kind', 'approved_leave_use')->count());
     }
 
-    public function test_late_al_rejection_releases_hold_and_opens_review_without_auto_classification(): void
+    public function test_ct_dec_046_holds_a_final_decision_after_an_al_date_starts(): void
     {
         $fixture = $this->fixture('lateal');
         $approvers = $this->staffApprovers($fixture);
         $service = app(LeaveRequestWorkflowService::class);
-        $submitted = $service->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'late-al-'.$fixture['suffix'], 'AL', [['date' => '2026-03-02', 'session' => 'AM']], 'Synthetic emergency reason');
+        $submitted = $service->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'late-al-'.$fixture['suffix'], 'AL', [['date' => '2026-03-06', 'session' => 'AM']]);
         $service->decide($approvers['pu']->id, $submitted['request_id'], 'late-al-support-'.$fixture['suffix'], 'SUPPORT');
+        Carbon::setTestNow('2026-03-06T09:00:00+08:00');
 
-        $rejected = $service->decide($approvers['pb']->id, $submitted['request_id'], 'late-al-reject-'.$fixture['suffix'], 'REJECT', 'Synthetic rejection reason');
+        $actionKey = 'late-al-reject-'.$fixture['suffix'];
+        $this->assertDomainException(fn () => $service->decide($approvers['pb']->id, $submitted['request_id'], $actionKey, 'REJECT', 'Synthetic rejection reason'));
 
-        $this->assertSame('REJECTED', $rejected['status']);
-        $this->assertSame('RELEASED', DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('status'));
-        $this->assertSame('LATE_AL_REJECTION', DB::table('leave_attendance_reviews')->where('revision_id', DB::table('leave_request_revisions')->where('request_id', $submitted['request_id'])->value('id'))->value('review_code'));
-        $this->assertTrue((bool) DB::table('leave_requests')->where('id', $submitted['request_id'])->value('attendance_review_required'));
+        $this->assertSame('WAITING_GENERAL_MANAGER_FINAL', DB::table('leave_requests')->where('id', $submitted['request_id'])->value('status'));
+        $this->assertSame('ACTIVE', DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('status'));
+        $this->assertSame(0, DB::table('leave_workflow_actions')->where('operation_key', $actionKey)->count());
+        $this->assertSame(0, DB::table('leave_attendance_reviews')->count());
         $this->assertSame(0, DB::table('leave_ledger_entries')->where('kind', 'approved_leave_use')->count());
+    }
+
+    public function test_ct_dec_032_holds_a_pending_request_after_effective_unit_transfer(): void
+    {
+        $fixture = $this->fixture('transfer-pending');
+        $approvers = $this->staffApprovers($fixture);
+        $service = app(LeaveRequestWorkflowService::class);
+        $submitted = $service->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'transfer-pending-'.$fixture['suffix'], 'AL', [['date' => '2026-03-06', 'session' => 'AM']]);
+        $newUnitId = DB::table('organization_units')->insertGetId(['code' => 'new'.$fixture['suffix'], 'name' => 'Synthetic transferred unit', 'active' => true]);
+        $categoryId = DB::table('employee_assignments')->where('employee_id', $fixture['employee_id'])->value('category_id');
+        DB::table('employee_assignments')->where('employee_id', $fixture['employee_id'])->update(['effective_to' => '2026-03-03']);
+        DB::table('employee_assignments')->insert([
+            'employee_id' => $fixture['employee_id'],
+            'unit_id' => $newUnitId,
+            'category_id' => $categoryId,
+            'effective_from' => '2026-03-04',
+        ]);
+        Carbon::setTestNow('2026-03-04T09:00:00+08:00');
+        $actionKey = 'transfer-pending-support-'.$fixture['suffix'];
+
+        $this->assertDomainException(fn () => $service->decide($approvers['pu']->id, $submitted['request_id'], $actionKey, 'SUPPORT'));
+
+        $this->assertSame('WAITING_UNIT_MANAGER_SUPPORT', DB::table('leave_requests')->where('id', $submitted['request_id'])->value('status'));
+        $this->assertSame('ACTIVE', DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('status'));
+        $this->assertSame(0, DB::table('leave_workflow_actions')->where('operation_key', $actionKey)->count());
     }
 
     public function test_employee_can_withdraw_a_pending_unused_al_request_once(): void
@@ -380,18 +321,18 @@ class LeaveRequestWorkflowServiceTest extends TestCase
         $this->assertSame('WAITING_UNIT_MANAGER_SUPPORT', $again['status']);
     }
 
-    public function test_current_day_and_tabung_funded_cancellations_fail_closed_without_releasing_usage(): void
+    public function test_ct_dec_046_keeps_same_day_pending_al_unacted_and_unreleased(): void
     {
         $currentDay = $this->fixture('cancelday');
         $currentDayApprovers = $this->staffApprovers($currentDay);
         $service = app(LeaveRequestWorkflowService::class);
         $todayRequest = $service->submit($currentDay['user']->id, $currentDay['annual_id'], $currentDay['tabung_id'], 'cancel-today-'.$currentDay['suffix'], 'AL', [['date' => '2026-03-02', 'session' => 'AM']], 'Synthetic same-day reason');
-        $service->decide($currentDayApprovers['pu']->id, $todayRequest['request_id'], 'cancel-today-support-'.$currentDay['suffix'], 'SUPPORT');
-        $service->decide($currentDayApprovers['pb']->id, $todayRequest['request_id'], 'cancel-today-approve-'.$currentDay['suffix'], 'APPROVE');
+        $this->assertDomainException(fn () => $service->decide($currentDayApprovers['pu']->id, $todayRequest['request_id'], 'cancel-today-support-'.$currentDay['suffix'], 'SUPPORT'));
         $this->assertDomainException(fn () => $service->requestApprovedAnnualLeaveCancellation($currentDay['user']->id, $todayRequest['request_id'], 'cancel-today-request-'.$currentDay['suffix'], 'Synthetic reason'));
-        $this->assertSame('APPROVED', DB::table('leave_requests')->where('id', $todayRequest['request_id'])->value('status'));
+        $this->assertSame('WAITING_UNIT_MANAGER_SUPPORT', DB::table('leave_requests')->where('id', $todayRequest['request_id'])->value('status'));
+        $this->assertSame('ACTIVE', DB::table('leave_reservations')->where('id', $todayRequest['reservation_id'])->value('status'));
+        $this->assertSame(0, DB::table('leave_workflow_actions')->where('revision_id', DB::table('leave_request_revisions')->where('request_id', $todayRequest['request_id'])->value('id'))->count());
         $this->assertSame(0, DB::table('leave_request_cancellation_actions')->where('request_id', $todayRequest['request_id'])->count());
-
     }
 
     public function test_tabung_funded_cancellation_stays_isolated_without_a_verified_cap(): void
@@ -463,15 +404,16 @@ class LeaveRequestWorkflowServiceTest extends TestCase
             'partial-submit-'.$fixture['suffix'],
             'AL',
             [
-                ['date' => '2026-03-02', 'session' => 'AM'],
-                ['date' => '2026-03-02', 'session' => 'PM'],
                 ['date' => '2026-03-06', 'session' => 'AM'],
                 ['date' => '2026-03-06', 'session' => 'PM'],
+                ['date' => '2026-03-09', 'session' => 'AM'],
+                ['date' => '2026-03-09', 'session' => 'PM'],
             ],
-            'Synthetic short-notice reason',
+            null,
         );
         $service->decide($approvers['pu']->id, $submitted['request_id'], 'partial-support-'.$fixture['suffix'], 'SUPPORT');
         $service->decide($approvers['pb']->id, $submitted['request_id'], 'partial-approve-'.$fixture['suffix'], 'APPROVE');
+        Carbon::setTestNow('2026-03-08T09:00:00+08:00');
         $requestKey = 'partial-request-'.$fixture['suffix'];
         $partial = $service->requestApprovedAnnualLeavePartialCancellation(
             $fixture['user']->id, $submitted['request_id'], $requestKey, 'Synthetic early return request',
@@ -483,13 +425,13 @@ class LeaveRequestWorkflowServiceTest extends TestCase
             $fixture['user']->id, $submitted['request_id'], 'partial-request-duplicate-'.$fixture['suffix'], 'Synthetic duplicate request',
         ));
 
-        Carbon::setTestNow('2026-03-05T09:00:00+08:00');
+        Carbon::setTestNow('2026-03-08T09:00:00+08:00');
         $verificationKey = 'partial-verify-'.$fixture['suffix'];
         $verified = $service->verifyApprovedAnnualLeavePartialCancellation(
-            $hr->id, $submitted['request_id'], $partial['partial_cancellation_id'], $verificationKey, '2026-03-04', 'Synthetic HR return verification',
+            $hr->id, $submitted['request_id'], $partial['partial_cancellation_id'], $verificationKey, '2026-03-07', 'Synthetic HR return verification',
         );
         $verificationReplay = $service->verifyApprovedAnnualLeavePartialCancellation(
-            $hr->id, $submitted['request_id'], $partial['partial_cancellation_id'], $verificationKey, '2026-03-04', 'Synthetic HR return verification',
+            $hr->id, $submitted['request_id'], $partial['partial_cancellation_id'], $verificationKey, '2026-03-07', 'Synthetic HR return verification',
         );
         $decisionKey = 'partial-confirm-'.$fixture['suffix'];
         $confirmed = $service->decideApprovedAnnualLeavePartialCancellation(
@@ -535,10 +477,9 @@ class LeaveRequestWorkflowServiceTest extends TestCase
             'partial-tabung-submit-'.$fixture['suffix'],
             'AL',
             [
-                ['date' => '2026-03-02', 'session' => 'AM'],
                 ['date' => '2026-03-06', 'session' => 'AM'],
+                ['date' => '2026-03-09', 'session' => 'AM'],
             ],
-            'Synthetic short-notice reason',
         );
         $this->assertSame(1, (int) DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('tabung_units'));
         $service->decide($approvers['pu']->id, $submitted['request_id'], 'partial-tabung-support-'.$fixture['suffix'], 'SUPPORT');
@@ -567,22 +508,22 @@ class LeaveRequestWorkflowServiceTest extends TestCase
             'partial-boundary-submit-'.$fixture['suffix'],
             'AL',
             [
-                ['date' => '2026-03-02', 'session' => 'AM'],
-                ['date' => '2026-03-02', 'session' => 'PM'],
-                ['date' => '2026-03-04', 'session' => 'AM'],
                 ['date' => '2026-03-06', 'session' => 'AM'],
+                ['date' => '2026-03-06', 'session' => 'PM'],
+                ['date' => '2026-03-09', 'session' => 'AM'],
+                ['date' => '2026-03-11', 'session' => 'AM'],
             ],
-            'Synthetic short-notice reason',
         );
         $service->decide($approvers['pu']->id, $submitted['request_id'], 'partial-boundary-support-'.$fixture['suffix'], 'SUPPORT');
         $service->decide($approvers['pb']->id, $submitted['request_id'], 'partial-boundary-approve-'.$fixture['suffix'], 'APPROVE');
+        Carbon::setTestNow('2026-03-08T09:00:00+08:00');
         $partial = $service->requestApprovedAnnualLeavePartialCancellation(
             $fixture['user']->id, $submitted['request_id'], 'partial-boundary-request-'.$fixture['suffix'], 'Synthetic early return request',
         );
 
-        Carbon::setTestNow('2026-03-05T09:00:00+08:00');
+        Carbon::setTestNow('2026-03-10T09:00:00+08:00');
         $this->assertDomainException(fn () => $service->verifyApprovedAnnualLeavePartialCancellation(
-            $hr->id, $submitted['request_id'], $partial['partial_cancellation_id'], 'partial-boundary-verify-'.$fixture['suffix'], '2026-03-04', 'Synthetic HR return verification',
+            $hr->id, $submitted['request_id'], $partial['partial_cancellation_id'], 'partial-boundary-verify-'.$fixture['suffix'], '2026-03-09', 'Synthetic HR return verification',
         ));
 
         $this->assertSame('APPROVED', DB::table('leave_requests')->where('id', $submitted['request_id'])->value('status'));
@@ -605,22 +546,17 @@ class LeaveRequestWorkflowServiceTest extends TestCase
         $this->assertSame(0, DB::table('leave_workflow_actions')->where('operation_key', 'correction-started-return-'.$fixture['suffix'])->count());
     }
 
-    public function test_rejected_retrospective_el_posts_the_documented_debit_and_opens_hr_review(): void
+    public function test_ct_dec_027_holds_el_submission_without_an_hr_configured_window(): void
     {
         $fixture = $this->fixture('retroel');
-        $approvers = $this->staffApprovers($fixture);
-        $service = app(LeaveRequestWorkflowService::class);
-        $submitted = $service->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'retro-el-'.$fixture['suffix'], 'EL', [['date' => '2026-02-27', 'session' => 'AM']], 'Synthetic emergency reason');
-        $service->decide($approvers['pu']->id, $submitted['request_id'], 'retro-el-support-'.$fixture['suffix'], 'SUPPORT');
+        $this->assertDomainException(fn () => app(LeaveRequestWorkflowService::class)->submit(
+            $fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'retro-el-'.$fixture['suffix'], 'EL', [['date' => '2026-02-27', 'session' => 'AM']], 'Synthetic emergency reason',
+        ));
 
-        $rejected = $service->decide($approvers['pb']->id, $submitted['request_id'], 'retro-el-reject-'.$fixture['suffix'], 'REJECT', 'Synthetic rejection reason');
-
-        $revisionId = DB::table('leave_request_revisions')->where('request_id', $submitted['request_id'])->value('id');
-        $this->assertSame('REJECTED', $rejected['status']);
-        $this->assertSame('COMMITTED', DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('status'));
-        $this->assertSame(1, DB::table('leave_ledger_entries')->where('kind', 'rejected_el_absence_use')->count());
-        $this->assertSame('RETROSPECTIVE_EL_REJECTION', DB::table('leave_attendance_reviews')->where('revision_id', $revisionId)->value('review_code'));
-        $this->assertTrue((bool) DB::table('leave_requests')->where('id', $submitted['request_id'])->value('attendance_review_required'));
+        $this->assertSame(0, DB::table('leave_requests')->count());
+        $this->assertSame(0, DB::table('leave_reservations')->count());
+        $this->assertSame(0, DB::table('leave_balance_operations')->count());
+        $this->assertSame(0, DB::table('leave_ledger_entries')->count());
     }
 
     public function test_short_notice_needs_a_reason_and_ambiguous_counting_boundary_fails_closed(): void

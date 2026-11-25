@@ -3,9 +3,12 @@
 namespace Tests\Feature\Leave;
 
 use App\Models\User;
+use App\Services\Leave\AnnualEntitlementCreditService;
 use App\Services\Leave\LeaveBalanceTransactionService;
 use App\Services\Leave\LedgerPostedTotals;
+use Carbon\Carbon;
 use DomainException;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -14,6 +17,12 @@ use Tests\TestCase;
 class LeaveBalanceTransactionServiceTest extends TestCase
 {
     use DatabaseTransactions;
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
 
     public function test_reservations_allocate_annual_before_tabung_count_pending_once_and_replay_idempotently(): void
     {
@@ -34,6 +43,17 @@ class LeaveBalanceTransactionServiceTest extends TestCase
         $this->assertSame(1, DB::table('leave_employee_history_markers')->where('request_key', $requestKey)->count());
         $this->assertSame(4, DB::table('leave_calendar_usage_snapshots')->where('history_marker_id', DB::table('leave_reservations')->where('id', $first['reservation_id'])->value('history_marker_id'))->count());
         $this->assertSame(8, (int) DB::table('leave_calendar_usage_snapshots')->where('history_marker_id', DB::table('leave_reservations')->where('id', $first['reservation_id'])->value('history_marker_id'))->sum('leave_units'));
+        $allocations = DB::table('leave_reservation_slot_allocations')->where('reservation_id', $first['reservation_id'])->orderBy('leave_date')->orderBy('session_code')->get();
+        $this->assertCount(8, $allocations);
+        $this->assertSame(4, $allocations->where('allocation_bucket', 'ANNUAL')->count());
+        $this->assertSame(4, $allocations->where('allocation_bucket', 'TABUNG')->count());
+        $this->assertSame([2097], $allocations->where('allocation_bucket', 'TABUNG')->pluck('source_year')->unique()->values()->all());
+        try {
+            DB::table('leave_reservation_slot_allocations')->where('reservation_id', $first['reservation_id'])->limit(1)->update(['units' => 2]);
+            $this->fail('Per-date source allocations must remain immutable.');
+        } catch (QueryException) {
+            $this->assertSame(1, (int) DB::table('leave_reservation_slot_allocations')->where('reservation_id', $first['reservation_id'])->limit(1)->value('units'));
+        }
 
         // HR's recorded answer permits a negative AL projection without a configured cap.
         $secondDate = new \DateTimeImmutable($slots[count($slots) - 1]['date']);
@@ -45,6 +65,7 @@ class LeaveBalanceTransactionServiceTest extends TestCase
         $this->assertSame(0, $second['tabung_units']);
         $this->assertSame(5, (int) DB::table('leave_reservations')->where('annual_account_id', $fixture['annual_id'])->where('status', 'ACTIVE')->sum('annual_units'));
         $this->assertSame(4, (int) DB::table('leave_reservations')->where('tabung_account_id', $fixture['tabung_id'])->where('status', 'ACTIVE')->sum('tabung_units'));
+        $this->assertSame(9, DB::table('leave_reservation_slot_allocations')->whereIn('reservation_id', [$first['reservation_id'], $second['reservation_id']])->count());
     }
 
     public function test_final_commit_posts_reserved_sources_once_and_replays_without_duplicate_entries(): void
@@ -168,9 +189,54 @@ class LeaveBalanceTransactionServiceTest extends TestCase
         $this->assertSame(2, DB::table('leave_active_slots')->where('employee_id', $fixture['employee_id'])->where('active_slot_key', 1)->count());
     }
 
+    public function test_terminal_release_requires_an_exact_source_map_for_all_active_slots(): void
+    {
+        $fixture = $this->fixture('slotmap', 2, []);
+        $service = app(LeaveBalanceTransactionService::class);
+        $slot = $this->workingSlots(1, $fixture['leave_year'])[0];
+        $reservation = $service->reserve($fixture['employee_user']->id, 'slotmap-'.$fixture['suffix'], 1, $fixture['annual_id'], $fixture['tabung_id'], [$slot], 'slotmap-reserve-'.$fixture['suffix']);
+        $nextYearAnnualId = DB::table('leave_annual_accounts')->insertGetId([
+            'employee_id' => $fixture['employee_id'],
+            'leave_year' => 2027,
+        ]);
+        try {
+            DB::table('leave_reservation_slot_allocations')->insert([
+                'reservation_id' => $reservation['reservation_id'],
+                'leave_date' => '2026-12-29',
+                'leave_year' => 2026,
+                'session_code' => 'AM',
+                'allocation_bucket' => 'ANNUAL',
+                'annual_account_id' => $nextYearAnnualId,
+                'units' => 1,
+                'created_at' => now(),
+            ]);
+            $this->fail('Annual source accounts must match the leave year in this same-year reservation slice.');
+        } catch (QueryException) {
+            $this->assertSame(1, DB::table('leave_reservation_slot_allocations')->where('reservation_id', $reservation['reservation_id'])->count());
+        }
+        DB::table('leave_active_slots')->insert([
+            'reservation_id' => $reservation['reservation_id'],
+            'employee_id' => $fixture['employee_id'],
+            'leave_date' => '2026-03-10',
+            'session_code' => 'AM',
+            'active_slot_key' => 1,
+            'status' => 'ACTIVE',
+            'created_at' => now(),
+        ]);
+
+        try {
+            $service->release($fixture['employee_user']->id, $reservation['reservation_id'], 'WITHDRAWAL', 'slotmap-release-'.$fixture['suffix']);
+            $this->fail('A reservation cannot become terminal when its active-slot set exceeds its immutable source map.');
+        } catch (QueryException) {
+            $this->assertSame('ACTIVE', DB::table('leave_reservations')->where('id', $reservation['reservation_id'])->value('status'));
+            $this->assertSame(2, DB::table('leave_active_slots')->where('reservation_id', $reservation['reservation_id'])->where('status', 'ACTIVE')->count());
+        }
+    }
+
     public function test_cross_year_holiday_ambiguous_sources_and_reused_operation_payload_fail_closed(): void
     {
         $fixture = $this->fixture('failclosed', 0, [2096 => 2, 2097 => 2]);
+        $this->advanceToCreditYear($fixture);
         $service = app(LeaveBalanceTransactionService::class);
         $weekday = $this->workingSlots(1, $fixture['leave_year'])[0];
 
@@ -190,6 +256,7 @@ class LeaveBalanceTransactionServiceTest extends TestCase
         }
 
         $nullFixture = $this->fixture('nullsource', 0, ['null' => 2]);
+        $this->advanceToCreditYear($nullFixture);
         try {
             $service->reserve($nullFixture['employee_user']->id, 'null-source-'.$nullFixture['suffix'], 1, $nullFixture['annual_id'], $nullFixture['tabung_id'], $this->workingSlots(1, $nullFixture['leave_year']), 'null-source-op-'.$nullFixture['suffix']);
             $this->fail('A Tabung allocation without source-year provenance must fail closed.');
@@ -198,6 +265,7 @@ class LeaveBalanceTransactionServiceTest extends TestCase
         }
 
         $holidayFixture = $this->fixture('holiday', 1, []);
+        $this->advanceToCreditYear($holidayFixture);
         $holidaySlot = $this->workingSlots(1, $holidayFixture['leave_year'])[0];
         DB::table('leave_calendar_days')->insert([
             'calendar_version_id' => $holidayFixture['calendar_id'],
@@ -214,6 +282,7 @@ class LeaveBalanceTransactionServiceTest extends TestCase
         }
 
         $okFixture = $this->fixture('payload', 1, []);
+        $this->advanceToCreditYear($okFixture);
         $payloadKey = 'payload-op-'.$okFixture['suffix'];
         $requestKey = 'payload-'.$okFixture['suffix'];
         $first = $service->reserve($okFixture['employee_user']->id, $requestKey, 1, $okFixture['annual_id'], $okFixture['tabung_id'], $this->workingSlots(1, $okFixture['leave_year']), $payloadKey);
@@ -235,9 +304,10 @@ class LeaveBalanceTransactionServiceTest extends TestCase
         $suffix = Str::lower(Str::random(10));
         $leaveYear = match ($label) {
             'retrospective' => 2025,
-            'nullsource' => 2099,
-            'holiday' => 2100,
-            'payload' => 2101,
+            'failclosed' => 2030,
+            'nullsource' => 2031,
+            'holiday' => 2032,
+            'payload' => 2033,
             default => 2026,
         };
         $employeeUser = User::factory()->create(['username' => $label.$suffix, 'email' => null, 'status' => 'ACTIVE']);
@@ -308,6 +378,18 @@ class LeaveBalanceTransactionServiceTest extends TestCase
         }
 
         return ['suffix' => $suffix, 'leave_year' => $leaveYear, 'employee_id' => $employeeId, 'employee_user' => $employeeUser, 'annual_id' => $annualId, 'tabung_id' => $tabungId, 'calendar_id' => $calendarId];
+    }
+
+    /** @param array{suffix:string,leave_year:int,employee_id:int,employee_user:User,annual_id:int,tabung_id:int,calendar_id:int} $fixture */
+    private function advanceToCreditYear(array $fixture): void
+    {
+        Carbon::setTestNow($fixture['leave_year'].'-01-01T09:00:00+08:00');
+        $fixture['employee_user']->givePermissionTo('leave.entitlement.credit');
+        $confirmation = DB::table('leave_annual_entitlement_confirmations')->where('annual_account_id', $fixture['annual_id'])->sole();
+        app(AnnualEntitlementCreditService::class)->creditConfirmedEntitlementOnJanuaryFirst(
+            $fixture['employee_user']->id,
+            (int) $confirmation->id,
+        );
     }
 
     /** @return list<array{date:string,session:string}> */

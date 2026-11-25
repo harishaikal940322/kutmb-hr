@@ -3,10 +3,10 @@
 namespace App\Services\Leave;
 
 use App\Models\AuditEvent;
-use App\Models\User;
 use DateTimeImmutable;
 use DateTimeZone;
 use DomainException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -25,10 +25,9 @@ class LeaveBalanceTransactionService
     ) {}
 
     /** @param list<array{date:string,session:string}> $requestedSlots
-     * @param  null|array{request_id:int,applicant_user_id:int,submission_key:string,payload_hash:string}  $onBehalfSubmission
      * @return array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int}
      */
-    public function reserve(int $actorId, string $requestKey, int $revision, int $annualAccountId, int $tabungAccountId, array $requestedSlots, string $operationKey, ?array $onBehalfSubmission = null): array
+    public function reserve(int $actorId, string $requestKey, int $revision, int $annualAccountId, int $tabungAccountId, array $requestedSlots, string $operationKey): array
     {
         $this->assertLocal();
         $this->validateKeys($requestKey, $operationKey);
@@ -39,7 +38,7 @@ class LeaveBalanceTransactionService
         $requestedUnits = count($slots);
 
         /** @var array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int} $result */
-        $result = DB::transaction(function () use ($actorId, $requestKey, $revision, $annualAccountId, $tabungAccountId, $requestedUnits, $slots, $operationKey, $onBehalfSubmission): array {
+        $result = DB::transaction(function () use ($actorId, $requestKey, $revision, $annualAccountId, $tabungAccountId, $requestedUnits, $slots, $operationKey): array {
             $this->lockRequestImpactGuards();
             $annualCandidate = DB::table('leave_annual_accounts')->where('id', $annualAccountId)->first(['employee_id']);
             if ($annualCandidate === null) {
@@ -53,49 +52,27 @@ class LeaveBalanceTransactionService
                 throw new DomainException('Annual and Tabung accounts must exist and belong to the same employee.');
             }
             $this->assertActiveActor($actorId);
-            if ((int) $employee->user_id === $actorId) {
-                if ($onBehalfSubmission !== null) {
-                    throw new DomainException('An employee self-submission cannot include an HR-assisted consent record.');
-                }
-            } else {
-                $this->assertAuthorizedHrRecorder($actorId);
-                if ($onBehalfSubmission === null || (int) $onBehalfSubmission['applicant_user_id'] !== (int) $employee->user_id) {
-                    throw new DomainException('Only the linked applicant or an explicitly authorized HR recorder with recorded staff confirmation can reserve leave.');
-                }
-                $request = DB::table('leave_requests')->where('id', $onBehalfSubmission['request_id'])
-                    ->where('request_key', $requestKey)->where('requester_user_id', $onBehalfSubmission['applicant_user_id'])->first();
-                $consent = DB::table('leave_request_on_behalf_submissions')->where('request_id', $onBehalfSubmission['request_id'])
-                    ->where('applicant_user_id', $onBehalfSubmission['applicant_user_id'])->where('hr_actor_user_id', $actorId)
-                    ->where('operation_key', $onBehalfSubmission['submission_key'])->first();
-                if ($request === null || $consent === null || ! hash_equals($request->payload_hash, $onBehalfSubmission['payload_hash'])
-                    || ! hash_equals($consent->payload_hash, $onBehalfSubmission['payload_hash'])) {
-                    throw new DomainException('A matching immutable applicant consent record is required before creating the balance reservation.');
-                }
+            if ((int) $employee->user_id !== $actorId) {
+                throw new DomainException('Only the linked staff member may reserve their own leave request.');
             }
             if (count(array_filter($slots, fn (array $slot): bool => (int) substr($slot['date'], 0, 4) !== (int) $annual->leave_year)) > 0) {
                 throw new DomainException('This transaction slice accepts dates from one calendar year matching the Annual Leave account.');
             }
             $currentYear = (int) now('Asia/Kuala_Lumpur')->format('Y');
+            if ((int) $annual->leave_year > $currentYear) {
+                throw new DomainException('Annual Leave for a future year is unavailable until its entitlement has been credited on 1 January.');
+            }
             $registeredEntitlement = DB::table('leave_annual_entitlement_confirmations')
                 ->where('annual_account_id', $annualAccountId)
                 ->where('employee_id', $employee->id)
                 ->where('leave_year', $annual->leave_year)
                 ->lockForUpdate()
                 ->first(['confirmed_half_day_units']);
-            if ((int) $annual->leave_year > $currentYear && $registeredEntitlement === null) {
-                throw new DomainException('A future-year Annual Leave entitlement must be registered and HR-confirmed before submission.');
-            }
 
             $payload = [
                 'actor_id' => $actorId,
                 'annual_account_id' => $annualAccountId,
                 'employee_id' => (int) $employee->id,
-                'on_behalf_submission' => $onBehalfSubmission === null ? null : [
-                    'applicant_user_id' => $onBehalfSubmission['applicant_user_id'],
-                    'payload_hash' => $onBehalfSubmission['payload_hash'],
-                    'request_id' => $onBehalfSubmission['request_id'],
-                    'submission_key' => $onBehalfSubmission['submission_key'],
-                ],
                 'request_key' => $requestKey,
                 'requested_slots' => $slots,
                 'revision' => $revision,
@@ -113,17 +90,14 @@ class LeaveBalanceTransactionService
 
             $historyMarkerId = $this->recordUsageSnapshots((int) $employee->id, $actorId, $requestKey, $revision, $slots);
             $posted = $this->totals->forAccounts($annualAccountId, $tabungAccountId);
-            if ($registeredEntitlement !== null && (int) $annual->leave_year >= $currentYear) {
+            if ($registeredEntitlement !== null && (int) $annual->leave_year === $currentYear) {
                 $creditEntry = DB::table('leave_ledger_entries')->where('annual_account_id', $annualAccountId)
                     ->where('kind', 'annual_entitlement_credit')->first(['signed_half_day_units']);
                 if ($creditEntry === null) {
-                    $confirmedUnits = (int) $registeredEntitlement->confirmed_half_day_units;
-                    if ($posted['annual_half_day_units'] > PHP_INT_MAX - $confirmedUnits) {
-                        throw new OverflowException('The confirmed future-year entitlement exceeds the supported integer range.');
-                    }
-                    $posted['annual_half_day_units'] += $confirmedUnits;
-                } elseif ((int) $creditEntry->signed_half_day_units !== (int) $registeredEntitlement->confirmed_half_day_units) {
-                    throw new DomainException('The posted annual credit does not match its registered future-year entitlement.');
+                    throw new DomainException('A confirmed annual entitlement must be posted before it can be reserved.');
+                }
+                if ((int) $creditEntry->signed_half_day_units !== (int) $registeredEntitlement->confirmed_half_day_units) {
+                    throw new DomainException('The posted annual credit does not match its registered entitlement.');
                 }
             }
             $pendingAnnual = $this->sumFor('annual_units', 'annual_account_id', $annualAccountId);
@@ -133,6 +107,22 @@ class LeaveBalanceTransactionService
             $annualUnits = $before['projected_annual'] - $after['projected_annual'];
             $tabungUnits = $before['projected_tabung'] - $after['projected_tabung'];
             $tabungSourceYear = $tabungUnits > 0 ? $this->singleAvailableTabungSourceYear($tabungAccountId, $tabungUnits) : null;
+            $annualPositiveUnits = min(max($before['annual_available'], 0), $requestedUnits);
+            $allocationRows = [];
+            foreach ($slots as $index => $slot) {
+                $isTabung = $index >= $annualPositiveUnits && $index < $annualPositiveUnits + $tabungUnits;
+                $allocationRows[] = [
+                    'leave_year' => (int) $annual->leave_year,
+                    'leave_date' => $slot['date'],
+                    'session_code' => $slot['session'],
+                    'allocation_bucket' => $isTabung ? 'TABUNG' : 'ANNUAL',
+                    'annual_account_id' => $isTabung ? null : $annualAccountId,
+                    'tabung_account_id' => $isTabung ? $tabungAccountId : null,
+                    'source_year' => $isTabung ? $tabungSourceYear : null,
+                    'units' => 1,
+                    'created_at' => now(),
+                ];
+            }
 
             $reservationId = DB::table('leave_reservations')->insertGetId([
                 'employee_id' => $employee->id,
@@ -151,6 +141,12 @@ class LeaveBalanceTransactionService
                 'created_by' => $actorId,
                 'created_at' => now(),
             ]);
+            if (Schema::hasTable('leave_reservation_slot_allocations')) {
+                DB::table('leave_reservation_slot_allocations')->insert(array_map(
+                    fn (array $row): array => ['reservation_id' => $reservationId, ...$row],
+                    $allocationRows,
+                ));
+            }
             $this->recordActiveSlots($reservationId, (int) $employee->id, $slots);
             $this->recordEvent($reservationId, $operation['id'], 'RESERVED', $actorId);
             $this->audit('hr.leave.balance_reserved', $reservationId, $operationKey);
@@ -174,14 +170,22 @@ class LeaveBalanceTransactionService
                 throw new DomainException('The reservation does not exist.');
             }
             $employee = DB::table('employees')->where('id', $candidate->employee_id)->lockForUpdate()->first();
-            $annual = DB::table('leave_annual_accounts')->where('id', $candidate->annual_account_id)->lockForUpdate()->first();
-            $tabung = DB::table('leave_tabung_accounts')->where('id', $candidate->tabung_account_id)->lockForUpdate()->first();
+            if ($employee === null) {
+                throw new DomainException('A consistent employee reservation is required.');
+            }
+            $lockedAccounts = $this->lockReservationAccounts($candidate, $employee);
+            $annual = $lockedAccounts['annual_accounts']->get((int) $candidate->annual_account_id);
+            $tabung = $lockedAccounts['tabung'];
             $reservation = DB::table('leave_reservations')->where('id', $reservationId)->lockForUpdate()->first();
-            if ($annual === null || $tabung === null || $employee === null || $reservation === null
+            if ($reservation === null
                 || (int) $annual->employee_id !== (int) $employee->id || (int) $tabung->employee_id !== (int) $employee->id
                 || (int) $annual->leave_year !== (int) $reservation->leave_year) {
                 throw new DomainException('The reservation account scope is inconsistent.');
             }
+            $allocations = Schema::hasTable('leave_reservation_slot_allocations')
+                ? DB::table('leave_reservation_slot_allocations')->where('reservation_id', $reservationId)->orderBy('leave_year')->orderBy('leave_date')->orderBy('session_code')->lockForUpdate()->get()
+                : collect();
+            $annualUnitsByAccount = $this->assertSlotAllocationConsistency($reservation, $employee, $tabung, $lockedAccounts['annual_accounts'], $allocations);
             $this->assertFinalApprover($actorId, $employee, $finalAssignmentId);
             $payload = ['actor_id' => $actorId, 'assignment_id' => $finalAssignmentId, 'reservation_id' => $reservationId];
             $operation = $this->startOperation($operationKey, 'COMMIT', $payload, (int) $employee->id, $actorId);
@@ -192,7 +196,16 @@ class LeaveBalanceTransactionService
                 throw new DomainException('Only an active pending reservation can be committed.');
             }
 
-            $this->appendUsageEntry($reservation, $operation['id'], $actorId, $operationKey, 'annual_account_id', 'annual_units', null);
+            if ($allocations->isEmpty()) {
+                $this->appendUsageEntry($reservation, $operation['id'], $actorId, $operationKey, 'annual_account_id', 'annual_units', null);
+            } else {
+                foreach ($annualUnitsByAccount as $accountId => $units) {
+                    $allocationAccount = $lockedAccounts['annual_accounts']->get((int) $accountId);
+                    $entryReservation = (object) ['annual_account_id' => $accountId, 'annual_units' => $units];
+                    $this->appendUsageEntry($entryReservation, $operation['id'], $actorId, $operationKey.':year-'.$allocationAccount->leave_year,
+                        'annual_account_id', 'annual_units', null);
+                }
+            }
             $this->appendUsageEntry($reservation, $operation['id'], $actorId, $operationKey, 'tabung_account_id', 'tabung_units', $reservation->tabung_source_year);
             $this->resolveReservation($reservationId, 'COMMITTED');
             $this->recordEvent($reservationId, $operation['id'], 'COMMITTED', $actorId);
@@ -218,11 +231,14 @@ class LeaveBalanceTransactionService
                 throw new DomainException('The reservation does not exist.');
             }
             $employee = DB::table('employees')->where('id', $candidate->employee_id)->lockForUpdate()->first();
-            $annual = DB::table('leave_annual_accounts')->where('id', $candidate->annual_account_id)->lockForUpdate()->first();
-            $tabung = DB::table('leave_tabung_accounts')->where('id', $candidate->tabung_account_id)->lockForUpdate()->first();
+            if ($employee === null) {
+                throw new DomainException('A consistent employee reservation is required.');
+            }
+            $lockedAccounts = $this->lockReservationAccounts($candidate, $employee);
+            $annual = $lockedAccounts['annual_accounts']->get((int) $candidate->annual_account_id);
+            $tabung = $lockedAccounts['tabung'];
             $reservation = DB::table('leave_reservations')->where('id', $reservationId)->lockForUpdate()->first();
-            if ($annual === null || $tabung === null || $employee === null || $reservation === null
-                || (int) $annual->employee_id !== (int) $employee->id || (int) $tabung->employee_id !== (int) $employee->id
+            if ((int) $annual->employee_id !== (int) $employee->id || (int) $tabung->employee_id !== (int) $employee->id
                 || (int) $annual->leave_year !== (int) $reservation->leave_year) {
                 throw new DomainException('The reservation account scope is inconsistent.');
             }
@@ -264,13 +280,21 @@ class LeaveBalanceTransactionService
                 throw new DomainException('The reservation does not exist.');
             }
             $employee = DB::table('employees')->where('id', $candidate->employee_id)->lockForUpdate()->first();
-            $annual = DB::table('leave_annual_accounts')->where('id', $candidate->annual_account_id)->lockForUpdate()->first();
-            $tabung = DB::table('leave_tabung_accounts')->where('id', $candidate->tabung_account_id)->lockForUpdate()->first();
+            if ($employee === null) {
+                throw new DomainException('A consistent employee reservation is required.');
+            }
+            $lockedAccounts = $this->lockReservationAccounts($candidate, $employee);
+            $annual = $lockedAccounts['annual_accounts']->get((int) $candidate->annual_account_id);
+            $tabung = $lockedAccounts['tabung'];
             $reservation = DB::table('leave_reservations')->where('id', $reservationId)->lockForUpdate()->first();
-            if ($annual === null || $tabung === null || $employee === null || $reservation === null
+            if ($reservation === null
                 || (int) $annual->employee_id !== (int) $employee->id || (int) $tabung->employee_id !== (int) $employee->id) {
                 throw new DomainException('The reservation account scope is inconsistent.');
             }
+            $allocations = Schema::hasTable('leave_reservation_slot_allocations')
+                ? DB::table('leave_reservation_slot_allocations')->where('reservation_id', $reservationId)->orderBy('leave_year')->orderBy('leave_date')->orderBy('session_code')->lockForUpdate()->get()
+                : collect();
+            $this->assertSlotAllocationConsistency($reservation, $employee, $tabung, $lockedAccounts['annual_accounts'], $allocations);
             $this->assertActiveActor($actorId);
             if ($reason === 'WITHDRAWAL') {
                 if ((int) $employee->user_id !== $actorId) {
@@ -330,8 +354,12 @@ class LeaveBalanceTransactionService
                 throw new DomainException('The reservation does not exist.');
             }
             $employee = DB::table('employees')->where('id', $candidate->employee_id)->lockForUpdate()->first();
-            $annual = DB::table('leave_annual_accounts')->where('id', $candidate->annual_account_id)->lockForUpdate()->first();
-            $tabung = DB::table('leave_tabung_accounts')->where('id', $candidate->tabung_account_id)->lockForUpdate()->first();
+            if ($employee === null) {
+                throw new DomainException('A consistent employee reservation is required.');
+            }
+            $lockedAccounts = $this->lockReservationAccounts($candidate, $employee);
+            $annual = $lockedAccounts['annual_accounts']->get((int) $candidate->annual_account_id);
+            $tabung = $lockedAccounts['tabung'];
             $reservation = DB::table('leave_reservations')->where('id', $reservationId)->lockForUpdate()->first();
             $action = DB::table('leave_request_cancellation_actions')->where('id', $cancellationActionId)->lockForUpdate()->first();
             $requestRevision = DB::table('leave_request_revisions as revision')
@@ -343,8 +371,7 @@ class LeaveBalanceTransactionService
                     'request.id as request_id', 'request.leave_type', 'request.status', 'request.current_revision',
                     'request.requester_user_id', 'revision.revision',
                 ]);
-            if ($annual === null || $tabung === null || $employee === null || $reservation === null
-                || (int) $annual->employee_id !== (int) $employee->id || (int) $tabung->employee_id !== (int) $employee->id
+            if ($reservation === null
                 || (int) $annual->leave_year !== (int) $reservation->leave_year
                 || $action === null || $action->action_code !== 'CONFIRMED' || (int) $action->actor_id !== $actorId
                 || (int) $action->assignment_id !== $assignmentId || $requestRevision === null
@@ -352,6 +379,10 @@ class LeaveBalanceTransactionService
                 || (int) $requestRevision->current_revision !== (int) $requestRevision->revision) {
                 throw new DomainException('A current confirmed Annual Leave cancellation is required for this reservation.');
             }
+            $allocations = Schema::hasTable('leave_reservation_slot_allocations')
+                ? DB::table('leave_reservation_slot_allocations')->where('reservation_id', $reservationId)->orderBy('leave_year')->orderBy('leave_date')->orderBy('session_code')->lockForUpdate()->get()
+                : collect();
+            $annualUnitsByAccount = $this->assertSlotAllocationConsistency($reservation, $employee, $tabung, $lockedAccounts['annual_accounts'], $allocations);
             $this->assertGeneralManagerAssignment($actorId, $assignmentId, $employee);
             $latestCycle = (int) DB::table('leave_request_cancellation_actions')->where('request_id', $requestRevision->request_id)->max('cycle');
             $hasRequestAction = DB::table('leave_request_cancellation_actions')->where('request_id', $requestRevision->request_id)
@@ -387,29 +418,30 @@ class LeaveBalanceTransactionService
             }
             $usageEntries = DB::table('leave_ledger_entries')->where('balance_operation_id', $committedEvent->balance_operation_id)
                 ->where('kind', 'approved_leave_use')->lockForUpdate()->get();
-            if ($usageEntries->count() !== 1) {
-                throw new DomainException('The original approved usage allocation is not a single Annual Leave entry.');
+            $usageEntriesByAnnualAccount = $usageEntries->keyBy('annual_account_id');
+            if ($usageEntries->count() !== count($annualUnitsByAccount) || $usageEntriesByAnnualAccount->count() !== count($annualUnitsByAccount)) {
+                throw new DomainException('The original annual usage entries do not match the per-date source allocation.');
             }
-            $usage = $usageEntries[0];
-            if ((int) $usage->annual_account_id !== (int) $reservation->annual_account_id
-                || $usage->tabung_account_id !== null || (int) $usage->signed_half_day_units !== -((int) $reservation->annual_units)
-                || $usage->source_year !== null || $usage->reverses_entry_id !== null) {
-                throw new DomainException('The original Annual Leave usage entry does not match the reservation allocation.');
+            foreach ($annualUnitsByAccount as $accountId => $units) {
+                $usage = $usageEntriesByAnnualAccount->get($accountId);
+                if ($usage === null || (int) $usage->annual_account_id !== (int) $accountId
+                    || $usage->tabung_account_id !== null || (int) $usage->signed_half_day_units !== -$units
+                    || $usage->source_year !== null || $usage->reverses_entry_id !== null
+                    || DB::table('leave_ledger_entries')->where('reverses_entry_id', $usage->id)->exists()) {
+                    throw new DomainException('An original Annual Leave usage entry is inconsistent or already reversed.');
+                }
+                $accountYear = (int) $lockedAccounts['annual_accounts']->get($accountId)->leave_year;
+                DB::table('leave_ledger_entries')->insert([
+                    'annual_account_id' => $accountId,
+                    'balance_operation_id' => $operation['id'],
+                    'signed_half_day_units' => $units,
+                    'kind' => 'approved_leave_cancellation',
+                    'source_year' => null,
+                    'operation_key' => $allocations->isEmpty() ? $operationKey.':annual' : $operationKey.':annual:'.$accountYear,
+                    'reverses_entry_id' => $usage->id,
+                    'actor_id' => $actorId,
+                ]);
             }
-            if (DB::table('leave_ledger_entries')->where('reverses_entry_id', $usage->id)->exists()) {
-                throw new DomainException('The original Annual Leave usage already has a reversal.');
-            }
-
-            DB::table('leave_ledger_entries')->insert([
-                'annual_account_id' => $reservation->annual_account_id,
-                'balance_operation_id' => $operation['id'],
-                'signed_half_day_units' => abs((int) $usage->signed_half_day_units),
-                'kind' => 'approved_leave_cancellation',
-                'source_year' => null,
-                'operation_key' => $operationKey.':annual',
-                'reverses_entry_id' => $usage->id,
-                'actor_id' => $actorId,
-            ]);
 
             $updated = DB::table('leave_reservations')->where('id', $reservationId)->where('status', 'COMMITTED')
                 ->update(['status' => 'CANCELLED', 'resolved_at' => now()]);
@@ -450,8 +482,12 @@ class LeaveBalanceTransactionService
                 throw new DomainException('The reservation does not exist.');
             }
             $employee = DB::table('employees')->where('id', $candidate->employee_id)->lockForUpdate()->first();
-            $annual = DB::table('leave_annual_accounts')->where('id', $candidate->annual_account_id)->lockForUpdate()->first();
-            $tabung = DB::table('leave_tabung_accounts')->where('id', $candidate->tabung_account_id)->lockForUpdate()->first();
+            if ($employee === null) {
+                throw new DomainException('A consistent employee reservation is required.');
+            }
+            $lockedAccounts = $this->lockReservationAccounts($candidate, $employee);
+            $annual = $lockedAccounts['annual_accounts']->get((int) $candidate->annual_account_id);
+            $tabung = $lockedAccounts['tabung'];
             $reservation = DB::table('leave_reservations')->where('id', $reservationId)->lockForUpdate()->first();
             $partialCancellation = DB::table('leave_request_partial_cancellations')->where('id', $partialCancellationId)->lockForUpdate()->first();
             $requestRevision = DB::table('leave_request_revisions as revision')
@@ -463,9 +499,7 @@ class LeaveBalanceTransactionService
                     'request.id as request_id', 'request.leave_type', 'request.status', 'request.current_revision',
                     'request.requester_user_id', 'revision.revision',
                 ]);
-            if ($employee === null || $annual === null || $tabung === null || $reservation === null
-                || (int) $annual->employee_id !== (int) $employee->id || (int) $tabung->employee_id !== (int) $employee->id
-                || (int) $annual->leave_year !== (int) $reservation->leave_year
+            if ($reservation === null || (int) $annual->leave_year !== (int) $reservation->leave_year
                 || $partialCancellation === null || $partialCancellation->status !== 'CONFIRMED'
                 || (int) $partialCancellation->general_manager_user_id !== $actorId
                 || (int) $partialCancellation->general_manager_assignment_id !== $assignmentId
@@ -476,6 +510,10 @@ class LeaveBalanceTransactionService
                 || (int) $partialCancellation->unused_half_day_units < 1) {
                 throw new DomainException('A current, verified, Annual-funded partial cancellation confirmed by the General Manager is required.');
             }
+            $allocations = Schema::hasTable('leave_reservation_slot_allocations')
+                ? DB::table('leave_reservation_slot_allocations')->where('reservation_id', $reservationId)->orderBy('leave_year')->orderBy('leave_date')->orderBy('session_code')->lockForUpdate()->get()
+                : collect();
+            $annualUnitsByAccount = $this->assertSlotAllocationConsistency($reservation, $employee, $tabung, $lockedAccounts['annual_accounts'], $allocations);
             $this->assertGeneralManagerAssignment($actorId, $assignmentId, $employee);
 
             $unusedUnits = (int) $partialCancellation->unused_half_day_units;
@@ -493,6 +531,23 @@ class LeaveBalanceTransactionService
             if ((int) $reservation->annual_units !== (int) $reservation->requested_units) {
                 throw new DomainException('Partial restoration is deferred until the original source allocation can be matched exactly.');
             }
+            $unusedUnitsByAccount = [];
+            if ($allocations->isEmpty()) {
+                $unusedUnitsByAccount[(int) $reservation->annual_account_id] = $unusedUnits;
+            } else {
+                foreach ($allocations as $allocation) {
+                    if ($allocation->allocation_bucket !== 'ANNUAL') {
+                        throw new DomainException('Partial restoration requires a per-date Annual Leave-only source map.');
+                    }
+                    if ($allocation->leave_date > $partialCancellation->actual_return_date) {
+                        $accountId = (int) $allocation->annual_account_id;
+                        $unusedUnitsByAccount[$accountId] = ($unusedUnitsByAccount[$accountId] ?? 0) + (int) $allocation->units;
+                    }
+                }
+                if (array_sum($unusedUnitsByAccount) !== $unusedUnits) {
+                    throw new DomainException('The confirmed unused sessions do not match the per-date Annual Leave source map.');
+                }
+            }
 
             $committedEvent = DB::table('leave_reservation_events')->where('reservation_id', $reservationId)
                 ->where('event_code', 'COMMITTED')->lockForUpdate()->first();
@@ -501,31 +556,37 @@ class LeaveBalanceTransactionService
             }
             $usageEntries = DB::table('leave_ledger_entries')->where('balance_operation_id', $committedEvent->balance_operation_id)
                 ->where('kind', 'approved_leave_use')->lockForUpdate()->get();
-            if ($usageEntries->count() !== 1) {
-                throw new DomainException('The original approved usage allocation is not a single Annual Leave entry.');
+            $usageEntriesByAnnualAccount = $usageEntries->keyBy('annual_account_id');
+            if ($usageEntries->count() !== count($annualUnitsByAccount) || $usageEntriesByAnnualAccount->count() !== count($annualUnitsByAccount)) {
+                throw new DomainException('The original annual usage entries do not match the per-date source allocation.');
             }
-            $usage = $usageEntries[0];
-            if ((int) $usage->annual_account_id !== (int) $reservation->annual_account_id
-                || $usage->tabung_account_id !== null || (int) $usage->signed_half_day_units !== -((int) $reservation->annual_units)
-                || $usage->source_year !== null || $usage->reverses_entry_id !== null) {
-                throw new DomainException('The original Annual Leave usage entry does not match the reservation allocation.');
+            foreach ($annualUnitsByAccount as $accountId => $originalUnits) {
+                $usage = $usageEntriesByAnnualAccount->get($accountId);
+                if ($usage === null || $usage->tabung_account_id !== null || (int) $usage->signed_half_day_units !== -$originalUnits
+                    || $usage->source_year !== null || $usage->reverses_entry_id !== null) {
+                    throw new DomainException('An original Annual Leave usage entry does not match its source allocation.');
+                }
+                $refundUnits = $unusedUnitsByAccount[$accountId] ?? 0;
+                if ($refundUnits < 1) {
+                    continue;
+                }
+                $alreadyReversed = $this->integerTotal((string) DB::table('leave_ledger_entries')->where('reverses_entry_id', $usage->id)
+                    ->selectRaw('CAST(COALESCE(SUM(signed_half_day_units), 0) AS CHAR) AS units')->value('units'));
+                if ($alreadyReversed < 0 || $alreadyReversed + $refundUnits > abs((int) $usage->signed_half_day_units)) {
+                    throw new DomainException('The partial refund would exceed the original Annual Leave usage.');
+                }
+                $accountYear = (int) $lockedAccounts['annual_accounts']->get($accountId)->leave_year;
+                DB::table('leave_ledger_entries')->insert([
+                    'annual_account_id' => $accountId,
+                    'balance_operation_id' => $operation['id'],
+                    'signed_half_day_units' => $refundUnits,
+                    'kind' => 'approved_leave_partial_cancellation',
+                    'source_year' => null,
+                    'operation_key' => $allocations->isEmpty() ? $operationKey.':annual' : $operationKey.':annual:'.$accountYear,
+                    'reverses_entry_id' => $usage->id,
+                    'actor_id' => $actorId,
+                ]);
             }
-            $alreadyReversed = $this->integerTotal((string) DB::table('leave_ledger_entries')->where('reverses_entry_id', $usage->id)
-                ->selectRaw('CAST(COALESCE(SUM(signed_half_day_units), 0) AS CHAR) AS units')->value('units'));
-            if ($alreadyReversed < 0 || $alreadyReversed + $unusedUnits > abs((int) $usage->signed_half_day_units)) {
-                throw new DomainException('The partial refund would exceed the original Annual Leave usage.');
-            }
-
-            DB::table('leave_ledger_entries')->insert([
-                'annual_account_id' => $reservation->annual_account_id,
-                'balance_operation_id' => $operation['id'],
-                'signed_half_day_units' => $unusedUnits,
-                'kind' => 'approved_leave_partial_cancellation',
-                'source_year' => null,
-                'operation_key' => $operationKey.':annual',
-                'reverses_entry_id' => $usage->id,
-                'actor_id' => $actorId,
-            ]);
             $releasedSlots = DB::table('leave_active_slots')->where('reservation_id', $reservationId)->where('status', 'COMMITTED')
                 ->where('leave_date', '>', $partialCancellation->actual_return_date)
                 ->update(['status' => 'RELEASED', 'active_slot_key' => null, 'resolved_at' => now()]);
@@ -793,20 +854,6 @@ class LeaveBalanceTransactionService
         }
     }
 
-    private function assertAuthorizedHrRecorder(int $actorId): void
-    {
-        if (! DB::table('permissions')->where('name', 'leave.request.record-on-behalf')->where('guard_name', 'web')->exists()) {
-            throw new DomainException('The local-only HR-assisted submission permission is not configured.');
-        }
-        $lockedActor = DB::table('users')->where('id', $actorId)->lockForUpdate()->first(['status', 'username']);
-        $actor = User::query()->find($actorId);
-        if ($lockedActor === null || $lockedActor->status !== 'ACTIVE' || $lockedActor->username === null
-            || $actor === null || $actor->status !== 'ACTIVE' || $actor->username === null
-            || ! $actor->hasPermissionTo('leave.request.record-on-behalf', 'web')) {
-            throw new DomainException('An active account with explicit HR-assisted submission authority is required.');
-        }
-    }
-
     private function resolveReservation(int $reservationId, string $status): void
     {
         $reservation = DB::table('leave_reservations')->where('id', $reservationId)->first(['requested_units']);
@@ -843,6 +890,91 @@ class LeaveBalanceTransactionService
         ]);
     }
 
+    /**
+     * @return array{annual_accounts:Collection<int, stdClass>,tabung:stdClass}
+     */
+    private function lockReservationAccounts(stdClass $candidate, stdClass $employee): array
+    {
+        $annualAccountIds = [(int) $candidate->annual_account_id];
+        if (Schema::hasTable('leave_reservation_slot_allocations')) {
+            $annualAccountIds = array_merge($annualAccountIds, DB::table('leave_reservation_slot_allocations')
+                ->where('reservation_id', $candidate->id)->where('allocation_bucket', 'ANNUAL')
+                ->pluck('annual_account_id')->map(fn (mixed $id): int => (int) $id)->all());
+        }
+        $annualAccountIds = array_values(array_unique($annualAccountIds));
+        sort($annualAccountIds, SORT_NUMERIC);
+        $annualAccounts = DB::table('leave_annual_accounts')->whereIn('id', $annualAccountIds)
+            ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        if ($annualAccounts->count() !== count($annualAccountIds)) {
+            throw new DomainException('A reservation references a missing Annual Leave account.');
+        }
+        foreach ($annualAccounts as $account) {
+            if ((int) $account->employee_id !== (int) $employee->id) {
+                throw new DomainException('All reservation Annual Leave accounts must belong to the same employee.');
+            }
+        }
+        $tabung = DB::table('leave_tabung_accounts')->where('id', $candidate->tabung_account_id)->lockForUpdate()->first();
+        if ($tabung === null || (int) $tabung->employee_id !== (int) $employee->id) {
+            throw new DomainException('The reservation Tabung account must belong to the same employee.');
+        }
+
+        return ['annual_accounts' => $annualAccounts, 'tabung' => $tabung];
+    }
+
+    /**
+     * @param  Collection<int, stdClass>  $annualAccounts
+     * @param  Collection<int, stdClass>  $allocations
+     * @return array<int, int>
+     */
+    private function assertSlotAllocationConsistency(stdClass $reservation, stdClass $employee, stdClass $tabung, Collection $annualAccounts, Collection $allocations): array
+    {
+        if ($allocations->isEmpty()) {
+            return (int) $reservation->annual_units > 0 ? [(int) $reservation->annual_account_id => (int) $reservation->annual_units] : [];
+        }
+        if ($allocations->count() !== (int) $reservation->requested_units) {
+            throw new DomainException('The per-date source map must cover every reserved slot exactly once.');
+        }
+
+        $annualUnitsByAccount = [];
+        $annualUnits = 0;
+        $tabungUnits = 0;
+        $tabungSourceYears = [];
+        foreach ($allocations as $allocation) {
+            if ((int) $allocation->units !== 1 || (int) $allocation->leave_year !== (int) substr($allocation->leave_date, 0, 4)
+                || ! in_array($allocation->session_code, ['AM', 'PM'], true)) {
+                throw new DomainException('A per-date source allocation has an invalid date, session or unit count.');
+            }
+            if ($allocation->allocation_bucket === 'ANNUAL') {
+                $account = $annualAccounts->get((int) $allocation->annual_account_id);
+                if ($account === null || (int) $account->employee_id !== (int) $employee->id
+                    || (int) $account->leave_year !== (int) $allocation->leave_year
+                    || $allocation->tabung_account_id !== null || $allocation->source_year !== null) {
+                    throw new DomainException('An Annual Leave source allocation does not match its employee and calendar year.');
+                }
+                $annualUnitsByAccount[(int) $account->id] = ($annualUnitsByAccount[(int) $account->id] ?? 0) + 1;
+                $annualUnits++;
+            } elseif ($allocation->allocation_bucket === 'TABUNG') {
+                if ($allocation->annual_account_id !== null || (int) $allocation->tabung_account_id !== (int) $tabung->id
+                    || (int) $tabung->employee_id !== (int) $employee->id || $allocation->source_year === null) {
+                    throw new DomainException('A Tabung source allocation does not match its account and provenance.');
+                }
+                $tabungSourceYears[(int) $allocation->source_year] = true;
+                $tabungUnits++;
+            } else {
+                throw new DomainException('A per-date source allocation has an unsupported bucket.');
+            }
+        }
+
+        if ($annualUnits !== (int) $reservation->annual_units || $tabungUnits !== (int) $reservation->tabung_units
+            || count($tabungSourceYears) > 1
+            || ($tabungUnits === 0 && $reservation->tabung_source_year !== null)
+            || ($tabungUnits > 0 && (count($tabungSourceYears) !== 1 || (int) array_key_first($tabungSourceYears) !== (int) $reservation->tabung_source_year))) {
+            throw new DomainException('The per-date source map does not match the reservation balance totals and Tabung source year.');
+        }
+
+        return $annualUnitsByAccount;
+    }
+
     /** @return array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int} */
     private function reservationResult(int $reservationId): array
     {
@@ -867,10 +999,27 @@ class LeaveBalanceTransactionService
             'tabung_units' => 'CAST(COALESCE(SUM(tabung_units), 0) AS CHAR) AS units',
             default => throw new DomainException('The requested reservation total is unsupported.'),
         };
-        $total = DB::table('leave_reservations')->where($accountColumn, $accountId)->where('status', 'ACTIVE')
-            ->selectRaw($expression)->value('units');
+        $query = DB::table('leave_reservations')->where($accountColumn, $accountId)->where('status', 'ACTIVE');
+        if ($sumColumn === 'annual_units' && Schema::hasTable('leave_reservation_slot_allocations')) {
+            $query->whereNotExists(function ($subquery): void {
+                $subquery->selectRaw('1')->from('leave_reservation_slot_allocations as allocations')
+                    ->whereColumn('allocations.reservation_id', 'leave_reservations.id');
+            });
+        }
+        $legacyTotal = $this->integerTotal($query->selectRaw($expression)->value('units'));
+        if ($sumColumn !== 'annual_units' || ! Schema::hasTable('leave_reservation_slot_allocations')) {
+            return $legacyTotal;
+        }
 
-        return $this->integerTotal($total);
+        $allocatedTotal = $this->integerTotal(DB::table('leave_reservation_slot_allocations as allocations')
+            ->join('leave_reservations as reservations', 'reservations.id', '=', 'allocations.reservation_id')
+            ->where('allocations.allocation_bucket', 'ANNUAL')->where('allocations.annual_account_id', $accountId)
+            ->where('reservations.status', 'ACTIVE')->selectRaw('CAST(COALESCE(SUM(allocations.units), 0) AS CHAR) AS units')->value('units'));
+        if ($legacyTotal > PHP_INT_MAX - $allocatedTotal) {
+            throw new OverflowException('The active Annual Leave reservation total exceeds the supported integer range.');
+        }
+
+        return $legacyTotal + $allocatedTotal;
     }
 
     private function integerTotal(mixed $value): int

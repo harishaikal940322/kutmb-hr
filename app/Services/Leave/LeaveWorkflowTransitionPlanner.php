@@ -37,11 +37,11 @@ class LeaveWorkflowTransitionPlanner
             ];
         }
         if (! $current['is_final']) {
-            if (! in_array($action, ['SUPPORT', 'NOT_SUPPORT'], true)) {
-                throw new DomainException('A support stage only accepts support or not-support decisions.');
+            if ($action === 'NOT_SUPPORT') {
+                throw new DomainException('CT-DEC-008 is unresolved; a not-supported request cannot be forwarded or rejected automatically.');
             }
-            if ($action === 'NOT_SUPPORT' && ! $hasReason) {
-                throw new DomainException('A reason is required when an officer does not support a request.');
+            if ($action !== 'SUPPORT') {
+                throw new DomainException('A support stage only accepts a support decision in the current slice.');
             }
             $next = $route[$currentStepOrder] ?? null;
             if ($next === null) {
