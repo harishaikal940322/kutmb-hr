@@ -348,6 +348,148 @@ class LeaveRequestWorkflowServiceTest extends TestCase
         $this->assertSame(1, DB::table('leave_workflow_actions')->where('revision_id', DB::table('leave_request_revisions')->where('request_id', $submitted['request_id'])->value('id'))->where('action_code', 'RETURN_FOR_CORRECTION')->count());
     }
 
+    public function test_mid_leave_partial_cancellation_requires_hr_verification_and_gm_confirmation(): void
+    {
+        $fixture = $this->fixture('partialcancel');
+        $approvers = $this->staffApprovers($fixture);
+        $hr = $this->user('partial-hr');
+        $hr->givePermissionTo('leave.partial-cancellation.review');
+        $service = app(LeaveRequestWorkflowService::class);
+        $submitted = $service->submit(
+            $fixture['user']->id,
+            $fixture['annual_id'],
+            $fixture['tabung_id'],
+            'partial-submit-'.$fixture['suffix'],
+            'AL',
+            [
+                ['date' => '2026-03-02', 'session' => 'AM'],
+                ['date' => '2026-03-02', 'session' => 'PM'],
+                ['date' => '2026-03-06', 'session' => 'AM'],
+                ['date' => '2026-03-06', 'session' => 'PM'],
+            ],
+            'Synthetic short-notice reason',
+        );
+        $service->decide($approvers['pu']->id, $submitted['request_id'], 'partial-support-'.$fixture['suffix'], 'SUPPORT');
+        $service->decide($approvers['pb']->id, $submitted['request_id'], 'partial-approve-'.$fixture['suffix'], 'APPROVE');
+        $requestKey = 'partial-request-'.$fixture['suffix'];
+        $partial = $service->requestApprovedAnnualLeavePartialCancellation(
+            $fixture['user']->id, $submitted['request_id'], $requestKey, 'Synthetic early return request',
+        );
+        $requestReplay = $service->requestApprovedAnnualLeavePartialCancellation(
+            $fixture['user']->id, $submitted['request_id'], $requestKey, 'Synthetic early return request',
+        );
+        $this->assertDomainException(fn () => $service->requestApprovedAnnualLeavePartialCancellation(
+            $fixture['user']->id, $submitted['request_id'], 'partial-request-duplicate-'.$fixture['suffix'], 'Synthetic duplicate request',
+        ));
+
+        Carbon::setTestNow('2026-03-05T09:00:00+08:00');
+        $verificationKey = 'partial-verify-'.$fixture['suffix'];
+        $verified = $service->verifyApprovedAnnualLeavePartialCancellation(
+            $hr->id, $submitted['request_id'], $partial['partial_cancellation_id'], $verificationKey, '2026-03-04', 'Synthetic HR return verification',
+        );
+        $verificationReplay = $service->verifyApprovedAnnualLeavePartialCancellation(
+            $hr->id, $submitted['request_id'], $partial['partial_cancellation_id'], $verificationKey, '2026-03-04', 'Synthetic HR return verification',
+        );
+        $decisionKey = 'partial-confirm-'.$fixture['suffix'];
+        $confirmed = $service->decideApprovedAnnualLeavePartialCancellation(
+            $approvers['pb']->id, $submitted['request_id'], $partial['partial_cancellation_id'], $decisionKey, 'CONFIRM',
+        );
+        $decisionReplay = $service->decideApprovedAnnualLeavePartialCancellation(
+            $approvers['pb']->id, $submitted['request_id'], $partial['partial_cancellation_id'], $decisionKey, 'CONFIRM',
+        );
+
+        $this->assertTrue($requestReplay['replayed']);
+        $this->assertSame(2, $verified['unused_half_day_units']);
+        $this->assertTrue($verificationReplay['replayed']);
+        $this->assertSame('APPROVED', $confirmed['status']);
+        $this->assertSame(2, $confirmed['refunded_half_day_units']);
+        $this->assertTrue($decisionReplay['replayed']);
+        $originalUsage = DB::table('leave_ledger_entries')->where('kind', 'approved_leave_use')->sole();
+        $partialRefund = DB::table('leave_ledger_entries')->where('kind', 'approved_leave_partial_cancellation')->sole();
+        $this->assertSame('APPROVED', DB::table('leave_requests')->where('id', $submitted['request_id'])->value('status'));
+        $this->assertSame('COMMITTED', DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('status'));
+        $this->assertSame(-4, (int) $originalUsage->signed_half_day_units);
+        $this->assertSame(2, (int) $partialRefund->signed_half_day_units);
+        $this->assertSame($originalUsage->id, $partialRefund->reverses_entry_id);
+        $this->assertSame($originalUsage->annual_account_id, $partialRefund->annual_account_id);
+        $this->assertSame(2, (int) DB::table('leave_ledger_reversal_totals')->where('original_entry_id', $originalUsage->id)->value('reversed_units'));
+        $this->assertSame(1, DB::table('leave_ledger_entries')->where('kind', 'approved_leave_partial_cancellation')->count());
+        $this->assertSame(2, DB::table('leave_active_slots')->where('reservation_id', $submitted['reservation_id'])->where('status', 'COMMITTED')->count());
+        $this->assertSame(2, DB::table('leave_active_slots')->where('reservation_id', $submitted['reservation_id'])->where('status', 'RELEASED')->count());
+        $this->assertSame(1, DB::table('leave_reservation_events')->where('reservation_id', $submitted['reservation_id'])->where('event_code', 'PARTIAL_REFUND')->count());
+        $this->assertSame(3, DB::table('leave_request_partial_cancellation_events')->where('partial_cancellation_id', $partial['partial_cancellation_id'])->count());
+        $this->assertSame('CONFIRMED', DB::table('leave_request_partial_cancellations')->where('id', $partial['partial_cancellation_id'])->value('status'));
+    }
+
+    public function test_partial_cancellation_of_tabung_funded_leave_fails_closed(): void
+    {
+        $fixture = $this->fixture('partialtabung');
+        $approvers = $this->staffApprovers($fixture);
+        $this->seedAnnualDeficitAndTabungCredit($fixture);
+        $service = app(LeaveRequestWorkflowService::class);
+        $submitted = $service->submit(
+            $fixture['user']->id,
+            $fixture['annual_id'],
+            $fixture['tabung_id'],
+            'partial-tabung-submit-'.$fixture['suffix'],
+            'AL',
+            [
+                ['date' => '2026-03-02', 'session' => 'AM'],
+                ['date' => '2026-03-06', 'session' => 'AM'],
+            ],
+            'Synthetic short-notice reason',
+        );
+        $this->assertSame(1, (int) DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('tabung_units'));
+        $service->decide($approvers['pu']->id, $submitted['request_id'], 'partial-tabung-support-'.$fixture['suffix'], 'SUPPORT');
+        $service->decide($approvers['pb']->id, $submitted['request_id'], 'partial-tabung-approve-'.$fixture['suffix'], 'APPROVE');
+
+        $this->assertDomainException(fn () => $service->requestApprovedAnnualLeavePartialCancellation(
+            $fixture['user']->id, $submitted['request_id'], 'partial-tabung-request-'.$fixture['suffix'], 'Synthetic early return request',
+        ));
+
+        $this->assertSame('APPROVED', DB::table('leave_requests')->where('id', $submitted['request_id'])->value('status'));
+        $this->assertSame('COMMITTED', DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('status'));
+        $this->assertSame(0, DB::table('leave_request_partial_cancellations')->where('request_id', $submitted['request_id'])->count());
+    }
+
+    public function test_partial_cancellation_does_not_guess_usage_on_a_requested_return_date(): void
+    {
+        $fixture = $this->fixture('partialreturnboundary');
+        $approvers = $this->staffApprovers($fixture);
+        $hr = $this->user('partial-boundary-hr');
+        $hr->givePermissionTo('leave.partial-cancellation.review');
+        $service = app(LeaveRequestWorkflowService::class);
+        $submitted = $service->submit(
+            $fixture['user']->id,
+            $fixture['annual_id'],
+            $fixture['tabung_id'],
+            'partial-boundary-submit-'.$fixture['suffix'],
+            'AL',
+            [
+                ['date' => '2026-03-02', 'session' => 'AM'],
+                ['date' => '2026-03-02', 'session' => 'PM'],
+                ['date' => '2026-03-04', 'session' => 'AM'],
+                ['date' => '2026-03-06', 'session' => 'AM'],
+            ],
+            'Synthetic short-notice reason',
+        );
+        $service->decide($approvers['pu']->id, $submitted['request_id'], 'partial-boundary-support-'.$fixture['suffix'], 'SUPPORT');
+        $service->decide($approvers['pb']->id, $submitted['request_id'], 'partial-boundary-approve-'.$fixture['suffix'], 'APPROVE');
+        $partial = $service->requestApprovedAnnualLeavePartialCancellation(
+            $fixture['user']->id, $submitted['request_id'], 'partial-boundary-request-'.$fixture['suffix'], 'Synthetic early return request',
+        );
+
+        Carbon::setTestNow('2026-03-05T09:00:00+08:00');
+        $this->assertDomainException(fn () => $service->verifyApprovedAnnualLeavePartialCancellation(
+            $hr->id, $submitted['request_id'], $partial['partial_cancellation_id'], 'partial-boundary-verify-'.$fixture['suffix'], '2026-03-04', 'Synthetic HR return verification',
+        ));
+
+        $this->assertSame('APPROVED', DB::table('leave_requests')->where('id', $submitted['request_id'])->value('status'));
+        $this->assertSame('COMMITTED', DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('status'));
+        $this->assertSame('REQUESTED', DB::table('leave_request_partial_cancellations')->where('id', $partial['partial_cancellation_id'])->value('status'));
+        $this->assertSame(1, DB::table('leave_request_partial_cancellation_events')->where('partial_cancellation_id', $partial['partial_cancellation_id'])->count());
+    }
+
     public function test_correction_return_does_not_release_a_hold_after_leave_starts(): void
     {
         $fixture = $this->fixture('correctionstarted');

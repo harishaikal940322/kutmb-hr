@@ -381,6 +381,117 @@ class LeaveBalanceTransactionService
         }, 3);
     }
 
+    /**
+     * @return array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int,refunded_units:int}
+     */
+    public function refundPartiallyCancelledAnnualLeave(int $actorId, int $reservationId, int $partialCancellationId, int $assignmentId, string $operationKey): array
+    {
+        $this->assertLocal();
+        $this->validateKeys((string) $reservationId, $operationKey);
+        if ($partialCancellationId < 1 || $assignmentId < 1) {
+            throw new DomainException('A verified partial cancellation and current General Manager assignment are required.');
+        }
+
+        return DB::transaction(function () use ($actorId, $reservationId, $partialCancellationId, $assignmentId, $operationKey): array {
+            foreach (['leave_calendar_confirmation_guard', 'leave_working_schedule_guard', 'office_assignment_guard'] as $guard) {
+                if (DB::table($guard)->where('id', 1)->lockForUpdate()->first() === null) {
+                    throw new RuntimeException('Leave calendar, schedule, and assignment guards must be available for partial cancellation.');
+                }
+            }
+            $candidate = DB::table('leave_reservations')->where('id', $reservationId)->first();
+            if ($candidate === null) {
+                throw new DomainException('The reservation does not exist.');
+            }
+            $employee = DB::table('employees')->where('id', $candidate->employee_id)->lockForUpdate()->first();
+            $annual = DB::table('leave_annual_accounts')->where('id', $candidate->annual_account_id)->lockForUpdate()->first();
+            $tabung = DB::table('leave_tabung_accounts')->where('id', $candidate->tabung_account_id)->lockForUpdate()->first();
+            $reservation = DB::table('leave_reservations')->where('id', $reservationId)->lockForUpdate()->first();
+            $partialCancellation = DB::table('leave_request_partial_cancellations')->where('id', $partialCancellationId)->lockForUpdate()->first();
+            $requestRevision = DB::table('leave_request_revisions as revision')
+                ->join('leave_requests as request', 'request.id', '=', 'revision.request_id')
+                ->where('revision.reservation_id', $reservationId)
+                ->where('revision.id', $partialCancellation?->revision_id)
+                ->lockForUpdate()
+                ->first([
+                    'request.id as request_id', 'request.leave_type', 'request.status', 'request.current_revision',
+                    'request.requester_user_id', 'revision.revision',
+                ]);
+            if ($employee === null || $annual === null || $tabung === null || $reservation === null
+                || (int) $annual->employee_id !== (int) $employee->id || (int) $tabung->employee_id !== (int) $employee->id
+                || (int) $annual->leave_year !== (int) $reservation->leave_year
+                || $partialCancellation === null || $partialCancellation->status !== 'CONFIRMED'
+                || (int) $partialCancellation->general_manager_user_id !== $actorId
+                || (int) $partialCancellation->general_manager_assignment_id !== $assignmentId
+                || $requestRevision === null || $requestRevision->leave_type !== 'AL' || $requestRevision->status !== 'APPROVED'
+                || (int) $requestRevision->current_revision !== (int) $requestRevision->revision
+                || (int) $partialCancellation->requested_by !== (int) $requestRevision->requester_user_id
+                || $reservation->status !== 'COMMITTED' || (int) $reservation->tabung_units !== 0
+                || (int) $partialCancellation->unused_half_day_units < 1) {
+                throw new DomainException('A current, verified, Annual-funded partial cancellation confirmed by the General Manager is required.');
+            }
+            $this->assertGeneralManagerAssignment($actorId, $assignmentId, $employee);
+
+            $unusedUnits = (int) $partialCancellation->unused_half_day_units;
+            $payload = [
+                'actor_id' => $actorId,
+                'assignment_id' => $assignmentId,
+                'partial_cancellation_id' => $partialCancellationId,
+                'reservation_id' => $reservationId,
+                'unused_half_day_units' => $unusedUnits,
+            ];
+            $operation = $this->startOperation($operationKey, 'PARTIAL_CANCEL_AL', $payload, (int) $employee->id, $actorId);
+            if ($operation['replay']) {
+                return [...$this->reservationResult((int) $operation['event']->reservation_id), 'refunded_units' => $unusedUnits];
+            }
+            if ((int) $reservation->annual_units !== (int) $reservation->requested_units) {
+                throw new DomainException('Partial restoration is deferred until the original source allocation can be matched exactly.');
+            }
+
+            $committedEvent = DB::table('leave_reservation_events')->where('reservation_id', $reservationId)
+                ->where('event_code', 'COMMITTED')->lockForUpdate()->first();
+            if ($committedEvent === null) {
+                throw new RuntimeException('The approved reservation has no committed balance event.');
+            }
+            $usageEntries = DB::table('leave_ledger_entries')->where('balance_operation_id', $committedEvent->balance_operation_id)
+                ->where('kind', 'approved_leave_use')->lockForUpdate()->get();
+            if ($usageEntries->count() !== 1) {
+                throw new DomainException('The original approved usage allocation is not a single Annual Leave entry.');
+            }
+            $usage = $usageEntries[0];
+            if ((int) $usage->annual_account_id !== (int) $reservation->annual_account_id
+                || $usage->tabung_account_id !== null || (int) $usage->signed_half_day_units !== -((int) $reservation->annual_units)
+                || $usage->source_year !== null || $usage->reverses_entry_id !== null) {
+                throw new DomainException('The original Annual Leave usage entry does not match the reservation allocation.');
+            }
+            $alreadyReversed = $this->integerTotal((string) DB::table('leave_ledger_entries')->where('reverses_entry_id', $usage->id)
+                ->selectRaw('CAST(COALESCE(SUM(signed_half_day_units), 0) AS CHAR) AS units')->value('units'));
+            if ($alreadyReversed < 0 || $alreadyReversed + $unusedUnits > abs((int) $usage->signed_half_day_units)) {
+                throw new DomainException('The partial refund would exceed the original Annual Leave usage.');
+            }
+
+            DB::table('leave_ledger_entries')->insert([
+                'annual_account_id' => $reservation->annual_account_id,
+                'balance_operation_id' => $operation['id'],
+                'signed_half_day_units' => $unusedUnits,
+                'kind' => 'approved_leave_partial_cancellation',
+                'source_year' => null,
+                'operation_key' => $operationKey.':annual',
+                'reverses_entry_id' => $usage->id,
+                'actor_id' => $actorId,
+            ]);
+            $releasedSlots = DB::table('leave_active_slots')->where('reservation_id', $reservationId)->where('status', 'COMMITTED')
+                ->where('leave_date', '>', $partialCancellation->actual_return_date)
+                ->update(['status' => 'RELEASED', 'active_slot_key' => null, 'resolved_at' => now()]);
+            if ($releasedSlots !== $unusedUnits) {
+                throw new RuntimeException('The confirmed unused sessions and released slot claims do not match.');
+            }
+            $this->recordEvent($reservationId, $operation['id'], 'PARTIAL_REFUND', $actorId);
+            $this->audit('hr.leave.partial_cancellation_refunded', $reservationId, $operationKey);
+
+            return [...$this->reservationResult($reservationId), 'refunded_units' => $unusedUnits];
+        }, 3);
+    }
+
     /** @param array<string, mixed> $payload
      * @return array{id:int,event:?stdClass,replay:bool}
      */
