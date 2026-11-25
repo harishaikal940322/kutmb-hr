@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, defineComponent, h, ref, watch, type Component } from 'vue';
+import { computed, defineComponent, h, nextTick, ref, watch, type Component } from 'vue';
 import {
     ArrowRight,
     Bell,
     CalendarDays,
     Check,
+    ChevronDown,
     CircleAlert,
     ClipboardList,
     Clock3,
@@ -51,6 +52,10 @@ type Screen =
 
 const role = ref<Role>('Staf');
 const screen = ref<Screen>('overview');
+const lastNavScreen = ref<Screen>('overview');
+const moduleNavOpen = ref(false);
+const moduleNavToggle = ref<HTMLButtonElement | null>(null);
+const pageHeading = ref<HTMLHeadingElement | null>(null);
 const selectedRequest = ref('AL-2026-052');
 const search = ref('');
 const activeFilter = ref('Semua');
@@ -163,6 +168,30 @@ const icons: Partial<Record<Screen, Component>> = {
 
 const activeTitle = computed(() => screens[screen.value].label);
 const visibleNav = computed(() => navByRole[role.value]);
+const currentNavScreen = computed(() =>
+    screen.value === 'detail' ? lastNavScreen.value : screen.value,
+);
+const navGroups: { label: string; items: Screen[] }[] = [
+    { label: 'Umum', items: ['overview'] },
+    {
+        label: 'Urusan cuti',
+        items: ['apply', 'requests', 'approvals', 'team'],
+    },
+    {
+        label: 'Pengurusan cuti',
+        items: ['staff', 'calendar', 'balances', 'year-end', 'prorata', 'changes'],
+    },
+    { label: 'Pemantauan', items: ['reports', 'audit', 'notifications'] },
+    { label: 'Rujukan', items: ['coverage'] },
+];
+const visibleNavGroups = computed(() =>
+    navGroups
+        .map((group) => ({
+            label: group.label,
+            items: visibleNav.value.filter((item) => group.items.includes(item)),
+        }))
+        .filter((group) => group.items.length > 0),
+);
 const isHr = computed(() => role.value === 'HR');
 const isApprover = computed(() =>
     ['Pengurus Unit', 'Pengurus Besar', 'Setiausaha ALK'].includes(role.value),
@@ -551,12 +580,32 @@ const workflowSteps = computed(() => {
 function navigate(target: Screen) {
     if (target === 'detail' && !selectedRequest.value) return;
     screen.value = target;
+    if (visibleNav.value.includes(target)) lastNavScreen.value = target;
+    moduleNavOpen.value = false;
+}
+
+async function selectModuleScreen(target: Screen) {
+    navigate(target);
+    await nextTick();
+    pageHeading.value?.focus();
+}
+
+async function closeModuleNav(event: KeyboardEvent) {
+    if (!moduleNavOpen.value || !moduleNavToggle.value?.getClientRects().length)
+        return;
+    event.stopPropagation();
+    moduleNavOpen.value = false;
+    await nextTick();
+    moduleNavToggle.value?.focus();
 }
 
 function changeRole(value: string) {
     role.value = value as Role;
-    if (!navByRole[role.value].includes(screen.value))
+    if (!navByRole[role.value].includes(screen.value)) {
         screen.value = 'overview';
+        lastNavScreen.value = 'overview';
+    }
+    moduleNavOpen.value = false;
     activeFilter.value = 'Semua';
 }
 
@@ -1045,7 +1094,7 @@ const CalendarRow = defineComponent({
 
 <template>
     <div
-        class="mx-auto flex w-full min-w-0 max-w-7xl flex-col bg-background text-foreground"
+        class="@container/leave-module mx-auto flex w-full min-w-0 max-w-[100rem] flex-col bg-background text-foreground"
     >
         <header
             class="flex flex-col gap-3 border-b border-border bg-card px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"
@@ -1096,38 +1145,88 @@ const CalendarRow = defineComponent({
             contoh sintetik; tiada permohonan, kelulusan atau pelarasan sebenar.
         </div>
 
-        <nav
-            class="flex flex-wrap gap-1.5 border-b border-border bg-card px-4 py-3 sm:px-6"
-            aria-label="Submodul Cuti Tahunan (simulasi)"
+        <div
+            class="grid min-w-0 items-start gap-4 px-3 py-4 sm:gap-5 sm:px-5 @min-[960px]/leave-module:grid-cols-[14rem_minmax(0,1fr)]"
         >
-            <button
-                v-for="item in visibleNav"
-                :key="item"
-                type="button"
-                class="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
-                :class="
-                    screen === item
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                "
-                :aria-current="screen === item ? 'page' : undefined"
-                @click="navigate(item)"
+            <aside
+                class="min-w-0 rounded-xl border border-border bg-card shadow-sm @min-[960px]/leave-module:sticky @min-[960px]/leave-module:top-4 @min-[960px]/leave-module:max-h-[calc(100dvh-2rem)] @min-[960px]/leave-module:overflow-y-auto"
             >
-                <component
-                    :is="icons[item] ?? FileText"
-                    class="size-4 shrink-0"
-                    aria-hidden="true"
-                />
-                <span>{{ screens[item].label }}</span>
-            </button>
-        </nav>
+                <div class="hidden border-b border-border px-4 py-4 @min-[960px]/leave-module:block">
+                    <div class="flex items-center gap-2.5">
+                        <div class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-foreground">
+                            <CalendarDays class="size-4" aria-hidden="true" />
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold">Submodul cuti</p>
+                            <p class="mt-0.5 text-xs text-muted-foreground">{{ role }}</p>
+                        </div>
+                    </div>
+                </div>
 
-        <section class="min-w-0" aria-labelledby="page-heading">
+                <button
+                    ref="moduleNavToggle"
+                    type="button"
+                    class="flex min-h-14 w-full items-center gap-3 rounded-xl px-4 py-3 text-left focus-visible:ring-2 focus-visible:ring-ring @min-[960px]/leave-module:hidden"
+                    :aria-expanded="moduleNavOpen"
+                    aria-controls="annual-leave-subnav"
+                    @click="moduleNavOpen = !moduleNavOpen"
+                    @keydown.esc="closeModuleNav"
+                >
+                    <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
+                        <component :is="icons[currentNavScreen] ?? FileText" class="size-4" aria-hidden="true" />
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block text-xs text-muted-foreground">Navigasi submodul</span>
+                        <span class="block text-sm font-semibold">{{ screens[currentNavScreen].label }}</span>
+                    </span>
+                    <ChevronDown
+                        class="size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none"
+                        :class="moduleNavOpen ? 'rotate-180' : ''"
+                        aria-hidden="true"
+                    />
+                </button>
+
+                <nav
+                    id="annual-leave-subnav"
+                    class="space-y-4 border-t border-border p-2.5 @min-[960px]/leave-module:block @min-[960px]/leave-module:border-t-0"
+                    :class="moduleNavOpen ? 'block' : 'hidden'"
+                    aria-label="Submodul Cuti Tahunan (simulasi)"
+                    @keydown.esc="closeModuleNav"
+                >
+                    <div v-for="group in visibleNavGroups" :key="group.label" class="space-y-1">
+                        <p class="px-2.5 pt-1 text-xs font-medium text-muted-foreground">
+                            {{ group.label }}
+                        </p>
+                        <button
+                            v-for="item in group.items"
+                            :key="item"
+                            type="button"
+                            class="flex min-h-10 w-full items-center gap-2.5 rounded-md border-l-2 px-2.5 py-2 text-left text-sm leading-5 transition-colors focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+                            :class="
+                                currentNavScreen === item
+                                    ? 'border-primary bg-primary/10 font-semibold text-primary'
+                                    : 'border-transparent font-medium text-muted-foreground hover:bg-muted hover:text-foreground'
+                            "
+                            :aria-current="currentNavScreen === item ? 'page' : undefined"
+                            @click="selectModuleScreen(item)"
+                        >
+                            <component
+                                :is="icons[item] ?? FileText"
+                                class="size-4 shrink-0"
+                                aria-hidden="true"
+                            />
+                            <span class="min-w-0 flex-1">{{ screens[item].label }}</span>
+                        </button>
+                    </div>
+                </nav>
+            </aside>
+
+            <section class="@container/leave-content min-w-0" aria-labelledby="page-heading">
                 <div
-                    class="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
+                    class="mx-auto min-w-0 space-y-6 px-1 py-2 @min-[560px]/leave-content:px-3 @min-[800px]/leave-content:px-5"
                 >
                     <header
-                        class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"
+                        class="flex flex-col gap-4 @min-[720px]/leave-content:flex-row @min-[720px]/leave-content:items-end @min-[720px]/leave-content:justify-between"
                     >
                         <div class="space-y-1.5">
                             <p
@@ -1137,7 +1236,9 @@ const CalendarRow = defineComponent({
                             </p>
                             <h1
                                 id="page-heading"
-                                class="text-2xl font-semibold tracking-tight sm:text-3xl"
+                                ref="pageHeading"
+                                tabindex="-1"
+                                class="rounded-sm text-2xl font-semibold tracking-tight focus-visible:ring-2 focus-visible:ring-ring @min-[560px]/leave-content:text-3xl"
                             >
                                 {{
                                     screen === 'overview'
@@ -1214,7 +1315,7 @@ const CalendarRow = defineComponent({
                     <template v-if="screen === 'overview'">
                         <section
                             v-if="role === 'Pentadbir IT'"
-                            class="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8"
+                            class="rounded-2xl border border-border bg-card p-6 shadow-sm @min-[560px]/leave-content:p-8"
                         >
                             <div
                                 class="flex size-12 items-center justify-center rounded-xl bg-muted text-muted-foreground"
@@ -1239,7 +1340,7 @@ const CalendarRow = defineComponent({
 
                         <template v-else-if="role === 'Setiausaha ALK'">
                             <div
-                                class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+                                class="grid gap-4 @min-[560px]/leave-content:grid-cols-2 @min-[960px]/leave-content:grid-cols-3"
                             >
                                 <article
                                     class="rounded-2xl border border-border bg-card p-5 shadow-sm"
@@ -1282,7 +1383,7 @@ const CalendarRow = defineComponent({
                                     </p>
                                 </article>
                                 <article
-                                    class="rounded-2xl border border-border bg-card p-5 shadow-sm sm:col-span-2 xl:col-span-1"
+                                    class="rounded-2xl border border-border bg-card p-5 shadow-sm @min-[560px]/leave-content:col-span-2 @min-[960px]/leave-content:col-span-1"
                                 >
                                     <p class="text-sm text-muted-foreground">
                                         Skop akses
@@ -1318,7 +1419,7 @@ const CalendarRow = defineComponent({
 
                         <template v-else-if="role === 'HR'">
                             <div
-                                class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+                                class="grid gap-4 @min-[560px]/leave-content:grid-cols-2 @min-[960px]/leave-content:grid-cols-4"
                             >
                                 <MetricCard
                                     label="Profil dalam pratonton"
@@ -1346,7 +1447,7 @@ const CalendarRow = defineComponent({
                                 />
                             </div>
                             <section
-                                class="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"
+                                class="rounded-2xl border border-border bg-card p-5 shadow-sm @min-[560px]/leave-content:p-6"
                             >
                                 <div
                                     class="flex flex-wrap items-start justify-between gap-3"
@@ -1368,7 +1469,7 @@ const CalendarRow = defineComponent({
                                     >
                                 </div>
                                 <div
-                                    class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+                                    class="mt-5 grid gap-3 @min-[560px]/leave-content:grid-cols-2 @min-[960px]/leave-content:grid-cols-4"
                                 >
                                     <Shortcut
                                         title="Profil & kelayakan"
@@ -1406,7 +1507,7 @@ const CalendarRow = defineComponent({
                             "
                         >
                             <div
-                                class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+                                class="grid gap-4 @min-[560px]/leave-content:grid-cols-2 @min-[960px]/leave-content:grid-cols-4"
                             >
                                 <MetricCard
                                     label="Menunggu tindakan"
@@ -1444,7 +1545,7 @@ const CalendarRow = defineComponent({
                                 />
                             </div>
                             <section
-                                class="grid gap-4 xl:grid-cols-[1.5fr_1fr]"
+                                class="grid gap-4 @min-[960px]/leave-content:grid-cols-[1.5fr_1fr]"
                             >
                                 <RequestTable
                                     :rows="displayedRequests"
@@ -1483,7 +1584,7 @@ const CalendarRow = defineComponent({
 
                         <template v-else>
                             <div
-                                class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"
+                                class="grid gap-4 @min-[560px]/leave-content:grid-cols-2 @min-[960px]/leave-content:grid-cols-5"
                             >
                                 <MetricCard
                                     label="Kelayakan tahun ini"
@@ -1517,7 +1618,7 @@ const CalendarRow = defineComponent({
                                 />
                             </div>
                             <section
-                                class="grid gap-4 xl:grid-cols-[1.35fr_1fr]"
+                                class="grid gap-4 @min-[960px]/leave-content:grid-cols-[1.35fr_1fr]"
                             >
                                 <div
                                     class="rounded-2xl border border-border bg-card shadow-sm"
@@ -1581,7 +1682,7 @@ const CalendarRow = defineComponent({
                                     </p>
                                 </div>
                             </section>
-                            <section class="grid gap-4 md:grid-cols-2">
+                            <section class="grid gap-4 @min-[720px]/leave-content:grid-cols-2">
                                 <div
                                     class="rounded-2xl border border-border bg-card p-5 shadow-sm"
                                 >
@@ -1634,7 +1735,7 @@ const CalendarRow = defineComponent({
                                 <h2 class="font-semibold">Baki kelayakan cuti</h2>
                                 <p class="text-sm text-muted-foreground">Data contoh · AL dan EL berkongsi baki yang sama.</p>
                             </div>
-                            <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                            <div class="grid grid-cols-2 gap-3 @min-[960px]/leave-content:grid-cols-4">
                                 <MetricCard label="Cuti Tahunan (AL)" :value="previewBalance.annual.toFixed(1)" note="hari · sebelum tempahan" icon="wallet" />
                                 <MetricCard label="Tabung Cuti" :value="previewBalance.tabung.toFixed(1)" note="hari · baki berasingan" icon="landmark" />
                                 <MetricCard label="Tempahan pending" :value="previewBalance.pending.toFixed(1)" note="hari · belum ditolak rasmi" icon="clock" />
@@ -1642,10 +1743,10 @@ const CalendarRow = defineComponent({
                             </div>
                         </section>
                         <div
-                            class="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.75fr)]"
+                            class="grid gap-5 @min-[960px]/leave-content:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.75fr)]"
                         >
                             <form
-                                class="space-y-5 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-7"
+                                class="space-y-5 rounded-2xl border border-border bg-card p-5 shadow-sm @min-[560px]/leave-content:p-7"
                                 @submit.prevent="previewSubmit"
                             >
                                 <section class="space-y-4">
@@ -1688,7 +1789,7 @@ const CalendarRow = defineComponent({
                                             anggaran reka bentuk.
                                         </p>
                                     </div>
-                                    <div class="grid gap-4 sm:grid-cols-2">
+                                    <div class="grid gap-4 @min-[560px]/leave-content:grid-cols-2">
                                         <label
                                             class="space-y-2 text-sm font-medium"
                                             >Tarikh mula<input
@@ -1705,7 +1806,7 @@ const CalendarRow = defineComponent({
                                                 class="block h-11 w-full rounded-lg border border-input bg-background px-3 text-sm disabled:opacity-60"
                                         /></label>
                                     </div>
-                                    <div class="grid gap-3 sm:grid-cols-2">
+                                    <div class="grid gap-3 @min-[560px]/leave-content:grid-cols-2">
                                         <label
                                             v-for="option in [
                                                 'Penuh hari',
@@ -1961,7 +2062,7 @@ const CalendarRow = defineComponent({
                                 class="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
                             >
                                 <div
-                                    class="flex flex-col gap-4 border-b border-border p-5 sm:flex-row sm:items-end sm:justify-between"
+                                    class="flex flex-col gap-4 border-b border-border p-5 @min-[560px]/leave-content:flex-row @min-[560px]/leave-content:items-end @min-[560px]/leave-content:justify-between"
                                 >
                                     <div>
                                         <h2 class="font-semibold">
@@ -2007,10 +2108,10 @@ const CalendarRow = defineComponent({
 
                     <template v-else-if="screen === 'detail'">
                         <div
-                            class="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.7fr)]"
+                            class="grid gap-5 @min-[960px]/leave-content:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.7fr)]"
                         >
                             <section
-                                class="space-y-5 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-7"
+                                class="space-y-5 rounded-2xl border border-border bg-card p-5 shadow-sm @min-[560px]/leave-content:p-7"
                             >
                                 <div
                                     class="flex flex-wrap items-start justify-between gap-3"
@@ -2039,7 +2140,7 @@ const CalendarRow = defineComponent({
                                         >{{ requestDetail.status }}</span
                                     >
                                 </div>
-                                <div class="grid gap-3 sm:grid-cols-2">
+                                <div class="grid gap-3 @min-[560px]/leave-content:grid-cols-2">
                                     <SummaryRow
                                         label="Tarikh cuti"
                                         :value="requestDetail.dates"
@@ -2214,7 +2315,7 @@ const CalendarRow = defineComponent({
 
                     <template v-else-if="screen === 'approvals'">
                         <div
-                            class="grid gap-4 md:grid-cols-[minmax(0,1fr)_18rem]"
+                            class="grid gap-4 @min-[720px]/leave-content:grid-cols-[minmax(0,1fr)_18rem]"
                         >
                             <div class="space-y-4">
                                 <div class="flex flex-wrap gap-2">
@@ -2280,9 +2381,9 @@ const CalendarRow = defineComponent({
                     </template>
 
                     <template v-else-if="screen === 'team'">
-                        <div class="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+                        <div class="grid gap-5 @min-[960px]/leave-content:grid-cols-[1.2fr_0.8fr]">
                             <section
-                                class="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"
+                                class="rounded-2xl border border-border bg-card p-5 shadow-sm @min-[560px]/leave-content:p-6"
                             >
                                 <div
                                     class="flex flex-wrap items-center justify-between gap-3"
@@ -2360,10 +2461,10 @@ const CalendarRow = defineComponent({
 
                     <template v-else-if="screen === 'staff'">
                         <section
-                            class="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"
+                            class="rounded-2xl border border-border bg-card p-5 shadow-sm @min-[560px]/leave-content:p-6"
                         >
                             <div
-                                class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"
+                                class="flex flex-col gap-4 @min-[840px]/leave-content:flex-row @min-[840px]/leave-content:items-end @min-[840px]/leave-content:justify-between"
                             >
                                 <div>
                                     <h2 class="font-semibold">
@@ -2509,9 +2610,9 @@ const CalendarRow = defineComponent({
                     </template>
 
                     <template v-else-if="screen === 'calendar'">
-                        <div class="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+                        <div class="grid gap-5 @min-[960px]/leave-content:grid-cols-[1.2fr_0.8fr]">
                             <section
-                                class="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"
+                                class="rounded-2xl border border-border bg-card p-5 shadow-sm @min-[560px]/leave-content:p-6"
                             >
                                 <div
                                     class="flex flex-wrap items-center justify-between gap-3"
@@ -2607,7 +2708,7 @@ const CalendarRow = defineComponent({
 
                     <template v-else-if="screen === 'balances'">
                         <section class="space-y-4">
-                            <div class="grid gap-4 md:grid-cols-3">
+                            <div class="grid gap-4 @min-[720px]/leave-content:grid-cols-3">
                                 <MetricCard
                                     label="AL tahun 2026"
                                     value="14.5"
@@ -2770,9 +2871,9 @@ const CalendarRow = defineComponent({
                     </template>
 
                     <template v-else-if="screen === 'year-end'">
-                        <div class="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+                        <div class="grid gap-5 @min-[960px]/leave-content:grid-cols-[1.1fr_0.9fr]">
                             <section
-                                class="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"
+                                class="rounded-2xl border border-border bg-card p-5 shadow-sm @min-[560px]/leave-content:p-6"
                             >
                                 <div
                                     class="flex items-start justify-between gap-3"
@@ -2926,9 +3027,9 @@ const CalendarRow = defineComponent({
                     </template>
 
                     <template v-else-if="screen === 'prorata'">
-                        <div class="grid gap-5 xl:grid-cols-[1fr_0.8fr]">
+                        <div class="grid gap-5 @min-[960px]/leave-content:grid-cols-[1fr_0.8fr]">
                             <section
-                                class="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"
+                                class="rounded-2xl border border-border bg-card p-5 shadow-sm @min-[560px]/leave-content:p-6"
                             >
                                 <h2 class="font-semibold">
                                     Semakan kelayakan prorata (contoh)
@@ -2937,7 +3038,7 @@ const CalendarRow = defineComponent({
                                     Masukkan maklumat untuk memaparkan konsep
                                     ringkasan; tiada kadar sebenar digunakan.
                                 </p>
-                                <div class="mt-5 grid gap-4 sm:grid-cols-2">
+                                <div class="mt-5 grid gap-4 @min-[560px]/leave-content:grid-cols-2">
                                     <label class="space-y-2 text-sm font-medium"
                                         >Staf<select
                                             class="block h-11 w-full rounded-lg border border-input bg-background px-3"
@@ -3044,7 +3145,7 @@ const CalendarRow = defineComponent({
                                     yang memerlukan pengesahan.
                                 </p>
                             </div>
-                            <div class="grid gap-4 md:grid-cols-2">
+                            <div class="grid gap-4 @min-[720px]/leave-content:grid-cols-2">
                                 <article
                                     v-for="item in [
                                         {
@@ -3195,7 +3296,7 @@ const CalendarRow = defineComponent({
                                     </button>
                                 </div>
                             </div>
-                            <div class="grid gap-4 md:grid-cols-3">
+                            <div class="grid gap-4 @min-[720px]/leave-content:grid-cols-3">
                                 <MetricCard
                                     label="Kelayakan direkod"
                                     value="2,416"
@@ -3423,7 +3524,7 @@ const CalendarRow = defineComponent({
                     <template v-else-if="screen === 'coverage'">
                         <section class="space-y-5">
                             <div
-                                class="rounded-2xl border border-border bg-card p-5 sm:p-6"
+                                class="rounded-2xl border border-border bg-card p-5 @min-[560px]/leave-content:p-6"
                             >
                                 <h2 class="font-semibold">
                                     Peta reka bentuk kepada SRS Cuti Tahunan
@@ -3440,7 +3541,7 @@ const CalendarRow = defineComponent({
                                     <div
                                         v-for="item in coverage"
                                         :key="item.ids"
-                                        class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
+                                        class="flex flex-col gap-3 py-4 @min-[560px]/leave-content:flex-row @min-[560px]/leave-content:items-center @min-[560px]/leave-content:justify-between"
                                     >
                                         <div>
                                             <p
@@ -3475,7 +3576,7 @@ const CalendarRow = defineComponent({
                                 </div>
                             </div>
                             <div
-                                class="rounded-2xl border border-border bg-card p-5 sm:p-6"
+                                class="rounded-2xl border border-border bg-card p-5 @min-[560px]/leave-content:p-6"
                             >
                                 <h2 class="font-semibold">
                                     Baseline keputusan CT-DEC
@@ -3486,7 +3587,7 @@ const CalendarRow = defineComponent({
                                     dalam daftar isu dan SRS.
                                 </p>
                                 <div
-                                    class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+                                    class="mt-4 grid gap-3 @min-[560px]/leave-content:grid-cols-2 @min-[960px]/leave-content:grid-cols-3"
                                 >
                                     <article
                                         v-for="item in decisionGroups"
@@ -3516,7 +3617,7 @@ const CalendarRow = defineComponent({
                                 </p>
                             </div>
                             <div
-                                class="rounded-2xl border border-border bg-card p-5 sm:p-6"
+                                class="rounded-2xl border border-border bg-card p-5 @min-[560px]/leave-content:p-6"
                             >
                                 <h2 class="font-semibold">
                                     Keperluan kualiti & operasi
@@ -3527,7 +3628,7 @@ const CalendarRow = defineComponent({
                                     backend dan operasi.
                                 </p>
                                 <div
-                                    class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+                                    class="mt-4 grid gap-3 @min-[560px]/leave-content:grid-cols-2 @min-[960px]/leave-content:grid-cols-3"
                                 >
                                     <article
                                         v-for="item in qualityCoverage"
@@ -3556,7 +3657,7 @@ const CalendarRow = defineComponent({
                                     berkuasa.
                                 </p>
                             </div>
-                            <div class="grid gap-3 sm:grid-cols-3">
+                            <div class="grid gap-3 @min-[560px]/leave-content:grid-cols-3">
                                 <MetricCard
                                     label="Functional requirements"
                                     value="32"
@@ -3584,7 +3685,8 @@ const CalendarRow = defineComponent({
                         tiada sambungan backend, API atau pangkalan data.
                     </footer>
                 </div>
-        </section>
+            </section>
+        </div>
 
         <Transition
             enter-active-class="transition duration-200 motion-reduce:transition-none"

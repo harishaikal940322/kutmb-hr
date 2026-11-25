@@ -1,3 +1,8 @@
+## 25 November 2026 — content-area sub-sidebar refinement (latest UI)
+
+- Requestor accepted Cuti Tahunan as a main sidebar module and requested a separate vertical sub-sidebar within its content area instead of horizontal tabs. Updated the existing AnnualLeavePreview Vue component: role-filtered logical groups, current page indication including detail context, sticky wide-pane navigation and collapsible narrow-pane navigation with focus management. Content-width container queries adapt the existing screen grids and spacing to the available pane rather than the entire viewport.
+- Main sidebar, /leave/annual, protected local admin review, frozen design screens, synthetic data and non-persistent interactions unchanged. No backend, permission, database, migration, route or dependency changes. Direct remote presentation edit; local build/type/lint/browser verification not run in this session. Prior backend verification limitations remain.
+
 ## 25 November 2026 — Cuti Tahunan sidebar module (latest UI placement)
 
 - Requestor reviewed the dashboard placement and requested Cuti Tahunan in the sidebar under Modul Utama instead. Source commit 7b54a644 restores original Dashboard, adds dedicated /leave/annual page and breadcrumb, and registers fixed leave.annual.index menu in the existing permission catalogue/navigation. Existing admin-only local/testing route and menu boundaries retained; sidebar module group only appears when authorized. Existing accepted responsive submodule UI and synthetic role selector retained.

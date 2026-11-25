@@ -18,6 +18,10 @@ The requestor authorized integrating the accepted UI directly into the existing 
 
 After reviewing the integrated dashboard, requestor directed that Cuti Tahunan be a separate main module in the system sidebar. Restore the original account Papan Pemuka at /dashboard. Add **Modul Utama → Cuti Tahunan** with its own protected GET /leave/annual Inertia page, title, breadcrumb and active sidebar state; reuse the accepted responsive content-area submodule navigation and existing Vue design. The fixed menu and route require local/testing and existing iam.rbac.manage authority. No new permission, assignment, migration or data changes. The module remains a synthetic admin design review, not an operational leave workflow. The previous dashboard placement is superseded. Source commit 7b54a644; local build/browser/feature verification pending.
 
+## 25 November 2026 — content-area sub-sidebar refinement
+
+Requestor accepted the main sidebar module placement and requested replacing the horizontal submodule tabs with a vertical sub-sidebar inside the Cuti Tahunan content area. Keep the application sidebar and /leave/annual route unchanged. The sub-sidebar groups the existing role-filtered screens, indicates the selected page (including its detail view), stays visible on sufficiently wide content areas, and becomes a compact disclosure menu on narrower areas with keyboard focus management. Use content-width container queries so the remaining panels and grids adapt when the system sidebar expands or collapses. Preserve existing light/dark tokens, synthetic review notice, role simulation and all workflow/data boundaries. This is a presentation-only refinement; local build and browser acceptance pending.
+
 ## SRS coverage map
 
 | Prototype view | SRS coverage | Main design content |
