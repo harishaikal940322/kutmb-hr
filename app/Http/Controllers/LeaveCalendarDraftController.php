@@ -200,9 +200,7 @@ class LeaveCalendarDraftController extends Controller
             if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null || $version->effective_to === null || $version->effective_to < $version->effective_from) {
                 throw ValidationException::withMessages(['acknowledge_complete' => 'Pilih draf aktif dengan tempoh mula dan tamat yang sah.']);
             }
-            if (DB::table('leave_calendar_usage_snapshots')->whereBetween('leave_date', [$version->effective_from, $version->effective_to])->exists()) {
-                throw ValidationException::withMessages(['acknowledge_complete' => 'Pengesahan ditangguhkan kerana tarikh versi ini mempunyai snapshot permohonan.']);
-            }
+            $this->assertCalendarChangeDoesNotAffectActiveRequests($version->effective_from, $version->effective_to);
             $others = DB::table('leave_calendar_versions')->where('id', '!=', $versionId)
                 ->where('effective_from', '<=', $version->effective_to)
                 ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', $version->effective_from))->get();
@@ -226,6 +224,37 @@ class LeaveCalendarDraftController extends Controller
         }, 3);
 
         return to_route('leave.calendar.drafts.index')->with('success', 'Kalendar sintetik disahkan untuk simulasi tempatan sahaja.');
+    }
+
+    private function assertCalendarChangeDoesNotAffectActiveRequests(string $from, string $to): void
+    {
+        if (! Schema::hasTable('leave_calendar_usage_snapshots')
+            || ! Schema::hasTable('leave_employee_history_markers')
+            || ! Schema::hasTable('leave_requests')) {
+            throw ValidationException::withMessages(['acknowledge_complete' => 'Pengesahan ditangguhkan kerana rekod kesan kalendar tidak lengkap.']);
+        }
+
+        $requestKeys = DB::table('leave_calendar_usage_snapshots as snapshots')
+            ->join('leave_employee_history_markers as markers', 'markers.id', '=', 'snapshots.history_marker_id')
+            ->whereBetween('snapshots.leave_date', [$from, $to])
+            ->orderBy('markers.request_key')
+            ->pluck('markers.request_key')
+            ->unique()
+            ->values();
+
+        if ($requestKeys->isEmpty()) {
+            return;
+        }
+
+        $requests = DB::table('leave_requests')->whereIn('request_key', $requestKeys)
+            ->orderBy('id')->lockForUpdate()->get(['request_key', 'status'])->keyBy('request_key');
+
+        foreach ($requestKeys as $requestKey) {
+            $request = $requests->get($requestKey);
+            if ($request === null || ! in_array($request->status, ['REJECTED', 'CANCELLED'], true)) {
+                throw ValidationException::withMessages(['acknowledge_complete' => 'Pengesahan ditangguhkan kerana permohonan yang terjejas masih aktif atau status sejarahnya tidak dapat disahkan.']);
+            }
+        }
     }
 
     /** @param list<string> $fields */

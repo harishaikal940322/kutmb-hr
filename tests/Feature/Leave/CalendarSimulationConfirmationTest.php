@@ -40,4 +40,77 @@ class CalendarSimulationConfirmationTest extends TestCase
         $this->post('/leave/calendar-drafts/'.$snapshotCalendar.'/simulate-confirmation', ['acknowledge_complete' => true])->assertSessionHasErrors('acknowledge_complete');
         $this->assertGreaterThan(0, DB::transactionLevel());
     }
+
+    public function test_simulation_confirmation_allows_terminal_history_but_keeps_active_request_snapshots_blocked(): void
+    {
+        $suffix = Str::lower(Str::random(16));
+        $actor = User::factory()->create(['username' => 'calterminal'.$suffix, 'email' => null, 'status' => 'ACTIVE']);
+        $actor->forceFill(['two_factor_secret' => 'synthetic', 'two_factor_confirmed_at' => now()])->save();
+        $actor->givePermissionTo('leave.calendar.manage');
+
+        $cancelledVersion = DB::table('leave_calendar_versions')->insertGetId([
+            'label' => 'Terminal synthetic '.$suffix,
+            'effective_from' => '2101-01-01',
+            'effective_to' => '2101-12-31',
+        ]);
+        $this->createSnapshotForRequest($actor->id, $cancelledVersion, $suffix.'cancelled', 'CANCELLED', '2101-03-01');
+        $this->actingAs($actor)->post('/leave/calendar-drafts/'.$cancelledVersion.'/simulate-confirmation', ['acknowledge_complete' => true])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('leave_calendar_versions', ['id' => $cancelledVersion, 'confirmed_by' => $actor->id]);
+
+        $approvedVersion = DB::table('leave_calendar_versions')->insertGetId([
+            'label' => 'Active synthetic '.$suffix,
+            'effective_from' => '2102-01-01',
+            'effective_to' => '2102-12-31',
+        ]);
+        $this->createSnapshotForRequest($actor->id, $approvedVersion, $suffix.'approved', 'APPROVED', '2102-03-01');
+        $this->post('/leave/calendar-drafts/'.$approvedVersion.'/simulate-confirmation', ['acknowledge_complete' => true])
+            ->assertSessionHasErrors('acknowledge_complete');
+        $this->assertDatabaseHas('leave_calendar_versions', ['id' => $approvedVersion, 'confirmed_at' => null, 'confirmed_by' => null]);
+    }
+
+    private function createSnapshotForRequest(int $actorId, int $calendarVersionId, string $suffix, string $status, string $date): void
+    {
+        $applicant = User::factory()->create(['username' => 'calsnapshot'.$suffix, 'email' => null, 'status' => 'ACTIVE']);
+        $employee = DB::table('employees')->insertGetId([
+            'employee_no' => 'calsnap'.$suffix,
+            'display_name' => 'Synthetic calendar applicant',
+            'service_start' => '2026-01-01',
+            'user_id' => $applicant->id,
+        ]);
+        $requestKey = 'calendar-snapshot-'.$suffix;
+        DB::table('leave_requests')->insert([
+            'request_key' => $requestKey,
+            'submission_key' => 'calendar-submit-'.$suffix,
+            'payload_hash' => hash('sha256', $requestKey),
+            'employee_id' => $employee,
+            'requester_user_id' => $applicant->id,
+            'leave_type' => 'AL',
+            'status' => $status,
+            'current_revision' => 1,
+            'current_step_order' => null,
+            'attendance_review_required' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $policyVersion = DB::table('leave_policy_versions')->insertGetId([
+            'label' => 'Synthetic calendar policy '.$suffix,
+            'effective_from' => substr($date, 0, 4).'-01-01',
+            'effective_to' => substr($date, 0, 4).'-12-31',
+        ]);
+        $marker = DB::table('leave_employee_history_markers')->insertGetId([
+            'employee_id' => $employee,
+            'request_key' => $requestKey,
+            'revision' => 1,
+            'actor_id' => $actorId,
+        ]);
+        DB::table('leave_calendar_usage_snapshots')->insert([
+            'history_marker_id' => $marker,
+            'employee_id' => $employee,
+            'leave_date' => $date,
+            'leave_units' => 1,
+            'calendar_version_id' => $calendarVersionId,
+            'policy_version_id' => $policyVersion,
+        ]);
+    }
 }
