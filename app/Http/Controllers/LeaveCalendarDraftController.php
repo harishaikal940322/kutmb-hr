@@ -192,16 +192,16 @@ class LeaveCalendarDraftController extends Controller
     public function confirmSimulation(Request $request, int $versionId, ConfirmedVersionLookup $lookup): RedirectResponse
     {
         $request->validate(['acknowledge_complete' => ['accepted']]);
-        // No calendar confirmation once request data exists until impact handling is integrated.
-        if (Schema::hasTable('leave_requests')) {
-            throw ValidationException::withMessages(['acknowledge_complete' => 'Pengesahan ditangguhkan sehingga kesan permohonan disokong.']);
-        }
+        abort_unless(Schema::hasTable('leave_calendar_usage_snapshots'), 503);
         DB::transaction(function () use ($request, $versionId, $lookup): void {
             abort_if(DB::table('leave_calendar_confirmation_guard')->where('id', 1)->lockForUpdate()->first() === null, 503);
             $version = DB::table('leave_calendar_versions')->where('id', $versionId)->lockForUpdate()->first();
             abort_if($version === null, 404);
             if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null || $version->effective_to === null || $version->effective_to < $version->effective_from) {
                 throw ValidationException::withMessages(['acknowledge_complete' => 'Pilih draf aktif dengan tempoh mula dan tamat yang sah.']);
+            }
+            if (DB::table('leave_calendar_usage_snapshots')->whereBetween('leave_date', [$version->effective_from, $version->effective_to])->exists()) {
+                throw ValidationException::withMessages(['acknowledge_complete' => 'Pengesahan ditangguhkan kerana tarikh versi ini mempunyai snapshot permohonan.']);
             }
             $others = DB::table('leave_calendar_versions')->where('id', '!=', $versionId)
                 ->where('effective_from', '<=', $version->effective_to)

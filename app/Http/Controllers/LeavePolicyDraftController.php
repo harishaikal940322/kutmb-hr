@@ -240,15 +240,16 @@ class LeavePolicyDraftController extends Controller
     public function confirmScheduleSimulation(Request $request, int $versionId, ConfirmedVersionLookup $lookup): RedirectResponse
     {
         $request->validate(['acknowledge_schedule' => ['accepted']]);
-        if (Schema::hasTable('leave_requests')) {
-            throw ValidationException::withMessages(['acknowledge_schedule' => 'Simulasi ditangguhkan sehingga kesan permohonan disokong.']);
-        }
+        abort_unless(Schema::hasTable('leave_calendar_usage_snapshots'), 503);
         DB::transaction(function () use ($request, $versionId, $lookup): void {
             abort_if(DB::table('leave_working_schedule_guard')->where('id', 1)->lockForUpdate()->first() === null, 503);
             $version = DB::table('leave_policy_versions')->where('id', $versionId)->lockForUpdate()->first();
             abort_if($version === null, 404);
             if ($version->confirmed_at !== null || $version->confirmed_by !== null || $version->schedule_simulated_at !== null || $version->schedule_simulated_by !== null || $version->cancelled_at !== null || $version->cancelled_by !== null || $version->effective_to === null || $version->effective_to < $version->effective_from) {
                 throw ValidationException::withMessages(['acknowledge_schedule' => 'Pilih draf aktif dengan tempoh mula dan tamat yang sah.']);
+            }
+            if (DB::table('leave_calendar_usage_snapshots')->whereBetween('leave_date', [$version->effective_from, $version->effective_to])->exists()) {
+                throw ValidationException::withMessages(['acknowledge_schedule' => 'Simulasi ditangguhkan kerana tarikh versi ini mempunyai snapshot permohonan.']);
             }
             $others = DB::table('leave_policy_versions')->where('id', '!=', $versionId)->where('effective_from', '<=', $version->effective_to)
                 ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', $version->effective_from))->get();

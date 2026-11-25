@@ -7,7 +7,6 @@ use App\Services\Leave\ConfirmedVersionLookup;
 use App\Services\Leave\TechnicalSessionSimulation;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -37,10 +36,12 @@ class ScheduleSimulationConfirmationTest extends TestCase
 
         $this->assertDatabaseHas('audit_events', ['actor_id' => $actor->id, 'action_code' => 'leave.policy.schedule_simulated', 'target_ref' => 'policy_version:'.$version]);
         $this->patch('/leave/policy-drafts/'.$version, ['label' => 'Denied', 'effective_from' => '2096-01-01', 'working_weekdays' => null])->assertSessionHasErrors('label');
-        $overlap = DB::table('leave_policy_versions')->insertGetId(['label' => 'Overlap '.$suffix, 'effective_from' => '2096-12-31', 'effective_to' => '2097-12-31']);
-        $this->post('/leave/policy-drafts/'.$overlap.'/simulate-schedule', ['acknowledge_schedule' => true])->assertSessionHasErrors('acknowledge_schedule');
-        Schema::shouldReceive('hasTable')->once()->with('leave_requests')->andReturn(true);
-        $this->post('/leave/policy-drafts/'.$overlap.'/simulate-schedule', ['acknowledge_schedule' => true])->assertSessionHasErrors('acknowledge_schedule');
+        $snapshotPolicy = DB::table('leave_policy_versions')->insertGetId(['label' => 'Snapshot policy '.$suffix, 'effective_from' => '2097-01-01', 'effective_to' => '2097-12-31']);
+        $snapshotCalendar = DB::table('leave_calendar_versions')->insertGetId(['label' => 'Snapshot calendar '.$suffix, 'effective_from' => '2097-01-01', 'effective_to' => '2097-12-31']);
+        $employee = DB::table('employees')->insertGetId(['employee_no' => 'snap'.$suffix, 'display_name' => 'Synthetic snapshot subject', 'service_start' => '2026-01-01']);
+        $marker = DB::table('leave_employee_history_markers')->insertGetId(['employee_id' => $employee, 'request_key' => 'snapshot-'.$suffix, 'revision' => 1, 'actor_id' => $actor->id]);
+        DB::table('leave_calendar_usage_snapshots')->insert(['history_marker_id' => $marker, 'employee_id' => $employee, 'leave_date' => '2097-03-01', 'leave_units' => 2, 'calendar_version_id' => $snapshotCalendar, 'policy_version_id' => $snapshotPolicy]);
+        $this->post('/leave/policy-drafts/'.$snapshotPolicy.'/simulate-schedule', ['acknowledge_schedule' => true])->assertSessionHasErrors('acknowledge_schedule');
         $this->assertGreaterThan(0, DB::transactionLevel());
     }
 }

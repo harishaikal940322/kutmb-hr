@@ -17,14 +17,14 @@ class EmployeeAccountLinkController extends Controller
         $request->merge(['reason' => is_string($request->input('reason')) ? trim($request->input('reason')) : $request->input('reason')]);
         $data = $request->validate(['user_id' => ['present', 'nullable', 'integer'], 'reason' => ['required', 'string', 'max:1000']]);
 
-        // Account reassociation must be reviewed with leave history before leave is introduced.
-        if (Schema::hasTable('leave_requests')) {
-            throw ValidationException::withMessages(['user_id' => 'Perubahan pautan tidak tersedia sehingga sejarah cuti disemak.']);
-        }
+        abort_unless(Schema::hasTable('leave_employee_history_markers'), 503);
         try {
             DB::transaction(function () use ($request, $employeeId, $data): void {
                 $employee = DB::table('employees')->where('id', $employeeId)->lockForUpdate()->first();
                 abort_if($employee === null, 404);
+                if (DB::table('leave_employee_history_markers')->where('employee_id', $employeeId)->exists()) {
+                    throw ValidationException::withMessages(['user_id' => 'Perubahan pautan tidak tersedia selepas sejarah cuti diwujudkan.']);
+                }
                 $actorId = (int) $request->user()->getKey();
                 $newId = isset($data['user_id']) ? (int) $data['user_id'] : null;
                 $oldId = $employee->user_id === null ? null : (int) $employee->user_id;

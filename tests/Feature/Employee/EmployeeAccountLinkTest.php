@@ -5,7 +5,6 @@ namespace Tests\Feature\Employee;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -41,7 +40,7 @@ class EmployeeAccountLinkTest extends TestCase
         $this->assertDatabaseHas('employee_account_link_history', ['employee_id' => $employee, 'previous_user_id' => $target->id, 'new_user_id' => null]);
         DB::table('employees')->where('id', $other)->update(['user_id' => $actor->id]);
         $this->put('/employees/'.$other.'/account', ['user_id' => null, 'reason' => 'Synthetic'])->assertSessionHasErrors('user_id');
-        Schema::shouldReceive('hasTable')->once()->with('leave_requests')->andReturn(true);
+        DB::table('leave_employee_history_markers')->insert(['employee_id' => $employee, 'request_key' => 'account-history-'.$suffix, 'revision' => 1, 'actor_id' => $actor->id]);
         $this->put('/employees/'.$employee.'/account', $payload)->assertSessionHasErrors('user_id');
         $actor->revokePermissionTo('hr.accounts.link');
         $this->put('/employees/'.$employee.'/account', $payload)->assertForbidden();

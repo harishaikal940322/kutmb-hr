@@ -1,3 +1,5 @@
+- 2026-11-25: Replaced leave-request table-name guards with immutable per-employee history markers and per-date calendar/policy impact snapshots; overlapping calendar/schedule confirmation now fails closed. See CURRENT_HANDOFF.
+
 - 2026-11-25: Consolidated rollback-isolated P02/P03 regression passed (23 tests, 334 assertions); documented HR-dependent blockers before P04–09. See CURRENT_HANDOFF.
 
 - 2026-11-25: Added an unexposed exact posted-ledger totals reader with employee-account pairing and integer overflow checks; no available-balance claim. See CURRENT_HANDOFF.
