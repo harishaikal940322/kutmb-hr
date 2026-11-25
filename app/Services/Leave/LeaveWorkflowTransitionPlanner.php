@@ -38,7 +38,7 @@ class LeaveWorkflowTransitionPlanner
 
             return [
                 'action_code' => $action,
-                'request_status' => $this->waitingStatus($next['stage_code']),
+                'request_status' => $this->statusForStage($next['stage_code']),
                 'next_step_order' => $next['step_order'],
                 'terminal' => false,
             ];
@@ -64,7 +64,7 @@ class LeaveWorkflowTransitionPlanner
         ];
     }
 
-    private function waitingStatus(string $stage): string
+    public function statusForStage(string $stage): string
     {
         return match ($stage) {
             'UNIT_MANAGER_SUPPORT' => 'WAITING_UNIT_MANAGER_SUPPORT',

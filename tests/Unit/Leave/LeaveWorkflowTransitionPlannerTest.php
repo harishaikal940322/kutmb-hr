@@ -26,6 +26,17 @@ class LeaveWorkflowTransitionPlannerTest extends TestCase
         $this->assertFalse($result['terminal']);
     }
 
+    public function test_every_planned_stage_maps_to_its_persisted_waiting_status(): void
+    {
+        $planner = new LeaveWorkflowTransitionPlanner;
+
+        $this->assertSame('WAITING_UNIT_MANAGER_SUPPORT', $planner->statusForStage('UNIT_MANAGER_SUPPORT'));
+        $this->assertSame('WAITING_GENERAL_MANAGER_SUPPORT', $planner->statusForStage('GENERAL_MANAGER_SUPPORT'));
+        $this->assertSame('WAITING_GENERAL_MANAGER_FINAL', $planner->statusForStage('GENERAL_MANAGER_FINAL'));
+        $this->assertSame('WAITING_SECRETARY_FINAL', $planner->statusForStage('SECRETARY_FINAL'));
+        $this->assertThrows(fn () => $planner->statusForStage('UNKNOWN'));
+    }
+
     public function test_final_approval_rejection_and_correction_are_terminal_decisions(): void
     {
         $planner = new LeaveWorkflowTransitionPlanner;
