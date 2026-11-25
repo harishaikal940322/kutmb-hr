@@ -75,6 +75,16 @@ class LeaveBalanceTransactionService
             if (count(array_filter($slots, fn (array $slot): bool => (int) substr($slot['date'], 0, 4) !== (int) $annual->leave_year)) > 0) {
                 throw new DomainException('This transaction slice accepts dates from one calendar year matching the Annual Leave account.');
             }
+            $currentYear = (int) now('Asia/Kuala_Lumpur')->format('Y');
+            $registeredEntitlement = DB::table('leave_annual_entitlement_confirmations')
+                ->where('annual_account_id', $annualAccountId)
+                ->where('employee_id', $employee->id)
+                ->where('leave_year', $annual->leave_year)
+                ->lockForUpdate()
+                ->first(['confirmed_half_day_units']);
+            if ((int) $annual->leave_year > $currentYear && $registeredEntitlement === null) {
+                throw new DomainException('A future-year Annual Leave entitlement must be registered and HR-confirmed before submission.');
+            }
 
             $payload = [
                 'actor_id' => $actorId,
@@ -103,6 +113,19 @@ class LeaveBalanceTransactionService
 
             $historyMarkerId = $this->recordUsageSnapshots((int) $employee->id, $actorId, $requestKey, $revision, $slots);
             $posted = $this->totals->forAccounts($annualAccountId, $tabungAccountId);
+            if ($registeredEntitlement !== null && (int) $annual->leave_year >= $currentYear) {
+                $creditEntry = DB::table('leave_ledger_entries')->where('annual_account_id', $annualAccountId)
+                    ->where('kind', 'annual_entitlement_credit')->first(['signed_half_day_units']);
+                if ($creditEntry === null) {
+                    $confirmedUnits = (int) $registeredEntitlement->confirmed_half_day_units;
+                    if ($posted['annual_half_day_units'] > PHP_INT_MAX - $confirmedUnits) {
+                        throw new OverflowException('The confirmed future-year entitlement exceeds the supported integer range.');
+                    }
+                    $posted['annual_half_day_units'] += $confirmedUnits;
+                } elseif ((int) $creditEntry->signed_half_day_units !== (int) $registeredEntitlement->confirmed_half_day_units) {
+                    throw new DomainException('The posted annual credit does not match its registered future-year entitlement.');
+                }
+            }
             $pendingAnnual = $this->sumFor('annual_units', 'annual_account_id', $annualAccountId);
             $pendingTabung = $this->sumFor('tabung_units', 'tabung_account_id', $tabungAccountId);
             $before = $this->projection->project($posted['annual_half_day_units'], $posted['tabung_half_day_units'], $pendingAnnual, $pendingTabung, 0);

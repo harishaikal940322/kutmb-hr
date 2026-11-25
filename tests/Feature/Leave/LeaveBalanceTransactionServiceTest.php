@@ -238,7 +238,7 @@ class LeaveBalanceTransactionServiceTest extends TestCase
             'nullsource' => 2099,
             'holiday' => 2100,
             'payload' => 2101,
-            default => 2098,
+            default => 2026,
         };
         $employeeUser = User::factory()->create(['username' => $label.$suffix, 'email' => null, 'status' => 'ACTIVE']);
         $employeeId = DB::table('employees')->insertGetId([
@@ -249,6 +249,19 @@ class LeaveBalanceTransactionServiceTest extends TestCase
         ]);
         $annualId = DB::table('leave_annual_accounts')->insertGetId(['employee_id' => $employeeId, 'leave_year' => $leaveYear]);
         $tabungId = DB::table('leave_tabung_accounts')->insertGetId(['employee_id' => $employeeId]);
+        if ($leaveYear > (int) now('Asia/Kuala_Lumpur')->format('Y')) {
+            DB::table('leave_annual_entitlement_confirmations')->insert([
+                'annual_account_id' => $annualId,
+                'employee_id' => $employeeId,
+                'leave_year' => $leaveYear,
+                'confirmed_half_day_units' => 1,
+                'confirmation_reference' => 'SYNTHETIC-TEST-ENTITLEMENT-'.$suffix,
+                'confirmed_by' => $employeeUser->id,
+                'confirmation_key' => 'test-entitlement-'.$suffix,
+                'payload_hash' => hash('sha256', 'synthetic-test-'.$suffix),
+                'created_at' => now(),
+            ]);
+        }
         $calendarId = DB::table('leave_calendar_versions')->insertGetId([
             'label' => 'Synthetic calendar '.$suffix,
             'effective_from' => $leaveYear.'-01-01',
@@ -267,12 +280,13 @@ class LeaveBalanceTransactionServiceTest extends TestCase
             'session_boundary' => '13:00',
             'work_end' => '17:00',
         ]);
-        if ($annualUnits !== 0) {
+        $openingAnnualUnits = $annualUnits - ($leaveYear > (int) now('Asia/Kuala_Lumpur')->format('Y') ? 1 : 0);
+        if ($openingAnnualUnits !== 0) {
             $operationId = $this->operation($employeeId, $employeeUser->id, 'opening-a-'.$suffix);
             DB::table('leave_ledger_entries')->insert([
                 'annual_account_id' => $annualId,
                 'balance_operation_id' => $operationId,
-                'signed_half_day_units' => $annualUnits,
+                'signed_half_day_units' => $openingAnnualUnits,
                 'kind' => 'synthetic_opening',
                 'operation_key' => 'opening-a-'.$suffix,
                 'actor_id' => $employeeUser->id,
