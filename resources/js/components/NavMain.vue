@@ -22,6 +22,7 @@ import { ref, watch } from 'vue';
 
 const props = defineProps<{
     items: NavItem[];
+    moduleItems?: NavItem[];
     adminItems: NavItem[];
 }>();
 
@@ -54,6 +55,27 @@ watch(
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
+        </SidebarMenu>
+    </SidebarGroup>
+    <SidebarGroup v-if="moduleItems?.length" class="px-2 py-0">
+        <SidebarGroupLabel>Modul Utama</SidebarGroupLabel>
+        <SidebarMenu>
+            <SidebarMenuItem v-for="item in moduleItems" :key="item.title">
+                <SidebarMenuButton
+                    as-child
+                    :is-active="isCurrentUrl(item.href)"
+                    :tooltip="item.title"
+                >
+                    <Link :href="item.href">
+                        <component :is="item.icon" />
+                        <span>{{ item.title }}</span>
+                    </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+        </SidebarMenu>
+    </SidebarGroup>
+    <SidebarGroup v-if="adminItems.length" class="px-2 py-0">
+        <SidebarMenu>
             <Collapsible
                 v-if="adminItems.length"
                 v-model:open="isAdminOpen"

@@ -7,7 +7,6 @@ import {
 } from '@lucide/vue';
 import { computed } from 'vue';
 import { dashboard, profile } from '@/routes';
-import AnnualLeavePreview from '@/pages/AnnualLeavePreview.vue';
 
 defineOptions({
     layout: {
@@ -22,16 +21,12 @@ defineOptions({
 
 const page = usePage();
 const displayName = computed(() => page.props.auth.user?.name ?? 'there');
-defineProps<{ annualLeaveDesignReview: boolean }>();
 </script>
 
 <template>
     <Head title="Papan Pemuka" />
 
-    <AnnualLeavePreview v-if="annualLeaveDesignReview" />
-
     <section
-        v-else
         class="mx-auto w-full max-w-6xl space-y-7 px-4 py-7 sm:px-6 lg:px-8"
     >
         <header

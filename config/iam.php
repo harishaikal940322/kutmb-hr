@@ -112,6 +112,10 @@ return [
     ],
     'menus' => [
         ...(in_array($appEnvironment, ['local', 'testing'], true) ? [
+            'leave.annual.index' => [
+                'label' => 'Cuti Tahunan', 'href' => '/leave/annual', 'icon' => 'calendar',
+                'permission' => 'iam.rbac.manage', 'editable' => false,
+            ],
             'employees.self' => [
                 'label' => 'Profil Pekerja Saya', 'href' => '/employee-profile', 'icon' => 'user',
                 'permission' => 'hr.profile.self.view', 'editable' => false,

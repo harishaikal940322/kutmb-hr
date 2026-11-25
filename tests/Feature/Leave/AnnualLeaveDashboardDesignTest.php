@@ -13,10 +13,11 @@ class AnnualLeaveDashboardDesignTest extends TestCase
 {
     use DatabaseTransactions;
 
-    public function test_dashboard_design_review_requires_local_admin_authority(): void
+    public function test_annual_leave_module_requires_local_admin_authority(): void
     {
         $this->assertGreaterThan(0, DB::transactionLevel());
         $this->get('/dashboard')->assertRedirect(route('login'));
+        $this->get('/leave/annual')->assertRedirect(route('login'));
 
         $actor = User::factory()->create([
             'username' => 'ux'.Str::lower(Str::random(16)),
@@ -26,17 +27,25 @@ class AnnualLeaveDashboardDesignTest extends TestCase
         $actor->forceFill(['two_factor_secret' => 'synthetic', 'two_factor_confirmed_at' => now()])->save();
 
         $this->actingAs($actor)->get('/dashboard')->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('Dashboard')->where('annualLeaveDesignReview', false));
+            ->assertInertia(fn (Assert $page) => $page->component('Dashboard')
+                ->where('visibleMenuKeys', fn ($keys) => ! collect($keys)->contains('leave.annual.index')));
+        $this->get('/leave/annual')->assertForbidden();
 
         $actor->givePermissionTo('iam.rbac.manage');
         $this->get('/dashboard')->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('Dashboard')->where('annualLeaveDesignReview', true));
+            ->assertInertia(fn (Assert $page) => $page->component('Dashboard')
+                ->where('visibleMenuKeys', fn ($keys) => collect($keys)->contains('leave.annual.index'))
+                ->missing('annualLeaveDesignReview'));
+        $this->get('/leave/annual')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('leave/AnnualLeave'));
 
         $previousEnvironment = app()->environment();
         try {
             app()->instance('env', 'production');
             $this->get('/dashboard')->assertOk()
-                ->assertInertia(fn (Assert $page) => $page->component('Dashboard')->where('annualLeaveDesignReview', false));
+                ->assertInertia(fn (Assert $page) => $page->component('Dashboard')
+                    ->where('visibleMenuKeys', fn ($keys) => ! collect($keys)->contains('leave.annual.index')));
+            $this->get('/leave/annual')->assertNotFound();
         } finally {
             app()->instance('env', $previousEnvironment);
         }

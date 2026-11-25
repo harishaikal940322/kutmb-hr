@@ -18,9 +18,7 @@ use App\Http\Controllers\OrganizationReferenceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserDirectoryController;
 use App\Http\Middleware\EnsureLocalHrDevelopment;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::inertia('/', 'Welcome')->name('home');
 
@@ -66,19 +64,17 @@ Route::middleware(['protected', 'can:iam.rbac.manage'])
     });
 
 Route::middleware('protected')->group(function () {
-    Route::get('dashboard', function (Request $request) {
-        return Inertia::render('Dashboard', [
-            'annualLeaveDesignReview' => app()->environment(['local', 'testing'])
-                && $request->user() !== null
-                && $request->user()->can('iam.rbac.manage'),
-        ]);
-    })->name('dashboard');
+    Route::inertia('dashboard', 'Dashboard')->name('dashboard');
     Route::get('profile', [ProfileController::class, 'show'])->name('profile');
     Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::get('users', UserDirectoryController::class)
         ->middleware(['user-directory-preview', 'permission:iam.users.view'])
         ->name('users.index');
 });
+
+Route::inertia('/leave/annual', 'leave/AnnualLeave')
+    ->middleware(['protected', EnsureLocalHrDevelopment::class, 'can:iam.rbac.manage'])
+    ->name('leave.annual.index');
 
 Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.organization.manage'])
     ->prefix('organization')->name('organization.')->group(function (): void {

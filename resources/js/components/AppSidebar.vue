@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
 import {
+    CalendarDays,
     KeyRound,
     LayoutGrid,
     Menu as MenuIcon,
@@ -8,6 +9,7 @@ import {
     UsersRound,
     UserRound,
 } from '@lucide/vue';
+import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -36,6 +38,11 @@ const mainNavItems: NavItem[] = [
     },
 ];
 const menuCatalog: Record<string, NavItem> = {
+    'leave.annual.index': {
+        title: 'Cuti Tahunan',
+        href: '/leave/annual',
+        icon: CalendarDays,
+    },
     'leave.policy.drafts.index': {
         title: 'Draf Dasar Cuti',
         href: '/leave/policy-drafts',
@@ -88,22 +95,31 @@ const menuCatalog: Record<string, NavItem> = {
     },
 };
 const page = usePage<{ visibleMenuKeys: string[] }>();
-const visibleMenus = page.props.visibleMenuKeys
-    .map((key) => menuCatalog[key])
-    .filter((item): item is NavItem => item !== undefined);
+const moduleKeys = new Set(['leave.annual.index']);
+const moduleItems = computed(() =>
+    page.props.visibleMenuKeys
+        .filter((key) => moduleKeys.has(key))
+        .map((key) => menuCatalog[key])
+        .filter((item): item is NavItem => item !== undefined),
+);
 const systemAdministrationKeys = new Set([
     'iam.roles.index',
     'iam.permissions.index',
     'iam.menus.index',
 ]);
-const systemAdministrationItems = page.props.visibleMenuKeys
-    .filter((key) => systemAdministrationKeys.has(key))
-    .map((key) => menuCatalog[key])
-    .filter((item): item is NavItem => item !== undefined);
-const workspaceItems = [
+const systemAdministrationItems = computed(() =>
+    page.props.visibleMenuKeys
+        .filter((key) => systemAdministrationKeys.has(key))
+        .map((key) => menuCatalog[key])
+        .filter((item): item is NavItem => item !== undefined),
+);
+const workspaceItems = computed(() => [
     ...mainNavItems,
-    ...visibleMenus.filter((item) => !systemAdministrationItems.includes(item)),
-];
+    ...page.props.visibleMenuKeys
+        .filter((key) => !moduleKeys.has(key) && !systemAdministrationKeys.has(key))
+        .map((key) => menuCatalog[key])
+        .filter((item): item is NavItem => item !== undefined),
+]);
 </script>
 
 <template>
@@ -123,6 +139,7 @@ const workspaceItems = [
         <SidebarContent>
             <NavMain
                 :items="workspaceItems"
+                :module-items="moduleItems"
                 :admin-items="systemAdministrationItems"
             />
         </SidebarContent>
