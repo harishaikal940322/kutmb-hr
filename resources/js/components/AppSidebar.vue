@@ -95,12 +95,11 @@ const menuCatalog: Record<string, NavItem> = {
     },
 };
 const page = usePage<{ visibleMenuKeys: string[] }>();
-const moduleKeys = new Set(['leave.annual.index']);
+const moduleKeys = new Set(['leave.annual.index', 'leave.annual.entitlements']);
 const moduleItems = computed(() =>
-    page.props.visibleMenuKeys
-        .filter((key) => moduleKeys.has(key))
-        .map((key) => menuCatalog[key])
-        .filter((item): item is NavItem => item !== undefined),
+    page.props.visibleMenuKeys.some((key) => moduleKeys.has(key))
+        ? [menuCatalog['leave.annual.index']]
+        : [],
 );
 const systemAdministrationKeys = new Set([
     'iam.roles.index',

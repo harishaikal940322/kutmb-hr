@@ -29,7 +29,11 @@ return [
             'action' => 'Manage',
             'system_only' => true,
         ],
-        ...(in_array($appEnvironment, ['local', 'testing'], true) ? ['leave.policy.manage' => [
+        ...(in_array($appEnvironment, ['local', 'testing'], true) ? ['leave.entitlement.view' => [
+            'label' => 'Lihat profil dan kelayakan cuti',
+            'description' => 'View minimum employee profile and confirmed annual entitlement in local development.',
+            'group' => 'Annual leave', 'submodule' => 'Profil & kelayakan', 'action' => 'View', 'system_only' => false,
+        ], 'leave.policy.manage' => [
             'label' => 'Manage draft leave policies', 'description' => 'Manage local development leave policy drafts.',
             'group' => 'Annual leave', 'submodule' => 'Policy drafts', 'action' => 'Manage', 'system_only' => false,
         ], 'leave.calendar.manage' => [
@@ -112,8 +116,12 @@ return [
     ],
     'menus' => [
         ...(in_array($appEnvironment, ['local', 'testing'], true) ? [
+            'leave.annual.entitlements' => [
+                'label' => 'Cuti Tahunan — Profil & kelayakan', 'href' => '/leave/annual', 'icon' => 'calendar',
+                'permission' => 'leave.entitlement.view', 'editable' => false,
+            ],
             'leave.annual.index' => [
-                'label' => 'Cuti Tahunan', 'href' => '/leave/annual', 'icon' => 'calendar',
+                'label' => 'Cuti Tahunan (semakan reka bentuk)', 'href' => '/leave/annual', 'icon' => 'calendar',
                 'permission' => 'iam.rbac.manage', 'editable' => false,
             ],
             'employees.self' => [

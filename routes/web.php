@@ -9,6 +9,7 @@ use App\Http\Controllers\IdentityMenuAccessController;
 use App\Http\Controllers\IdentityPermissionController;
 use App\Http\Controllers\IdentityRoleController;
 use App\Http\Controllers\KeycloakController;
+use App\Http\Controllers\AnnualLeaveController;
 use App\Http\Controllers\LeaveCalendarDraftController;
 use App\Http\Controllers\LeavePolicyDraftController;
 use App\Http\Controllers\LeaveSessionSimulationController;
@@ -72,8 +73,8 @@ Route::middleware('protected')->group(function () {
         ->name('users.index');
 });
 
-Route::inertia('/leave/annual', 'leave/AnnualLeave')
-    ->middleware(['protected', EnsureLocalHrDevelopment::class, 'can:iam.rbac.manage'])
+Route::get('/leave/annual', AnnualLeaveController::class)
+    ->middleware(['protected', EnsureLocalHrDevelopment::class])
     ->name('leave.annual.index');
 
 Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.organization.manage'])
