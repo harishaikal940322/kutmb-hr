@@ -1,3 +1,5 @@
+- 2026-11-25: Added a local-only P05 assignment resolver with target-unit, active-office, transaction-lock and self-approval checks; request submission remains unexposed. See CURRENT_HANDOFF.
+
 - 2026-11-25: Added aggregate reversal caps and source-year preservation with transaction-locked per-entry totals; corrected a MySQL trigger lock restriction before any test data persisted. See CURRENT_HANDOFF.
 
 - 2026-11-25: Added local-only same-year balance reservations, idempotent posting/release contracts, immutable calendar/history snapshots and AM/PM overlap claims; no request workflow is exposed. See CURRENT_HANDOFF.
