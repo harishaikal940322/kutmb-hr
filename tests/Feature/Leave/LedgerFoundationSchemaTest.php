@@ -22,8 +22,10 @@ class LedgerFoundationSchemaTest extends TestCase
         $employee = DB::table('employees')->insertGetId(['employee_no' => 'e'.$suffix, 'display_name' => 'Synthetic', 'service_start' => '2026-01-01']);
         $annual = DB::table('leave_annual_accounts')->insertGetId(['employee_id' => $employee, 'leave_year' => 2026]);
         $tabung = DB::table('leave_tabung_accounts')->insertGetId(['employee_id' => $employee]);
-        DB::table('leave_ledger_entries')->insert(['annual_account_id' => $annual, 'signed_half_day_units' => 4, 'kind' => 'synthetic', 'operation_key' => 'annual-'.$suffix, 'actor_id' => $actor->id]);
+        $annualEntry = DB::table('leave_ledger_entries')->insertGetId(['annual_account_id' => $annual, 'signed_half_day_units' => 4, 'kind' => 'synthetic', 'operation_key' => 'annual-'.$suffix, 'actor_id' => $actor->id]);
         DB::table('leave_ledger_entries')->insert(['tabung_account_id' => $tabung, 'signed_half_day_units' => 6, 'kind' => 'synthetic', 'source_year' => 2025, 'operation_key' => 'tabung-'.$suffix, 'actor_id' => $actor->id]);
+        DB::table('leave_ledger_entries')->insert(['annual_account_id' => $annual, 'signed_half_day_units' => -2, 'kind' => 'synthetic_reversal', 'operation_key' => 'reverse-good-'.$suffix, 'reverses_entry_id' => $annualEntry, 'actor_id' => $actor->id]);
+        $this->assertSame(1, DB::table('leave_ledger_entries')->where('operation_key', 'reverse-good-'.$suffix)->count());
         $operations = [
             fn () => DB::table('leave_annual_accounts')->insert(['employee_id' => $employee, 'leave_year' => 2026]),
             fn () => DB::table('leave_tabung_accounts')->insert(['employee_id' => $employee]),
@@ -33,6 +35,8 @@ class LedgerFoundationSchemaTest extends TestCase
             fn () => DB::table('leave_annual_accounts')->where('id', $annual)->delete(),
             fn () => DB::table('leave_ledger_entries')->where('operation_key', 'annual-'.$suffix)->update(['signed_half_day_units' => 8]),
             fn () => DB::table('leave_ledger_entries')->where('operation_key', 'annual-'.$suffix)->delete(),
+            fn () => DB::table('leave_ledger_entries')->insert(['tabung_account_id' => $tabung, 'signed_half_day_units' => -1, 'kind' => 'synthetic_reversal', 'operation_key' => 'reverse-wrong-bucket-'.$suffix, 'reverses_entry_id' => $annualEntry, 'actor_id' => $actor->id]),
+            fn () => DB::table('leave_ledger_entries')->insert(['annual_account_id' => $annual, 'signed_half_day_units' => 1, 'kind' => 'synthetic_reversal', 'operation_key' => 'reverse-wrong-sign-'.$suffix, 'reverses_entry_id' => $annualEntry, 'actor_id' => $actor->id]),
         ];
         foreach ($operations as $operation) {
             try {

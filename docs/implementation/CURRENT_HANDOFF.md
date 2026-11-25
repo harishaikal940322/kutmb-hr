@@ -1,3 +1,9 @@
+## 25 November 2026 — CT-P03 reversal account/sign integrity
+
+- Added a MySQL insert trigger requiring each compensating ledger entry to reference an existing original entry in the same AL or Tabung account and use the opposite nonzero sign. It permits partial reversals; it does not cap cumulative reversal units or define source-year semantics. Applied additive migration 2026_11_25_000024 after verifying the existing `kutmb_hr_dev` target was empty for ledger data and reviewing its SQL preview.
+- Rollback-isolated synthetic MySQL test passed (1 test, 14 assertions) for a valid partial reversal, wrong bucket, same sign, account separation and prior ledger constraints. Pint passed for all three ledger migrations and the focused test. Test fixtures rolled back; no account or ledger rows were retained.
+- Next: treat CT-P03 posting as blocked on policy mapping, source-year/carry-forward provenance, concurrency, aggregate reversal limits and HR authority. No request/workflow slice can safely depend on this foundation yet.
+
 ## 25 November 2026 — CT-P03 empty account and append-only ledger foundation
 
 - Added empty per-employee/year Annual Leave accounts, one continuous Tabung account per employee and a signed integer half-day ledger with actor/reversal references, per-entry unique operation key and optional source-year provenance. MySQL enforces exactly one account bucket per entry; database triggers reject ledger updates and deletes. Applied only additive migrations 2026_11_24_000022 and 2026_11_25_000023 to the verified existing `kutmb_hr_dev` MySQL 8.4.13 target after reviewing the second migration's SQL preview. All three tables are InnoDB and contain zero rows.
