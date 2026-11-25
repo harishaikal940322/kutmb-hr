@@ -23,9 +23,9 @@ class LedgerPostedTotalsTest extends TestCase
         $employee = DB::table('employees')->insertGetId(['employee_no' => 'read'.$suffix, 'display_name' => 'Synthetic', 'service_start' => '2026-01-01']);
         $annual = DB::table('leave_annual_accounts')->insertGetId(['employee_id' => $employee, 'leave_year' => 2026]);
         $tabung = DB::table('leave_tabung_accounts')->insertGetId(['employee_id' => $employee]);
-        DB::table('leave_ledger_entries')->insert(['annual_account_id' => $annual, 'signed_half_day_units' => 5, 'kind' => 'synthetic', 'operation_key' => 'annual-credit-'.$suffix, 'actor_id' => $actor->id]);
-        DB::table('leave_ledger_entries')->insert(['annual_account_id' => $annual, 'signed_half_day_units' => -1, 'kind' => 'synthetic', 'operation_key' => 'annual-debit-'.$suffix, 'actor_id' => $actor->id]);
-        DB::table('leave_ledger_entries')->insert(['tabung_account_id' => $tabung, 'signed_half_day_units' => 6, 'kind' => 'synthetic', 'source_year' => 2025, 'operation_key' => 'tabung-credit-'.$suffix, 'actor_id' => $actor->id]);
+        DB::table('leave_ledger_entries')->insert(['annual_account_id' => $annual, 'balance_operation_id' => $this->operation($employee, $actor->id, 'annual-credit-op-'.$suffix), 'signed_half_day_units' => 5, 'kind' => 'synthetic', 'operation_key' => 'annual-credit-'.$suffix, 'actor_id' => $actor->id]);
+        DB::table('leave_ledger_entries')->insert(['annual_account_id' => $annual, 'balance_operation_id' => $this->operation($employee, $actor->id, 'annual-debit-op-'.$suffix), 'signed_half_day_units' => -1, 'kind' => 'synthetic', 'operation_key' => 'annual-debit-'.$suffix, 'actor_id' => $actor->id]);
+        DB::table('leave_ledger_entries')->insert(['tabung_account_id' => $tabung, 'balance_operation_id' => $this->operation($employee, $actor->id, 'tabung-credit-op-'.$suffix), 'signed_half_day_units' => 6, 'kind' => 'synthetic', 'source_year' => 2025, 'operation_key' => 'tabung-credit-'.$suffix, 'actor_id' => $actor->id]);
 
         $this->assertSame([
             'annual_half_day_units' => 4,
@@ -52,10 +52,22 @@ class LedgerPostedTotalsTest extends TestCase
         $employee = DB::table('employees')->insertGetId(['employee_no' => 'overflow'.$suffix, 'display_name' => 'Synthetic', 'service_start' => '2026-01-01']);
         $annual = DB::table('leave_annual_accounts')->insertGetId(['employee_id' => $employee, 'leave_year' => 2026]);
         $tabung = DB::table('leave_tabung_accounts')->insertGetId(['employee_id' => $employee]);
-        DB::table('leave_ledger_entries')->insert(['annual_account_id' => $annual, 'signed_half_day_units' => PHP_INT_MAX, 'kind' => 'synthetic', 'operation_key' => 'overflow-a-'.$suffix, 'actor_id' => $actor->id]);
-        DB::table('leave_ledger_entries')->insert(['annual_account_id' => $annual, 'signed_half_day_units' => 1, 'kind' => 'synthetic', 'operation_key' => 'overflow-b-'.$suffix, 'actor_id' => $actor->id]);
+        DB::table('leave_ledger_entries')->insert(['annual_account_id' => $annual, 'balance_operation_id' => $this->operation($employee, $actor->id, 'overflow-a-op-'.$suffix), 'signed_half_day_units' => PHP_INT_MAX, 'kind' => 'synthetic', 'operation_key' => 'overflow-a-'.$suffix, 'actor_id' => $actor->id]);
+        DB::table('leave_ledger_entries')->insert(['annual_account_id' => $annual, 'balance_operation_id' => $this->operation($employee, $actor->id, 'overflow-b-op-'.$suffix), 'signed_half_day_units' => 1, 'kind' => 'synthetic', 'operation_key' => 'overflow-b-'.$suffix, 'actor_id' => $actor->id]);
 
         $this->expectException(OverflowException::class);
         app(LedgerPostedTotals::class)->forAccounts($annual, $tabung);
+    }
+
+    private function operation(int $employeeId, int $actorId, string $key): int
+    {
+        return DB::table('leave_balance_operations')->insertGetId([
+            'employee_id' => $employeeId,
+            'actor_id' => $actorId,
+            'operation_key' => $key,
+            'operation_type' => 'SYNTHETIC_TEST',
+            'payload_hash' => hash('sha256', $key),
+            'created_at' => now(),
+        ]);
     }
 }
