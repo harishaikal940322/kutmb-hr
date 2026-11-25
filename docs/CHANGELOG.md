@@ -1,3 +1,5 @@
+- 2026-11-25: Added aggregate reversal caps and source-year preservation with transaction-locked per-entry totals; corrected a MySQL trigger lock restriction before any test data persisted. See CURRENT_HANDOFF.
+
 - 2026-11-25: Added local-only same-year balance reservations, idempotent posting/release contracts, immutable calendar/history snapshots and AM/PM overlap claims; no request workflow is exposed. See CURRENT_HANDOFF.
 
 - 2026-11-25: Replaced leave-request table-name guards with immutable per-employee history markers and per-date calendar/policy impact snapshots; overlapping calendar/schedule confirmation now fails closed. See CURRENT_HANDOFF.
