@@ -1,3 +1,9 @@
+## 25 November 2026 — CT-P03 rejected retrospective EL debit
+
+- Added an internal final-decision balance operation for the detailed CT-DEC-029 rule: a finally rejected retrospective EL debits the reservation’s original AL-first/Tabung allocation, preserves Tabung source year, and records a distinct ledger kind, reservation event and audit code. Operation-key payload checks make retries idempotent; active slot claims remain committed so the same absence cannot be reserved twice. The caller must authorize final rejection and establish that the request is retrospective EL. No attendance classification, payroll action or route is added.
+- Verification: the focused balance transaction test file passed (6 tests, 50 assertions) against the existing `kutmb_hr_dev` database with rollback isolation; targeted Pint/PHPStan and `git diff --check` passed. No ledger or reservation fixture persisted. Concurrency was verified through row locks and unique keys, not a simultaneous-worker stress run.
+- Next: integrate this operation with the locked P04/P05 request and action transaction; create an HR attendance-review marker for late rejections and keep the workflow unexposed until all decision paths are covered.
+
 ## 25 November 2026 — CT-P05 current target assignment resolver
 
 - Added a local/testing-only resolver that must run inside the caller's transaction. It locks calendar → working-schedule → office-assignment guards, then the linked active requester, employee and effective assignments; it requires one current employee unit for every requested leave date and exactly one active assignee per planned stage. The route threshold is checked against unique AM/PM half-day slots. Requests spanning unit transfers, missing/ambiguous appointments, inactive accounts, invalid slots and self-approval fail closed. No request persistence, submission/decision action, route, page or notification was added.

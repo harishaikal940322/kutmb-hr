@@ -75,6 +75,42 @@ class LeaveBalanceTransactionServiceTest extends TestCase
         $this->assertSame(0, app(LedgerPostedTotals::class)->forAccounts($fixture['annual_id'], $fixture['tabung_id'])['tabung_half_day_units']);
     }
 
+    public function test_rejected_retrospective_el_debits_reserved_sources_once_and_replays_idempotently(): void
+    {
+        $fixture = $this->fixture('retrospective', 2, [2024 => 2]);
+        $approver = $this->approver('approver-'.$fixture['suffix']);
+        $assignmentId = DB::table('approval_assignments')->insertGetId([
+            'user_id' => $approver->id,
+            'office_code' => 'SECRETARY_ALK',
+            'effective_from' => '2020-01-01',
+        ]);
+        $service = app(LeaveBalanceTransactionService::class);
+        $slots = $this->workingSlots(4, $fixture['leave_year']);
+        $reservation = $service->reserve(
+            $fixture['employee_user']->id,
+            'retro-'.$fixture['suffix'],
+            1,
+            $fixture['annual_id'],
+            $fixture['tabung_id'],
+            $slots,
+            'reserve-retro-'.$fixture['suffix'],
+        );
+        $operationKey = 'reject-retro-'.$fixture['suffix'];
+
+        $settled = $service->debitRetrospectiveElRejection($approver->id, $reservation['reservation_id'], $assignmentId, $operationKey);
+        $replay = $service->debitRetrospectiveElRejection($approver->id, $reservation['reservation_id'], $assignmentId, $operationKey);
+        $entries = DB::table('leave_ledger_entries')->where('kind', 'rejected_el_absence_use')->orderBy('annual_account_id')->get();
+
+        $this->assertSame('COMMITTED', $settled['status']);
+        $this->assertSame($settled, $replay);
+        $this->assertCount(2, $entries);
+        $this->assertSame([-2, -2], $entries->pluck('signed_half_day_units')->sort()->values()->all());
+        $this->assertSame([2024], $entries->whereNotNull('source_year')->pluck('source_year')->unique()->values()->all());
+        $this->assertSame(1, DB::table('leave_reservation_events')->where('reservation_id', $reservation['reservation_id'])->where('event_code', 'EL_REJECTED')->count());
+        $this->assertSame(1, DB::table('audit_events')->where('action_code', 'hr.leave.retrospective_el_rejection_debited')->where('target_ref', 'leave_reservation:'.$reservation['reservation_id'])->count());
+        $this->assertSame(0, DB::table('leave_reservations')->where('id', $reservation['reservation_id'])->where('status', 'ACTIVE')->count());
+    }
+
     public function test_only_final_rejection_or_employee_withdrawal_releases_and_each_release_is_idempotent(): void
     {
         $fixture = $this->fixture('release', 2, []);
@@ -198,6 +234,7 @@ class LeaveBalanceTransactionServiceTest extends TestCase
     {
         $suffix = Str::lower(Str::random(10));
         $leaveYear = match ($label) {
+            'retrospective' => 2025,
             'nullsource' => 2099,
             'holiday' => 2100,
             'payload' => 2101,

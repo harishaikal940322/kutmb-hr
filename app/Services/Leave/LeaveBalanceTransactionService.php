@@ -157,6 +157,50 @@ class LeaveBalanceTransactionService
         return $result;
     }
 
+    /** The caller must first authorize the final rejection of a retrospective EL request. */
+    /** @return array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int} */
+    public function debitRetrospectiveElRejection(int $actorId, int $reservationId, int $finalAssignmentId, string $operationKey): array
+    {
+        $this->assertLocal();
+        $this->validateKeys((string) $reservationId, $operationKey);
+
+        /** @var array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int} $result */
+        $result = DB::transaction(function () use ($actorId, $reservationId, $finalAssignmentId, $operationKey): array {
+            $candidate = DB::table('leave_reservations')->where('id', $reservationId)->first();
+            if ($candidate === null) {
+                throw new DomainException('The reservation does not exist.');
+            }
+            $employee = DB::table('employees')->where('id', $candidate->employee_id)->lockForUpdate()->first();
+            $annual = DB::table('leave_annual_accounts')->where('id', $candidate->annual_account_id)->lockForUpdate()->first();
+            $tabung = DB::table('leave_tabung_accounts')->where('id', $candidate->tabung_account_id)->lockForUpdate()->first();
+            $reservation = DB::table('leave_reservations')->where('id', $reservationId)->lockForUpdate()->first();
+            if ($annual === null || $tabung === null || $employee === null || $reservation === null
+                || (int) $annual->employee_id !== (int) $employee->id || (int) $tabung->employee_id !== (int) $employee->id
+                || (int) $annual->leave_year !== (int) $reservation->leave_year) {
+                throw new DomainException('The reservation account scope is inconsistent.');
+            }
+            $this->assertFinalApprover($actorId, $employee, $finalAssignmentId);
+            $payload = ['actor_id' => $actorId, 'assignment_id' => $finalAssignmentId, 'reservation_id' => $reservationId];
+            $operation = $this->startOperation($operationKey, 'EL_REJECTION_DEBIT', $payload, (int) $employee->id, $actorId);
+            if ($operation['replay']) {
+                return $this->reservationResult((int) $operation['event']->reservation_id);
+            }
+            if ($reservation->status !== 'ACTIVE') {
+                throw new DomainException('Only an active pending reservation can settle a retrospective EL rejection.');
+            }
+
+            $this->appendUsageEntry($reservation, $operation['id'], $actorId, $operationKey, 'annual_account_id', 'annual_units', null, 'rejected_el_absence_use');
+            $this->appendUsageEntry($reservation, $operation['id'], $actorId, $operationKey, 'tabung_account_id', 'tabung_units', $reservation->tabung_source_year, 'rejected_el_absence_use');
+            $this->resolveReservation($reservationId, 'COMMITTED');
+            $this->recordEvent($reservationId, $operation['id'], 'EL_REJECTED', $actorId);
+            $this->audit('hr.leave.retrospective_el_rejection_debited', $reservationId, $operationKey);
+
+            return $this->reservationResult($reservationId);
+        }, 3);
+
+        return $result;
+    }
+
     /** @return array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int} */
     public function release(int $actorId, int $reservationId, string $reason, string $operationKey, ?int $finalAssignmentId = null): array
     {
@@ -391,7 +435,7 @@ class LeaveBalanceTransactionService
         return $sourceYear;
     }
 
-    private function appendUsageEntry(stdClass $reservation, int $operationId, int $actorId, string $operationKey, string $accountColumn, string $unitsColumn, ?int $sourceYear): void
+    private function appendUsageEntry(stdClass $reservation, int $operationId, int $actorId, string $operationKey, string $accountColumn, string $unitsColumn, ?int $sourceYear, string $kind = 'approved_leave_use'): void
     {
         $units = (int) $reservation->{$unitsColumn};
         if ($units === 0) {
@@ -402,7 +446,7 @@ class LeaveBalanceTransactionService
             $accountColumn => $reservation->{$accountColumn},
             'balance_operation_id' => $operationId,
             'signed_half_day_units' => -$units,
-            'kind' => 'approved_leave_use',
+            'kind' => $kind,
             'source_year' => $sourceYear,
             'operation_key' => $operationKey.':'.$suffix,
             'actor_id' => $actorId,

@@ -1,3 +1,5 @@
+- 2026-11-25: Added a distinct, source-preserving, idempotent AL/Tabung debit for final rejection of retrospective EL; no attendance classification or payroll effect. See CURRENT_HANDOFF.
+
 - 2026-11-25: Added a local-only P05 assignment resolver with target-unit, active-office, transaction-lock and self-approval checks; request submission remains unexposed. See CURRENT_HANDOFF.
 
 - 2026-11-25: Added aggregate reversal caps and source-year preservation with transaction-locked per-entry totals; corrected a MySQL trigger lock restriction before any test data persisted. See CURRENT_HANDOFF.
