@@ -13,7 +13,7 @@ class AnnualLeaveDashboardDesignTest extends TestCase
 {
     use DatabaseTransactions;
 
-    public function test_annual_leave_module_requires_local_admin_authority(): void
+    public function test_admin_can_review_design_without_access_to_employee_data(): void
     {
         $this->assertGreaterThan(0, DB::transactionLevel());
         $this->get('/dashboard')->assertRedirect(route('login'));
@@ -37,7 +37,8 @@ class AnnualLeaveDashboardDesignTest extends TestCase
                 ->where('visibleMenuKeys', fn ($keys) => collect($keys)->contains('leave.annual.index'))
                 ->missing('annualLeaveDesignReview'));
         $this->get('/leave/annual')->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('leave/AnnualLeave'));
+            ->assertInertia(fn (Assert $page) => $page->component('leave/AnnualLeave')
+                ->where('canViewEntitlements', false)->missing('employees'));
 
         $previousEnvironment = app()->environment();
         try {

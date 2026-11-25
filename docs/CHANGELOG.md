@@ -145,3 +145,5 @@ No application features were implemented as part of the initial documentation ba
 - 2026-11-25: Move Cuti Tahunan from Papan Pemuka to sidebar Modul Utama with protected dedicated /leave/annual route, restore original dashboard and preserve synthetic design-review boundary. Source 7b54a644; no database or dependency change, local verification pending.
 
 - 2026-11-25: Refine annual leave content navigation to a grouped vertical sub-sidebar with responsive disclosure and pane-width layout; preserve existing main sidebar and synthetic review boundary. Vue and documentation only; local verification pending.
+
+- 2026-11-25: Begin functional Cuti Tahunan implementation with database-backed Profil & Kelayakan read view (c43fcbd), explicit local-only read permission, unchanged synthetic admin review and one module sidebar item. Permission migration and focused verification pending locally; no automatic grants, calculation or mutation.
