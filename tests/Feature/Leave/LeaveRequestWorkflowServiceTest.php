@@ -200,6 +200,40 @@ class LeaveRequestWorkflowServiceTest extends TestCase
         $this->assertSame(0, DB::table('leave_ledger_entries')->where('kind', 'approved_leave_use')->count());
     }
 
+    public function test_employee_can_withdraw_a_pending_unused_al_request_once(): void
+    {
+        $fixture = $this->fixture('withdraw');
+        $this->staffApprovers($fixture);
+        $service = app(LeaveRequestWorkflowService::class);
+        $submitted = $service->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'withdraw-submit-'.$fixture['suffix'], 'AL', [['date' => '2026-03-06', 'session' => 'AM']]);
+        $key = 'withdraw-action-'.$fixture['suffix'];
+
+        $withdrawn = $service->withdrawPendingAnnualLeave($fixture['user']->id, $submitted['request_id'], $key);
+        $replay = $service->withdrawPendingAnnualLeave($fixture['user']->id, $submitted['request_id'], $key);
+
+        $this->assertSame('CANCELLED', $withdrawn['status']);
+        $this->assertTrue($replay['replayed']);
+        $this->assertSame('CANCELLED', DB::table('leave_requests')->where('id', $submitted['request_id'])->value('status'));
+        $this->assertNull(DB::table('leave_requests')->where('id', $submitted['request_id'])->value('current_step_order'));
+        $this->assertSame('RELEASED', DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('status'));
+        $this->assertSame(1, DB::table('leave_request_withdrawals')->where('request_id', $submitted['request_id'])->count());
+        $this->assertSame(1, DB::table('audit_events')->where('action_code', 'hr.leave.request_withdrawn')->where('target_ref', 'leave_request:'.$submitted['request_id'])->count());
+    }
+
+    public function test_pending_al_with_a_started_leave_date_cannot_release_its_hold_automatically(): void
+    {
+        $fixture = $this->fixture('withdrawstarted');
+        $this->staffApprovers($fixture);
+        $service = app(LeaveRequestWorkflowService::class);
+        $submitted = $service->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'withdraw-start-submit-'.$fixture['suffix'], 'AL', [['date' => '2026-03-02', 'session' => 'AM']], 'Synthetic emergency reason');
+
+        $this->assertDomainException(fn () => $service->withdrawPendingAnnualLeave($fixture['user']->id, $submitted['request_id'], 'withdraw-start-'.$fixture['suffix']));
+
+        $this->assertSame('WAITING_UNIT_MANAGER_SUPPORT', DB::table('leave_requests')->where('id', $submitted['request_id'])->value('status'));
+        $this->assertSame('ACTIVE', DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('status'));
+        $this->assertSame(0, DB::table('leave_request_withdrawals')->where('request_id', $submitted['request_id'])->count());
+    }
+
     public function test_rejected_retrospective_el_posts_the_documented_debit_and_opens_hr_review(): void
     {
         $fixture = $this->fixture('retroel');

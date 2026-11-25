@@ -285,6 +285,91 @@ class LeaveRequestWorkflowService
         }, 3);
     }
 
+    /** @return array{request_id:int,status:string,current_step_order:null,reservation_id:int,replayed:bool} */
+    public function withdrawPendingAnnualLeave(int $requesterUserId, int $requestId, string $operationKey): array
+    {
+        $this->assertLocal();
+        $this->assertOperationKey($operationKey);
+        if ($requesterUserId < 1 || $requestId < 1) {
+            throw new DomainException('A pending request and linked employee are required.');
+        }
+
+        return DB::transaction(function () use ($requesterUserId, $requestId, $operationKey): array {
+            $candidate = DB::table('leave_requests')->where('id', $requestId)->first(['employee_id']);
+            if ($candidate === null) {
+                throw new DomainException('The leave request does not exist.');
+            }
+            $employee = DB::table('employees')->where('id', $candidate->employee_id)->lockForUpdate()->first();
+            $request = DB::table('leave_requests')->where('id', $requestId)->lockForUpdate()->first();
+            $actor = DB::table('users')->where('id', $requesterUserId)->lockForUpdate()->first(['status', 'username']);
+            if ($employee === null || $request === null || (int) $employee->user_id !== $requesterUserId
+                || (int) $request->requester_user_id !== $requesterUserId || $actor === null
+                || $actor->status !== 'ACTIVE' || $actor->username === null) {
+                throw new DomainException('Only the linked active employee can withdraw their own request.');
+            }
+
+            $existing = DB::table('leave_request_withdrawals')->where('operation_key', $operationKey)->lockForUpdate()->first();
+            if ($existing !== null) {
+                $payloadHash = $this->withdrawalPayloadHash($requesterUserId, $requestId, (int) $existing->revision_id);
+                if ((int) $existing->request_id !== $requestId || (int) $existing->actor_id !== $requesterUserId
+                    || ! hash_equals($existing->payload_hash, $payloadHash)) {
+                    throw new DomainException('The withdrawal key was already used for a different action.');
+                }
+
+                return [
+                    'request_id' => $requestId,
+                    'status' => 'CANCELLED',
+                    'current_step_order' => null,
+                    'reservation_id' => $this->currentReservationId($requestId, (int) $request->current_revision),
+                    'replayed' => true,
+                ];
+            }
+            if (DB::table('leave_workflow_actions')->where('operation_key', $operationKey)->exists()) {
+                throw new DomainException('The operation key was already used for a workflow decision.');
+            }
+            if ($request->leave_type !== 'AL' || $request->current_step_order === null
+                || ! in_array($request->status, ['WAITING_UNIT_MANAGER_SUPPORT', 'WAITING_GENERAL_MANAGER_SUPPORT', 'WAITING_GENERAL_MANAGER_FINAL', 'WAITING_SECRETARY_FINAL'], true)) {
+                throw new DomainException('Only a pending Annual Leave request can be withdrawn under this operation.');
+            }
+
+            $revision = DB::table('leave_request_revisions')->where('request_id', $requestId)
+                ->where('revision', $request->current_revision)->lockForUpdate()->first();
+            if ($revision === null) {
+                throw new RuntimeException('The current leave request revision is missing.');
+            }
+            $dates = DB::table('leave_request_days')->where('revision_id', $revision->id)->orderBy('leave_date')->pluck('leave_date')->all();
+            $today = now('Asia/Kuala_Lumpur')->toDateString();
+            if ($dates === [] || collect($dates)->contains(fn (string $date): bool => $date <= $today)) {
+                throw new DomainException('Withdrawal is held for HR review once a requested leave date has started.');
+            }
+            $payloadHash = $this->withdrawalPayloadHash($requesterUserId, $requestId, (int) $revision->id);
+
+            DB::table('leave_request_withdrawals')->insert([
+                'request_id' => $requestId,
+                'revision_id' => $revision->id,
+                'actor_id' => $requesterUserId,
+                'operation_key' => $operationKey,
+                'payload_hash' => $payloadHash,
+                'created_at' => now(),
+            ]);
+            $reservation = $this->balances->release($requesterUserId, (int) $revision->reservation_id, 'WITHDRAWAL', $operationKey.':w');
+            DB::table('leave_requests')->where('id', $requestId)->update([
+                'status' => 'CANCELLED',
+                'current_step_order' => null,
+                'updated_at' => now(),
+            ]);
+            $this->audit('hr.leave.request_withdrawn', $requestId, $requesterUserId, $operationKey);
+
+            return [
+                'request_id' => $requestId,
+                'status' => 'CANCELLED',
+                'current_step_order' => null,
+                'reservation_id' => $reservation['reservation_id'],
+                'replayed' => false,
+            ];
+        }, 3);
+    }
+
     /** @return array{short_notice:bool,min_days:?int,max_days:?int} */
     private function assessShortNotice(string $firstLeaveDate, string $today): array
     {
@@ -442,6 +527,27 @@ class LeaveRequestWorkflowService
             'request_id' => $requestId,
             'revision_id' => $revisionId,
         ]);
+    }
+
+    private function withdrawalPayloadHash(int $actorId, int $requestId, int $revisionId): string
+    {
+        return $this->hash([
+            'action' => 'WITHDRAW_BEFORE_APPROVAL',
+            'actor_id' => $actorId,
+            'request_id' => $requestId,
+            'revision_id' => $revisionId,
+        ]);
+    }
+
+    private function currentReservationId(int $requestId, int $revisionNumber): int
+    {
+        $reservationId = DB::table('leave_request_revisions')->where('request_id', $requestId)
+            ->where('revision', $revisionNumber)->value('reservation_id');
+        if ($reservationId === null) {
+            throw new RuntimeException('The withdrawn request has no current reservation revision.');
+        }
+
+        return (int) $reservationId;
     }
 
     /** @return array{request_id:int,request_key:string,status:string,current_step_order:?int,reservation_id:int,replayed:bool} */
