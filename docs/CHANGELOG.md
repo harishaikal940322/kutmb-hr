@@ -1,3 +1,5 @@
+- 2026-11-25: Added an unexposed exact posted-ledger totals reader with employee-account pairing and integer overflow checks; no available-balance claim. See CURRENT_HANDOFF.
+
 - 2026-11-25: Constrained ledger compensations to the original account and opposite nonzero sign; aggregate and source-year rules remain open. See CURRENT_HANDOFF.
 
 - 2026-11-25: Added empty Annual/Tabung accounts and MySQL-enforced append-only integer ledger foundation; no postings or HR values. See CURRENT_HANDOFF.

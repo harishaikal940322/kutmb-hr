@@ -1,3 +1,9 @@
+## 25 November 2026 — CT-P03 exact posted-ledger totals reader
+
+- Added an unexposed transactional reader for explicitly selected annual and continuous Tabung accounts belonging to the same employee. It locks Annual then Tabung account rows, sums signed integer units as exact MySQL text values and rejects totals outside PHP's integer range. This reports posted ledger totals only; pending reservations, entitlements and available balances are not inferred. Any future appender must take the same account locks in the same order; no ledger writer or route was added.
+- Focused schema and reader checks passed together (4 tests, 18 assertions), including separate-bucket totals, cross-employee rejection and overflow rejection. Targeted PHPStan passed for the reader, and Pint passed for the reader and its tests. All synthetic fixture rows rolled back.
+- Next: ledger posting/availability and CT-P04–09 request operations still depend on unimplemented reservation/workflow contracts and unresolved rate, source-year and authority decisions; continue independent safe foundations and verification only.
+
 ## 25 November 2026 — CT-P03 reversal account/sign integrity
 
 - Added a MySQL insert trigger requiring each compensating ledger entry to reference an existing original entry in the same AL or Tabung account and use the opposite nonzero sign. It permits partial reversals; it does not cap cumulative reversal units or define source-year semantics. Applied additive migration 2026_11_25_000024 after verifying the existing `kutmb_hr_dev` target was empty for ledger data and reviewing its SQL preview.
