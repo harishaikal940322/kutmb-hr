@@ -4,15 +4,19 @@
 >
 > **Baseline:** All 56 Cuti Tahunan decisions are frozen for UI/UX design per requestor direction. Setiausaha ALK is the final approver for all General Manager leave; this resolves the CT-DEC-001/006 conflict under CR-HR-2026-002. No new policy or status is introduced.
 >
-> **Boundary:** The design has two review surfaces: the static HTML prototype and a Vue UI/UX preview opened from the existing Dashboard. Both use synthetic data and local-only preview interactions. No leave route, API, database operation, real transaction, notification or approval action is connected. Backend and functional workflow implementation remain on hold.
+> **Boundary:** The design has two review surfaces: the static HTML prototype and a Vue UI/UX design surface opened from the main module sidebar. Both use synthetic data and local-only preview interactions. No leave route, API, database operation, real transaction, notification or approval action is connected. Backend and functional workflow implementation remain on hold.
 
 ## Prototype
 
-Open [MOD-005 Annual Leave UI/UX prototype v0.3](MOD-005_Annual_Leave_UI_UX_Prototype_v0.3.html) for the standalone design index. In the main system, **Papan Pemuka → Pratonton UI/UX Cuti Tahunan** opens the Vue review surface. Its role selector and navigation are review controls only; the main system menu will be organized after this design review.
+Open [MOD-005 Annual Leave UI/UX prototype v0.3](MOD-005_Annual_Leave_UI_UX_Prototype_v0.3.html) for the standalone design index. In the main system, **Modul Utama → Cuti Tahunan** opens the Vue review surface at `/leave/annual`. The role selector and submodule navigation remain synthetic review controls.
 
-## 25 November 2026 — integrated dashboard design surface
+## 25 November 2026 — integrated dashboard design surface (historical, superseded below)
 
 The requestor authorized integrating the accepted UI directly into the existing Papan Pemuka. The authenticated system admin with `iam.rbac.manage` in local/testing opens the Cuti Tahunan design surface directly at /dashboard, without the former preview button or full-screen overlay. Existing system sidebar/header and profile links remain; the module uses compact responsive content-area navigation. The server supplies a Boolean design-review capability; no new permissions or grants. Other accounts and production retain the normal account dashboard. The simulation role selector is explicitly labelled and available only inside this authorized design review; it never represents the actual account's HR authorization. All example balances, dates, records, and actions remain synthetic and non-persistent. No real submission/decision routes, API, ledger writes or notifications are added by this UI integration. Functional role-scoped dashboard and AL transaction integration remain separate next work. Source review only, browser/build/feature tests not yet run remotely.
+
+## 25 November 2026 — main module navigation correction (current)
+
+After reviewing the integrated dashboard, requestor directed that Cuti Tahunan be a separate main module in the system sidebar. Restore the original account Papan Pemuka at /dashboard. Add **Modul Utama → Cuti Tahunan** with its own protected GET /leave/annual Inertia page, title, breadcrumb and active sidebar state; reuse the accepted responsive content-area submodule navigation and existing Vue design. The fixed menu and route require local/testing and existing iam.rbac.manage authority. No new permission, assignment, migration or data changes. The module remains a synthetic admin design review, not an operational leave workflow. The previous dashboard placement is superseded. Source commit 7b54a644; local build/browser/feature verification pending.
 
 ## SRS coverage map
 

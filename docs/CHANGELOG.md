@@ -141,3 +141,5 @@ No application features were implemented as part of the initial documentation ba
 - 2026-11-25: Correct latest CT-DEC interpretations using current written HR answers; restore internal workflow and consent/pre-credit reservation contracts (f54b2396), preserve transaction safeguards, and prioritize a usable same-year AL vertical slice. Remote source correction; revised tests not run, no production activation.
 
 - 2026-11-25: Integrate accepted Cuti Tahunan design directly into existing local admin dashboard, use system layout and responsive submodule navigation, retain clear synthetic-only review boundary. No functional leave endpoint or permission grant. Local verification pending.
+
+- 2026-11-25: Move Cuti Tahunan from Papan Pemuka to sidebar Modul Utama with protected dedicated /leave/annual route, restore original dashboard and preserve synthetic design-review boundary. Source 7b54a644; no database or dependency change, local verification pending.

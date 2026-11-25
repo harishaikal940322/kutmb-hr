@@ -1,3 +1,8 @@
+## 25 November 2026 — Cuti Tahunan sidebar module (latest UI placement)
+
+- Requestor reviewed the dashboard placement and requested Cuti Tahunan in the sidebar under Modul Utama instead. Source commit 7b54a644 restores original Dashboard, adds dedicated /leave/annual page and breadcrumb, and registers fixed leave.annual.index menu in the existing permission catalogue/navigation. Existing admin-only local/testing route and menu boundaries retained; sidebar module group only appears when authorized. Existing accepted responsive submodule UI and synthetic role selector retained.
+- No new permission grant, schema, migration, real HR data or workflow route. No dependency change. Revised rollback-only feature test covers guest/unauthorized/authorized/production boundaries and original Dashboard, but was not run remotely. Local build/browser verification pending. Previous dashboard placement entry is historical and superseded; previous backend blockers and verification limits unchanged.
+
 ## 25 November 2026 — Cuti Tahunan integrated into main dashboard (UI-only)
 
 - Requestor authorized the accepted Cuti Tahunan UI/UX directly on the main dashboard. Reused the frozen Vue design in the existing system layout, removed the former preview entry button/full-screen overlay, and consolidated desktop/mobile submodule navigation into one responsive content-area nav. Kept all accepted design screens and explicit simulation-role controls for authorized design review, with a prominent synthetic-data/no-write notice; fixed half-day end-date control.
