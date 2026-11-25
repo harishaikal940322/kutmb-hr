@@ -1,3 +1,5 @@
+- 2026-11-25: Added empty Annual/Tabung accounts and MySQL-enforced append-only integer ledger foundation; no postings or HR values. See CURRENT_HANDOFF.
+
 - 2026-11-24: Added unexposed integer AL/Tabung projection using explicit balances and allocated holds; no posting. See CURRENT_HANDOFF.
 
 - 2026-11-24: Added local, permission-gated read-only AM/PM session simulation using technical versions. See CURRENT_HANDOFF.
