@@ -77,7 +77,7 @@ class ResetLocalDevelopmentDatabase extends Command
 
         $this->info('Development schema and baseline roles recreated. Destructive commands are blocked again.');
         $this->line('Register the first protected System Admin using the existing local /register flow before explicitly seeding development users.');
-        $this->line('Then run DevelopmentUserSeeder, DevelopmentLeaveAccessSeeder, DevelopmentEmployeeOrganizationSeeder and DevelopmentLeaveConfigurationSeeder in that order.');
+        $this->line('Then run php artisan dev:data to seed all development fixtures.');
 
         return self::SUCCESS;
     }

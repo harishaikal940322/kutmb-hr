@@ -1,3 +1,8 @@
+## 26 November 2026 — single development data command
+
+- Owner requested `php artisan dev:data`. Added an explicit local-only orchestrator for the five existing development seeders (roles, users, leave access, employee/organization, leave configuration). Checks uncached Docker MySQL target and live schema identity, pending migrations and active protected System Admin before seeding. Stops on error; individual seeders retain their transaction and replay behavior, so completed earlier seeders may remain committed. Existing fixture workflow grants are restored by the access seeder; no automatic reset, migrations, account bootstrap or new infrastructure. Reset command now points to dev:data after owner registration.
+- Source-only change. No test, migration, seed or database operation executed remotely; owner to pull and run.
+
 ## 26 November 2026 — Owner-confirmed local development reset
 
 - Owner reported direct fresh migration blocked by the destructive-command safety guard and explicitly approved a narrow, intentional reset mechanism for the existing synthetic development database. Added `dev:reset-database` (interactive terminal only, local uncached config, mysql:3306, configured and live database identity kutmb_hr_dev, no DB URL/socket/read-write overrides, no CI/test context, exact typed confirmation). Ordinary migrate:fresh, db:wipe, refresh/reset/rollback protections remain unchanged. The in-process exception is limited to migrate:fresh and its nested db:wipe on mysql, restored in finally before ordinary DatabaseSeeder runs. No backup is automatically generated; the Owner must preserve any required data/incident evidence outside the database and stop competing activity before confirming. MySQL DDL is not rollback-safe.
