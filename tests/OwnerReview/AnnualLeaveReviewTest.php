@@ -352,6 +352,37 @@ class AnnualLeaveReviewTest extends TestCase
         $this->get('/leave/annual/adjustments')->assertOk();
     }
 
+    public function test_cr_q03_after_end_special_adjustment_requires_three_distinct_actors(): void
+    {
+        $f = $this->fixture();
+        $maker = $this->actor('special-maker', ['leave.adjustment.prepare', 'leave.adjustment.decide', 'leave.partial-cancellation.review']);
+        $reviewer = $this->actor('special-reviewer', ['leave.adjustment.decide', 'leave.partial-cancellation.review']);
+        $date = $this->workingDate($this->year.'-12-21', $this->year.'-12-24');
+        $workflow = app(LeaveRequestWorkflowService::class);
+        $result = $workflow->submit($f['staff']->id, $f['annual'], $f['tabung'], $this->key(), 'AL',
+            [['date' => $date, 'session' => 'AM'], ['date' => $date, 'session' => 'PM']]);
+        $id = $result['request_id'];
+        $this->approve($f, $id);
+        $this->assertSame(38, $this->annual($f['annual']));
+        $this->denied(fn () => $workflow->prepareAfterEndCancellation($maker->id, $id, $this->key(), 'Synthetic return', 'SYNTHETIC'));
+        Carbon::setTestNow(Carbon::parse($date.' 18:00:00', 'Asia/Kuala_Lumpur'));
+        $this->denied(fn () => $workflow->requestApprovedAnnualLeavePartialCancellation($f['staff']->id, $id, $this->key(), 'Late ordinary request'));
+        $this->denied(fn () => $workflow->prepareAfterEndCancellation($f['staff']->id, $id, $this->key(), 'Synthetic return', 'SYNTHETIC'));
+        $key = $this->key();
+        $case = $workflow->prepareAfterEndCancellation($maker->id, $id, $key, 'Synthetic return', 'SYNTHETIC')['partial_cancellation_id'];
+        $this->assertSame($case, $workflow->prepareAfterEndCancellation($maker->id, $id, $key, 'Synthetic return', 'SYNTHETIC')['partial_cancellation_id']);
+        $this->denied(fn () => $workflow->verifyApprovedAnnualLeavePartialCancellation($maker->id, $id, $case, $this->key(), $date, 'Verified', 'PM'));
+        $workflow->verifyApprovedAnnualLeavePartialCancellation($reviewer->id, $id, $case, $this->key(), $date, 'Verified', 'PM');
+        $this->assertSame(38, $this->annual($f['annual']));
+        $decision = $this->key();
+        $workflow->decideApprovedAnnualLeavePartialCancellation($f['pb']->id, $id, $case, $decision, 'CONFIRM');
+        $workflow->decideApprovedAnnualLeavePartialCancellation($f['pb']->id, $id, $case, $decision, 'CONFIRM');
+        $this->assertSame(39, $this->annual($f['annual']));
+        $this->assertDatabaseHas('leave_request_partial_cancellations', ['id' => $case, 'case_kind' => 'AFTER_END', 'status' => 'CONFIRMED', 'unused_half_day_units' => 1]);
+        $this->assertDatabaseHas('leave_requests', ['id' => $id, 'status' => 'APPROVED']);
+        $this->denied(fn () => $workflow->prepareAfterEndCancellation($maker->id, $id, $this->key(), 'Duplicate', 'SYNTHETIC'));
+    }
+
     private function fixture(): array
     {
         $suffix = Str::lower(Str::random(10));

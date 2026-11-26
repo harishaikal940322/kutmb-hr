@@ -919,6 +919,21 @@ class LeaveRequestWorkflowService
     /** @return array{request_id:int,status:string,current_step_order:null,reservation_id:int,partial_cancellation_id:int,replayed:bool} */
     public function requestApprovedAnnualLeavePartialCancellation(int $requesterUserId, int $requestId, string $operationKey, string $reason): array
     {
+        return $this->openPartialCancellation($requesterUserId, $requestId, $operationKey, $reason, null);
+    }
+
+    /** CR-Q03: HR-only preparation after the approved leave period ends. */
+    public function prepareAfterEndCancellation(int $actorId, int $requestId, string $operationKey, string $reason, string $evidenceReference): array
+    {
+        $evidenceReference = trim($evidenceReference);
+        if ($evidenceReference === '' || strlen($evidenceReference) > 120) {
+            throw new DomainException('Rujukan bukti kehadiran diperlukan.');
+        }
+        return $this->openPartialCancellation($actorId, $requestId, $operationKey, $reason, $evidenceReference);
+    }
+
+    private function openPartialCancellation(int $requesterUserId, int $requestId, string $operationKey, string $reason, ?string $evidenceReference): array
+    {
         $this->assertLocal();
         $this->assertOperationKey($operationKey);
         $reason = $this->normalizeReason($reason);
@@ -926,7 +941,8 @@ class LeaveRequestWorkflowService
             throw new DomainException('The linked employee and a reason are required to request partial cancellation.');
         }
 
-        return DB::transaction(function () use ($requesterUserId, $requestId, $operationKey, $reason): array {
+        return DB::transaction(function () use ($requesterUserId, $requestId, $operationKey, $reason, $evidenceReference): array {
+            $special = $evidenceReference !== null;
             $this->lockCancellationGuards();
             $candidate = DB::table('leave_requests')->where('id', $requestId)->first(['employee_id']);
             if ($candidate === null) {
@@ -940,8 +956,9 @@ class LeaveRequestWorkflowService
             $existing = DB::table('leave_request_partial_cancellations')->where('request_operation_key', $operationKey)->lockForUpdate()->first();
             if ($existing !== null) {
                 $expectedHash = $this->partialCancellationPayloadHash('REQUESTED', $requesterUserId, $requestId, (int) $existing->revision_id,
-                    (int) $existing->cycle, null, $reason, null, null);
+                    (int) $existing->cycle, null, $reason, null, null, null, $evidenceReference);
                 if ((int) $existing->request_id !== $requestId || (int) $existing->requested_by !== $requesterUserId
+                    || $existing->case_kind !== ($special ? 'AFTER_END' : 'ORDINARY') || $existing->evidence_reference !== $evidenceReference
                     || ! hash_equals($existing->request_payload_hash, $expectedHash)) {
                     throw new DomainException('The partial cancellation request key was already used for a different action.');
                 }
@@ -956,7 +973,15 @@ class LeaveRequestWorkflowService
                 ];
             }
             $this->assertPartialCancellationOperationKeyAvailable($operationKey);
-            $this->assertActiveEmployeeRequester($requesterUserId, $employee, $request);
+            if ($special) {
+                $maker = User::query()->whereKey($requesterUserId)->lockForUpdate()->first();
+                if ($maker === null || $maker->status !== 'ACTIVE' || $maker->username === null || ! $maker->can('leave.adjustment.prepare')
+                    || (int) $employee->user_id === $requesterUserId || (int) $employee->user_id !== (int) $request->requester_user_id) {
+                    throw new DomainException('Penyedia HR yang berasingan dan diberi kuasa diperlukan.');
+                }
+            } else {
+                $this->assertActiveEmployeeRequester($requesterUserId, $employee, $request);
+            }
             if (DB::table('leave_request_partial_cancellations')->where('request_id', $requestId)
                 ->whereIn('status', ['REQUESTED', 'HR_VERIFIED'])->exists()) {
                 throw new DomainException('A partial cancellation review is already open for this leave request.');
@@ -969,11 +994,23 @@ class LeaveRequestWorkflowService
             if ($revision === null) {
                 throw new RuntimeException('The current leave request revision is missing.');
             }
-            $dates = DB::table('leave_request_days')->where('revision_id', $revision->id)->orderBy('leave_date')->pluck('leave_date')->all();
-            $today = now('Asia/Kuala_Lumpur')->toDateString();
-            if ($dates === [] || ! collect($dates)->contains(fn (string $date): bool => $date <= $today)
-                || ! collect($dates)->contains(fn (string $date): bool => $date >= $today)) {
-                throw new DomainException('Partial cancellation is limited to an approved leave period that has started and not yet ended.');
+            $slots = DB::table('leave_request_days')->where('revision_id', $revision->id)->orderBy('leave_date')->orderBy('session_code')->get();
+            if ($slots->isEmpty()) {
+                throw new DomainException('Rekod sesi asal diperlukan.');
+            }
+            $dates = $slots->pluck('leave_date')->all();
+            $first = $slots->first();
+            $last = $slots->last();
+            $firstSchedule = $this->versions->workingScheduleFor($first->leave_date);
+            $lastSchedule = $this->versions->workingScheduleFor($last->leave_date);
+            $starts = $first->leave_date.' '.($first->session_code === 'AM' ? $firstSchedule->work_start : $firstSchedule->session_boundary);
+            $ends = $last->leave_date.' '.($last->session_code === 'AM' ? $lastSchedule->session_boundary : $lastSchedule->work_end);
+            $now = now('Asia/Kuala_Lumpur')->format('Y-m-d H:i:s');
+            if (($special && $now < $ends) || (! $special && ($now < $starts || $now >= $ends))) {
+                throw new DomainException($special ? 'Pelarasan khas hanya selepas sesi cuti terakhir tamat.' : 'Pembatalan separa hanya dalam tempoh cuti; selepas tamat rujuk HR.');
+            }
+            if ($special && (int) substr($last->leave_date, 0, 4) !== (int) now('Asia/Kuala_Lumpur')->format('Y')) {
+                throw new DomainException('Pelarasan tahun lama memerlukan rekonsiliasi TB-05.');
             }
             $reservation = DB::table('leave_reservations')->where('id', $revision->reservation_id)->lockForUpdate()->first();
             if ($reservation === null || $reservation->status !== 'COMMITTED' || (int) $reservation->requested_units < 1) {
@@ -993,12 +1030,14 @@ class LeaveRequestWorkflowService
 
             $cycle = (int) DB::table('leave_request_partial_cancellations')->where('request_id', $requestId)->max('cycle') + 1;
             $payloadHash = $this->partialCancellationPayloadHash('REQUESTED', $requesterUserId, $requestId, (int) $revision->id,
-                $cycle, null, $reason, null, null);
+                $cycle, null, $reason, null, null, null, $evidenceReference);
             $partialCancellationId = DB::table('leave_request_partial_cancellations')->insertGetId([
                 'request_id' => $requestId,
                 'revision_id' => $revision->id,
                 'cycle' => $cycle,
                 'status' => 'REQUESTED',
+                'case_kind' => $special ? 'AFTER_END' : 'ORDINARY',
+                'evidence_reference' => $evidenceReference,
                 'requested_by' => $requesterUserId,
                 'request_reason' => $reason,
                 'request_operation_key' => $operationKey,
@@ -1007,7 +1046,7 @@ class LeaveRequestWorkflowService
                 'updated_at' => now(),
             ]);
             $this->recordPartialCancellationEvent($partialCancellationId, 'REQUESTED', $requesterUserId, null, $reason, null, null, $operationKey, $payloadHash);
-            $this->audit('hr.leave.partial_cancellation_requested', $requestId, $requesterUserId, $operationKey);
+            $this->audit($special ? 'hr.leave.special_adjustment_prepared' : 'hr.leave.partial_cancellation_requested', $requestId, $requesterUserId, $operationKey);
 
             return [
                 'request_id' => $requestId,
@@ -1069,7 +1108,9 @@ class LeaveRequestWorkflowService
             $this->assertPartialCancellationOperationKeyAvailable($operationKey);
             $hrActor = User::query()->whereKey($hrActorId)->lockForUpdate()->first();
             if ($hrActor === null || $hrActor->status !== 'ACTIVE' || $hrActor->username === null
-                || ! $hrActor->can('leave.partial-cancellation.review') || $hrActorId === (int) $employee->user_id) {
+                || ! $hrActor->can('leave.partial-cancellation.review') || $hrActorId === (int) $employee->user_id
+                || ($partialCancellation->case_kind === 'AFTER_END' && (! $hrActor->can('leave.adjustment.decide')
+                    || $hrActorId === (int) $partialCancellation->requested_by))) {
                 throw new DomainException('An active, separately authorized HR reviewer is required.');
             }
             $currentRevisionId = (int) DB::table('leave_request_revisions')->where('request_id', $requestId)
@@ -1123,7 +1164,7 @@ class LeaveRequestWorkflowService
                 'updated_at' => now(),
             ]);
             $this->recordPartialCancellationEvent($partialCancellationId, 'HR_VERIFIED', $hrActorId, null, $reason, $actualReturnDate, $unusedUnits, $operationKey, $payloadHash, $actualReturnSession);
-            $this->audit('hr.leave.partial_cancellation_hr_verified', $requestId, $hrActorId, $operationKey);
+            $this->audit($partialCancellation->case_kind === 'AFTER_END' ? 'hr.leave.special_adjustment_hr_verified' : 'hr.leave.partial_cancellation_hr_verified', $requestId, $hrActorId, $operationKey);
 
             return [
                 'request_id' => $requestId,
@@ -1186,7 +1227,9 @@ class LeaveRequestWorkflowService
                 ->where('revision', $request->current_revision)->value('id');
             if ($request->leave_type !== 'AL' || $request->status !== 'APPROVED'
                 || $currentRevisionId !== (int) $partialCancellation->revision_id
-                || $partialCancellation->status !== 'HR_VERIFIED' || (int) $employee->user_id === $actorId) {
+                || $partialCancellation->status !== 'HR_VERIFIED' || (int) $employee->user_id === $actorId
+                || ($partialCancellation->case_kind === 'AFTER_END' && ((int) $partialCancellation->requested_by === $actorId
+                    || (int) $partialCancellation->hr_verified_by === $actorId || ! User::query()->findOrFail($actorId)->can('leave.request.decide')))) {
                 throw new DomainException('A current HR-verified partial cancellation requires a distinct General Manager decision.');
             }
             $this->assertActiveGeneralManager($actorId);
@@ -1216,8 +1259,8 @@ class LeaveRequestWorkflowService
                 );
                 $refundedUnits = $result['refunded_units'];
             }
-            $this->audit($decision === 'CONFIRM' ? 'hr.leave.partial_cancellation_confirmed' : 'hr.leave.partial_cancellation_rejected',
-                $requestId, $actorId, $operationKey);
+            $auditPrefix = $partialCancellation->case_kind === 'AFTER_END' ? 'hr.leave.special_adjustment_' : 'hr.leave.partial_cancellation_';
+            $this->audit($auditPrefix.($decision === 'CONFIRM' ? 'confirmed' : 'rejected'), $requestId, $actorId, $operationKey);
 
             return [
                 'request_id' => $requestId,
@@ -1314,8 +1357,10 @@ class LeaveRequestWorkflowService
         ?string $actualReturnDate,
         ?int $unusedUnits,
         ?string $actualReturnSession = null,
+        ?string $evidenceReference = null,
     ): string {
         return $this->hash([
+            ...($evidenceReference === null ? [] : ['case_kind' => 'AFTER_END', 'evidence_reference' => $evidenceReference]),
             ...($actualReturnSession === null ? [] : ['actual_return_session' => $actualReturnSession]),
             'action_code' => $eventCode,
             'actor_id' => $actorId,

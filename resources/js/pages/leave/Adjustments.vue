@@ -4,10 +4,16 @@ import { ref } from 'vue';
 import AnnualLeaveNavigation, { type AnnualAccess } from './AnnualLeaveNavigation.vue';
 
 type Adjustment = { id: number; display_name: string; employee_no: string; leave_year: number; bucket: string; source_year: number | null; signed_units: number; reason: string; evidence_reference: string; prepared_balance: number; prepared_pending: number; status: 'PENDING' | 'APPROVED' | 'REJECTED'; before_units: number | null; after_units: number | null; decision_reason: string | null; prepared_by_name: string; decided_by_name: string | null; can_decide: boolean; created_at: string };
-const props = defineProps<{ access: AnnualAccess; canPrepare: boolean; year: number; employees: { id: number; employee_no: string; display_name: string }[]; adjustments: { data: Adjustment[]; prev_page_url: string | null; next_page_url: string | null } }>();
+type SpecialCase = { id: number; request_key: string; display_name: string; employee_no: string; status: string; request_reason: string; evidence_reference: string; actual_return_date: string | null; actual_return_session: string | null; unused_half_day_units: number | null };
+const props = defineProps<{ specialCases: { data: SpecialCase[]; prev_page_url: string | null; next_page_url: string | null }; specialCandidates: { request_key: string; display_name: string; employee_no: string }[]; access: AnnualAccess; canPrepare: boolean; year: number; employees: { id: number; employee_no: string; display_name: string }[]; adjustments: { data: Adjustment[]; prev_page_url: string | null; next_page_url: string | null } }>();
 defineOptions({ layout: { breadcrumbs: [{ title: 'Cuti Tahunan', href: '/leave/annual' }] } });
 const prepare = useForm({ employee: '', bucket: 'AL', source_year: props.year, units: '', reason: '', evidence_reference: '', key: '' });
 const decide = useForm({ decision: 'APPROVED', reason: '', key: '' });
+const special = useForm({ request_key: '', reason: '', evidence_reference: '', key: '' });
+function sendSpecial() {
+    special.key ||= crypto.randomUUID();
+    special.post('/leave/annual/adjustments/special', { preserveScroll: true, onSuccess: () => { special.reset(); notice.value = 'Pelarasan khas disediakan. Baki belum berubah.'; } });
+}
 const selected = ref<number | null>(null);
 const notice = ref('');
 const input = 'block min-h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm';
@@ -41,6 +47,27 @@ function days(value: number | null) { return value === null ? '—' : (Number(va
                     <p v-for="error in prepare.errors" :key="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
                     <button type="submit" :class="button" :disabled="prepare.processing">Hantar untuk semakan</button>
                 </form>
+                <section class="space-y-4 rounded-xl border border-border bg-card p-5">
+                    <h2 class="font-semibold">Pelarasan khas selepas cuti tamat</h2>
+                    <p class="text-sm text-muted-foreground">CR-Q03 · Rujuk permohonan asal dan bukti kehadiran. HR menyemak tarikh/sesi sebenar, Pengurus Besar mengesahkan. Baki hanya dipulangkan selepas keputusan akhir. Tahun lama masih memerlukan rekonsiliasi.</p>
+                    <form v-if="canPrepare" class="space-y-3" @submit.prevent="sendSpecial">
+                        <label class="block space-y-1 text-sm font-medium">Permohonan asal<input v-model="special.request_key" list="special-requests" required maxlength="80" :class="input" placeholder="Masukkan rujukan permohonan cuti" /><datalist id="special-requests"><option v-for="row in specialCandidates" :key="row.request_key" :value="row.request_key">{{ row.employee_no }} · {{ row.display_name }}</option></datalist></label>
+                        <label class="block space-y-1 text-sm font-medium">Sebab pelarasan<textarea v-model="special.reason" required maxlength="1000" :class="input" /></label>
+                        <label class="block space-y-1 text-sm font-medium">Rujukan bukti kehadiran<input v-model="special.evidence_reference" required maxlength="120" :class="input" /></label>
+                        <p v-for="error in special.errors" :key="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
+                        <button type="submit" :class="button" :disabled="special.processing">Hantar pelarasan khas untuk semakan HR</button>
+                    </form>
+                    <Link v-if="access.can_review_partial" href="/leave/annual?view=workflow&section=approvals" class="text-sm font-medium text-primary">Buka senarai tindakan semakan HR</Link>
+                    <div v-for="row in specialCases.data" :key="row.id" class="space-y-1 border-t border-border pt-3 text-sm">
+                        <div class="flex flex-wrap justify-between gap-2"><strong>{{ row.employee_no }} · {{ row.display_name }}</strong><span>{{ { REQUESTED: 'Menunggu HR', HR_VERIFIED: 'Menunggu Pengurus Besar', CONFIRMED: 'Disahkan', REJECTED: 'Ditolak' }[row.status] ?? row.status }}</span></div>
+                        <p class="break-all text-xs text-muted-foreground">{{ row.request_key }}</p>
+                        <p class="whitespace-pre-wrap">{{ row.request_reason }}</p>
+                        <p class="text-xs text-muted-foreground">Bukti: {{ row.evidence_reference }}</p>
+                        <p v-if="row.actual_return_date">{{ row.actual_return_date }} {{ row.actual_return_session }} · {{ days(row.unused_half_day_units) }}</p>
+                    </div>
+                    <p v-if="!specialCases.data.length" class="text-sm text-muted-foreground">Tiada rekod pelarasan khas.</p>
+                    <nav class="flex gap-4 text-sm text-primary"><Link v-if="specialCases.prev_page_url" :href="specialCases.prev_page_url">Sebelum</Link><Link v-if="specialCases.next_page_url" :href="specialCases.next_page_url">Seterusnya</Link></nav>
+                </section>
                 <section class="divide-y divide-border rounded-xl border border-border bg-card">
                     <h2 class="p-4 font-semibold">Rekod pelarasan</h2>
                     <article v-for="row in adjustments.data" :key="row.id" class="space-y-3 p-4">

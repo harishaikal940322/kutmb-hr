@@ -447,12 +447,16 @@ class AnnualLeaveWorkflowController extends Controller
             ->join('leave_request_partial_cancellations as partial', 'partial.revision_id', '=', 'revision.id')
             ->whereColumn('employee.user_id', 'leave.requester_user_id')
             ->where('leave.requester_user_id', '<>', $actor)
+            ->where(fn (Builder $query) => $query->where('partial.case_kind', 'ORDINARY')
+                ->orWhere(fn (Builder $special) => $special->where('partial.case_kind', 'AFTER_END')->where('partial.requested_by', '<>', $actor)
+                    ->when($gm && ! $hr, fn (Builder $gmScope) => $gmScope->where('partial.hr_verified_by', '<>', $actor))
+                    ->when($hr && ! $gm && ! User::query()->findOrFail($actor)->can('leave.adjustment.decide'), fn (Builder $denied) => $denied->whereRaw('1 = 0'))))
             ->where(fn (Builder $query) => $query->whereIn('partial.status', $statuses)
                 ->when($key !== null && $hr, fn (Builder $query) => $query->orWhere(fn (Builder $query) => $query
                     ->where('partial.hr_verified_by', $actor)->where('partial.hr_operation_key', $key)))
                 ->when($key !== null && $gm, fn (Builder $query) => $query->orWhere(fn (Builder $query) => $query
                     ->where('partial.general_manager_user_id', $actor)->where('partial.decision_operation_key', $key))))
-            ->select('partial.id', 'partial.status', 'partial.request_reason', 'partial.actual_return_date', 'partial.actual_return_session',
+            ->select('partial.id', 'partial.status', 'partial.case_kind', 'partial.evidence_reference', 'partial.request_reason', 'partial.actual_return_date', 'partial.actual_return_session',
                 'partial.unused_half_day_units', 'employee.display_name', 'leave.request_key');
     }
 

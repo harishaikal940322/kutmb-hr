@@ -440,6 +440,10 @@ Owner TB-Q02/03: manual authorized close now posts only eligible carry into rema
 
 See [CR-Q01–04](../decisions/MOD-005_Cancellation_Owner_Clarifications_2026-11-26.md). Migration 000054 and service/UI implement current-year same-year session-level partial refunds including original Tabung cohorts. HR confirms actual AM/PM, GM decides, only unused sessions reversed; FIFO disposal protects active holds. Legacy null session preserves old after-date behavior. Closed-year reconciliation, cross-year partial commitments and post-period HR special correction remain separate implementation gates, not unanswered Owner decisions.
 
+## 8AB. CR-Q03 after-end special adjustment
+
+Owner CR-Q03, CT-DEC-016/017 and CT-DEC-040: source implemented with distinct HR maker, HR checker and effective GM; immutable AFTER_END case, evidence reference, original request and AM/PM source refunds, audit and replay controls. Existing current-year same-year atomic refund reused; no standalone balance credit. Additive forward migration 000055. Ordinary cancellation stops at confirmed schedule final-session end. No historical-year/previous-partial correction automation, separate HR rejection before verification, or evidence upload. Runtime remains unverified.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.

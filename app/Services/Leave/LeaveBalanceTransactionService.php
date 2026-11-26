@@ -682,7 +682,11 @@ class LeaveBalanceTransactionService
                 || (int) $partialCancellation->general_manager_assignment_id !== $assignmentId
                 || $requestRevision === null || $requestRevision->leave_type !== 'AL' || $requestRevision->status !== 'APPROVED'
                 || (int) $requestRevision->current_revision !== (int) $requestRevision->revision
-                || (int) $partialCancellation->requested_by !== (int) $requestRevision->requester_user_id
+                || ($partialCancellation->case_kind === 'ORDINARY' && (int) $partialCancellation->requested_by !== (int) $requestRevision->requester_user_id)
+                || ($partialCancellation->case_kind === 'AFTER_END' && ($partialCancellation->evidence_reference === null
+                    || (int) $partialCancellation->requested_by === (int) $requestRevision->requester_user_id
+                    || (int) $partialCancellation->requested_by === (int) $partialCancellation->hr_verified_by
+                    || (int) $partialCancellation->requested_by === $actorId || (int) $partialCancellation->hr_verified_by === $actorId))
                 || $reservation->status !== 'COMMITTED'
                 || (int) $partialCancellation->unused_half_day_units < 1) {
                 throw new DomainException('A current, verified partial cancellation confirmed by the General Manager is required.');
@@ -833,7 +837,7 @@ class LeaveBalanceTransactionService
                 throw new RuntimeException('The confirmed unused sessions and released slot claims do not match.');
             }
             $this->recordEvent($reservationId, $operation['id'], 'PARTIAL_REFUND', $actorId);
-            $this->audit('hr.leave.partial_cancellation_refunded', $reservationId, $operationKey);
+            $this->audit($partialCancellation->case_kind === 'AFTER_END' ? 'hr.leave.special_adjustment_refunded' : 'hr.leave.partial_cancellation_refunded', $reservationId, $operationKey);
 
             return [...$this->reservationResult($reservationId), 'refunded_units' => $unusedUnits];
         }, 3);

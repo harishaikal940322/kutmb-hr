@@ -5,6 +5,8 @@ import { ref } from 'vue';
 type Review = {
     id: number;
     status: 'REQUESTED' | 'HR_VERIFIED';
+    case_kind: 'ORDINARY' | 'AFTER_END';
+    evidence_reference: string | null;
     request_reason: string;
     actual_return_date: string | null;
     actual_return_session: 'AM' | 'PM' | null;
@@ -55,12 +57,13 @@ function submit(row: Review) {
             <article v-for="row in page.data" :key="row.id" class="p-5">
                 <button type="button" :aria-expanded="selected === row.id" :disabled="form.processing"
                     class="flex w-full flex-wrap justify-between gap-2 text-left text-sm focus-visible:ring-2 focus-visible:ring-ring" @click="select(row.id)">
-                    <strong>{{ row.display_name }}</strong>
+                    <strong>{{ row.display_name }}<span v-if="row.case_kind === 'AFTER_END'" class="ml-2 text-xs font-medium text-primary">Pelarasan khas selepas cuti tamat</span></strong>
                     <span class="text-muted-foreground">{{ row.status === 'REQUESTED' ? 'Pengesahan HR' : 'Keputusan Pengurus Besar' }}</span>
                 </button>
                 <form v-if="selected === row.id" class="mt-4 max-w-xl space-y-3 text-sm" @submit.prevent="submit(row)">
                     <p class="break-all text-muted-foreground">{{ row.request_key }}</p>
                     <p class="whitespace-pre-wrap">{{ row.request_reason }}</p>
+                    <p v-if="row.case_kind === 'AFTER_END'" class="text-xs text-muted-foreground">Rujukan bukti kehadiran: {{ row.evidence_reference }}</p>
                     <fieldset :disabled="form.processing" class="space-y-3">
                         <label v-if="row.status === 'REQUESTED'" class="block space-y-1">
                             <span>Tarikh sebenar kembali bekerja</span>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Leave\LeaveAdjustmentService;
+use App\Services\Leave\LeaveRequestWorkflowService;
 use DomainException;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -42,6 +43,21 @@ class AnnualLeaveAdjustmentController extends Controller
         return Inertia::render('leave/Adjustments', [
             'access' => AnnualLeaveWorkflowController::capabilities($actor),
             'canPrepare' => $prepare, 'year' => (int) now('Asia/Kuala_Lumpur')->format('Y'), 'adjustments' => $rows,
+            'specialCases' => DB::table('leave_request_partial_cancellations as p')
+                ->join('leave_requests as q', 'q.id', '=', 'p.request_id')->join('employees as e', 'e.id', '=', 'q.employee_id')
+                ->where('p.case_kind', 'AFTER_END')->when(! $decide, fn ($query) => $query->where('p.requested_by', $actor->id))
+                ->where(fn ($query) => $query->whereNull('e.user_id')->orWhere('e.user_id', '<>', $actor->id))
+                ->orderByDesc('p.id')->simplePaginate(20, ['p.id', 'q.request_key', 'e.employee_no', 'e.display_name', 'p.status',
+                    'p.request_reason', 'p.evidence_reference', 'p.actual_return_date', 'p.actual_return_session', 'p.unused_half_day_units'], 'special_page'),
+            'specialCandidates' => $prepare ? DB::table('leave_requests as q')
+                ->join('leave_request_revisions as r', fn ($join) => $join->on('r.request_id', '=', 'q.id')->on('r.revision', '=', 'q.current_revision'))
+                ->join('leave_reservations as b', 'b.id', '=', 'r.reservation_id')->join('employees as e', 'e.id', '=', 'q.employee_id')
+                ->where('q.status', 'APPROVED')->where('q.leave_type', 'AL')->where('b.status', 'COMMITTED')
+                ->where('b.leave_year', (int) now('Asia/Kuala_Lumpur')->format('Y'))->whereColumn('e.user_id', 'q.requester_user_id')
+                ->where('e.user_id', '<>', $actor->id)
+                ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('leave_request_days as d')->whereColumn('d.revision_id', 'r.id')->where('d.leave_date', '>', now('Asia/Kuala_Lumpur')->toDateString()))
+                ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('leave_request_partial_cancellations as p')->whereColumn('p.request_id', 'q.id')->whereIn('p.status', ['REQUESTED', 'HR_VERIFIED', 'CONFIRMED']))
+                ->orderByDesc('q.id')->limit(50)->get(['q.request_key', 'e.employee_no', 'e.display_name']) : [],
             'employees' => $prepare ? DB::table('employees')->where(fn ($q) => $q->whereNull('user_id')->orWhere('user_id', '<>', $actor->id))
                 ->orderBy('display_name')->get(['id', 'employee_no', 'display_name']) : [],
         ]);
@@ -62,6 +78,27 @@ class AnnualLeaveAdjustmentController extends Controller
         }
 
         return back()->with('success', 'Pelarasan disediakan. Baki belum berubah.');
+    }
+
+    public function prepareSpecial(Request $request, LeaveRequestWorkflowService $workflow): RedirectResponse
+    {
+        $data = $request->validate([
+            'request_key' => ['required', 'string', 'max:80'],
+            'reason' => ['required', 'string', 'max:1000'],
+            'evidence_reference' => ['required', 'string', 'max:120'],
+            'key' => ['required', 'uuid'],
+        ]);
+        $id = DB::table('leave_requests')->where('request_key', trim($data['request_key']))->value('id');
+        if ($id === null) {
+            throw ValidationException::withMessages(['request_key' => 'Permohonan asal tidak ditemui.']);
+        }
+        try {
+            $workflow->prepareAfterEndCancellation($request->user()->id, (int) $id, $data['key'], $data['reason'], $data['evidence_reference']);
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages(['request_key' => $exception->getMessage()]);
+        }
+
+        return back()->with('success', 'Pelarasan khas disediakan. Baki belum berubah.');
     }
 
     public function decide(Request $request, int $adjustment, LeaveAdjustmentService $service): RedirectResponse
