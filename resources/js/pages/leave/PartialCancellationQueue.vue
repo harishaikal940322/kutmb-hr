@@ -7,6 +7,7 @@ type Review = {
     status: 'REQUESTED' | 'HR_VERIFIED';
     request_reason: string;
     actual_return_date: string | null;
+    actual_return_session: 'AM' | 'PM' | null;
     unused_half_day_units: number | null;
     display_name: string;
     request_key: string;
@@ -22,7 +23,7 @@ defineProps<{ page: PartialReviewPage; today: string }>();
 
 const selected = ref<number>();
 const feedback = ref('');
-const form = useForm({ key: '', actual_return_date: '', decision: '', reason: '' });
+const form = useForm({ key: '', actual_return_date: '', actual_return_session: '', decision: '', reason: '' });
 
 function select(id: number) {
     selected.value = selected.value === id ? undefined : id;
@@ -65,8 +66,16 @@ function submit(row: Review) {
                             <span>Tarikh sebenar kembali bekerja</span>
                             <input v-model="form.actual_return_date" type="date" required :max="today" class="block min-h-10 w-full rounded-lg border border-input bg-background px-3" />
                         </label>
-                        <template v-else>
-                            <p>{{ row.actual_return_date }} · {{ (row.unused_half_day_units ?? 0) / 2 }} hari belum digunakan</p>
+                        <label v-if="row.status === 'REQUESTED'" class="block space-y-1">
+                            <span>Sesi sebenar kembali bertugas</span>
+                            <select v-model="form.actual_return_session" required class="block min-h-10 w-full rounded-lg border border-input bg-background px-3">
+                                <option value="" disabled>Pilih sesi</option>
+                                <option value="AM">AM · pagi</option>
+                                <option value="PM">PM · petang</option>
+                            </select>
+                        </label>
+                        <template v-if="row.status === 'HR_VERIFIED'">
+                            <p>{{ row.actual_return_date }} {{ row.actual_return_session ?? '(rekod lama)' }} · {{ (row.unused_half_day_units ?? 0) / 2 }} hari belum digunakan</p>
                             <label class="block space-y-1">
                                 <span>Keputusan</span>
                                 <select v-model="form.decision" required class="block min-h-10 w-full rounded-lg border border-input bg-background px-3">

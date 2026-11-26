@@ -436,6 +436,10 @@ See [Owner TB-Q01–06](../decisions/MOD-005_Tabung_Owner_Clarifications_2026-11
 
 Owner TB-Q02/03: manual authorized close now posts only eligible carry into remaining capacity and permanently burns free prior-year AL excess with a separate ledger debit, and disposes existing over-cap Tabung via FIFO free source balances. Migration 000053 extends immutable close history without editing old rows. Pending holds remain intact; insufficient free disposal capacity and negative AL block posting. Both credited years prerequisite retained for manual recovery path only; automatic midnight ordering, retry/reporting, reconciliation and exit module not yet implemented.
 
+## 8AA. Cancellation Owner clarifications
+
+See [CR-Q01–04](../decisions/MOD-005_Cancellation_Owner_Clarifications_2026-11-26.md). Migration 000054 and service/UI implement current-year same-year session-level partial refunds including original Tabung cohorts. HR confirms actual AM/PM, GM decides, only unused sessions reversed; FIFO disposal protects active holds. Legacy null session preserves old after-date behavior. Closed-year reconciliation, cross-year partial commitments and post-period HR special correction remain separate implementation gates, not unanswered Owner decisions.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.

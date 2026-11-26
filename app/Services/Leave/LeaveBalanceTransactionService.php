@@ -683,9 +683,9 @@ class LeaveBalanceTransactionService
                 || $requestRevision === null || $requestRevision->leave_type !== 'AL' || $requestRevision->status !== 'APPROVED'
                 || (int) $requestRevision->current_revision !== (int) $requestRevision->revision
                 || (int) $partialCancellation->requested_by !== (int) $requestRevision->requester_user_id
-                || $reservation->status !== 'COMMITTED' || (int) $reservation->tabung_units !== 0
+                || $reservation->status !== 'COMMITTED'
                 || (int) $partialCancellation->unused_half_day_units < 1) {
-                throw new DomainException('A current, verified, Annual-funded partial cancellation confirmed by the General Manager is required.');
+                throw new DomainException('A current, verified partial cancellation confirmed by the General Manager is required.');
             }
             $allocations = Schema::hasTable('leave_reservation_slot_allocations')
                 ? DB::table('leave_reservation_slot_allocations')->where('reservation_id', $reservationId)->orderBy('leave_year')->orderBy('leave_date')->orderBy('session_code')->lockForUpdate()->get()
@@ -705,25 +705,54 @@ class LeaveBalanceTransactionService
             if ($operation['replay']) {
                 return [...$this->reservationResult((int) $operation['event']->reservation_id), 'refunded_units' => $unusedUnits];
             }
-            if ((int) $reservation->annual_units !== (int) $reservation->requested_units) {
-                throw new DomainException('Partial restoration is deferred until the original source allocation can be matched exactly.');
-            }
             $unusedUnitsByAccount = [];
+            $unusedTabungBySource = [];
+            $originalTabungBySource = $this->tabungUnitsBySource($reservation, $allocations);
+            $returnSession = $partialCancellation->actual_return_session;
+            $isUnused = fn ($slot): bool => $slot->leave_date > $partialCancellation->actual_return_date
+                || ($slot->leave_date === $partialCancellation->actual_return_date
+                    && ($returnSession === 'AM' || ($returnSession === 'PM' && $slot->session_code === 'PM')));
             if ($allocations->isEmpty()) {
+                if ((int) $reservation->tabung_units !== 0) {
+                    throw new DomainException('Mixed legacy reservations require an exact source map.');
+                }
                 $unusedUnitsByAccount[(int) $reservation->annual_account_id] = $unusedUnits;
             } else {
                 foreach ($allocations as $allocation) {
-                    if ($allocation->allocation_bucket !== 'ANNUAL') {
-                        throw new DomainException('Partial restoration requires a per-date Annual Leave-only source map.');
+                    if (! $isUnused($allocation)) {
+                        continue;
                     }
-                    if ($allocation->leave_date > $partialCancellation->actual_return_date) {
+                    if ($allocation->allocation_bucket === 'ANNUAL') {
                         $accountId = (int) $allocation->annual_account_id;
-                        $unusedUnitsByAccount[$accountId] = ($unusedUnitsByAccount[$accountId] ?? 0) + (int) $allocation->units;
+                        $unusedUnitsByAccount[$accountId] = ($unusedUnitsByAccount[$accountId] ?? 0) + 1;
+                    } else {
+                        $sourceYear = (int) $allocation->source_year;
+                        $unusedTabungBySource[$sourceYear] = ($unusedTabungBySource[$sourceYear] ?? 0) + 1;
                     }
                 }
-                if (array_sum($unusedUnitsByAccount) !== $unusedUnits) {
-                    throw new DomainException('The confirmed unused sessions do not match the per-date Annual Leave source map.');
+                if (array_sum($unusedUnitsByAccount) + array_sum($unusedTabungBySource) !== $unusedUnits) {
+                    throw new DomainException('Verified unused sessions do not match the original source map.');
                 }
+            }
+            $currentYear = (int) now('Asia/Kuala_Lumpur')->format('Y');
+            foreach ($unusedUnitsByAccount as $accountId => $units) {
+                if ((int) $lockedAccounts['annual_accounts']->get($accountId)->leave_year !== $currentYear) {
+                    throw new DomainException('Pemulangan AL tahun lain memerlukan rekonsiliasi atau pembatalan komitmen.');
+                }
+            }
+            $tabungExcess = 0;
+            if ($unusedTabungBySource !== []) {
+                $cap = (new TabungCapacity)->confirmedCapFor((int) $employee->id, $currentYear);
+                $posted = $this->totals->forAccounts((int) $annual->id, (int) $tabung->id)['tabung_half_day_units'];
+                if ($cap === null || $posted < 0 || $posted > $cap) {
+                    throw new DomainException('Sahkan had dan baki Tabung semasa sebelum pemulangan.');
+                }
+                $tabungExcess = max(0, $posted + array_sum($unusedTabungBySource) - $cap);
+            }
+            $slotQuery = DB::table('leave_active_slots')->where('reservation_id', $reservationId)->where('status', 'COMMITTED');
+            $refundSlots = $slotQuery->get()->filter($isUnused);
+            if ($refundSlots->count() !== $unusedUnits) {
+                throw new DomainException('Sesi telah dipulangkan atau tidak sepadan dengan rekod kelulusan.');
             }
 
             $committedEvent = DB::table('leave_reservation_events')->where('reservation_id', $reservationId)
@@ -733,8 +762,10 @@ class LeaveBalanceTransactionService
             }
             $usageEntries = DB::table('leave_ledger_entries')->where('balance_operation_id', $committedEvent->balance_operation_id)
                 ->where('kind', 'approved_leave_use')->lockForUpdate()->get();
-            $usageEntriesByAnnualAccount = $usageEntries->keyBy('annual_account_id');
-            if ($usageEntries->count() !== count($annualUnitsByAccount) || $usageEntriesByAnnualAccount->count() !== count($annualUnitsByAccount)) {
+            $usageEntriesByAnnualAccount = $usageEntries->whereNotNull('annual_account_id')->keyBy('annual_account_id');
+            $tabungUsage = $usageEntries->whereNotNull('tabung_account_id')->keyBy('source_year');
+            if ($usageEntries->count() !== count($annualUnitsByAccount) + count($originalTabungBySource)
+                || $usageEntriesByAnnualAccount->count() !== count($annualUnitsByAccount) || $tabungUsage->count() !== count($originalTabungBySource)) {
                 throw new DomainException('The original annual usage entries do not match the per-date source allocation.');
             }
             foreach ($annualUnitsByAccount as $accountId => $originalUnits) {
@@ -764,8 +795,39 @@ class LeaveBalanceTransactionService
                     'actor_id' => $actorId,
                 ]);
             }
+            foreach ($originalTabungBySource as $sourceYear => $originalUnits) {
+                $usage = $tabungUsage->get($sourceYear);
+                if ($usage === null || (int) $usage->tabung_account_id !== (int) $tabung->id
+                    || $usage->annual_account_id !== null || (int) $usage->signed_half_day_units !== -$originalUnits || $usage->reverses_entry_id !== null) {
+                    throw new DomainException('The original Tabung usage does not match its source map.');
+                }
+                $refundUnits = $unusedTabungBySource[$sourceYear] ?? 0;
+                if ($refundUnits === 0) {
+                    continue;
+                }
+                $reversed = (int) DB::table('leave_ledger_entries')->where('reverses_entry_id', $usage->id)->sum('signed_half_day_units');
+                if ($reversed < 0 || $reversed + $refundUnits > $originalUnits) {
+                    throw new DomainException('Partial refund exceeds original Tabung usage.');
+                }
+                DB::table('leave_ledger_entries')->insert([
+                    'tabung_account_id' => $tabung->id, 'balance_operation_id' => $operation['id'],
+                    'signed_half_day_units' => $refundUnits, 'kind' => 'approved_leave_partial_cancellation',
+                    'source_year' => $sourceYear, 'operation_key' => $operationKey.':tabung:'.$sourceYear,
+                    'reverses_entry_id' => $usage->id, 'actor_id' => $actorId,
+                ]);
+            }
+            if ($tabungExcess > 0) {
+                foreach ($this->totals->allocateTabungFifo((int) $tabung->id, $tabungExcess) as $sourceYear => $units) {
+                    DB::table('leave_ledger_entries')->insert([
+                        'tabung_account_id' => $tabung->id, 'balance_operation_id' => $operation['id'],
+                        'signed_half_day_units' => -$units, 'kind' => 'tabung_cancellation_excess_disposal',
+                        'source_year' => $sourceYear, 'operation_key' => $operationKey.':excess:'.$sourceYear, 'actor_id' => $actorId,
+                    ]);
+                }
+                $this->audit('hr.leave.tabung_excess_disposed', $reservationId, $operationKey);
+            }
             $releasedSlots = DB::table('leave_active_slots')->where('reservation_id', $reservationId)->where('status', 'COMMITTED')
-                ->where('leave_date', '>', $partialCancellation->actual_return_date)
+                ->whereIn('id', $refundSlots->pluck('id'))
                 ->update(['status' => 'RELEASED', 'active_slot_key' => null, 'resolved_at' => now()]);
             if ($releasedSlots !== $unusedUnits) {
                 throw new RuntimeException('The confirmed unused sessions and released slot claims do not match.');

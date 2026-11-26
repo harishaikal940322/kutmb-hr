@@ -1,3 +1,7 @@
+## 26 November 2026 — CR-Q01–04 and session-level partial cancellation
+
+- Recorded Owner CR-Q01–04 in `docs/decisions/MOD-005_Cancellation_Owner_Clarifications_2026-11-26.md`. Migration 000054 adds AM/PM to case and event, updates existing MySQL source/state guards without rewriting history. Current-year same-year partial refund uses original per-slot source, including multi-cohort Tabung, FIFO excess disposal, distinct GM approval, actual-session HR verification and replay protection. No runtime execution. Cross-year/closed-year reconciliation, unposted partial commitments, after-period HR special adjustment, precise final-session request boundary and full audit snapshot remain open implementation tasks.
+
 ## 26 November 2026 — TB-04 manual close burn and excess disposal
 
 - Forward migration 000053 adds immutable close burn amount/entry and total Tabung disposal. For the existing authorized manual close with both annual awards credited, free prior-year AL = transfer + burn. Distinct annual_year_close_burn debit removes uncarriable old-year free AL; never deduct receiving-year AL. Existing over-cap Tabung disposed FIFO from free source units only, distinct ledger entries linked to close operation. Existing close records retain zero defaults; no repeat. Holds, negative-AL gate, closed-year guard, synthetic-only environment remain. No automatic scheduler or new-year credit sequencing yet. No runtime verification.

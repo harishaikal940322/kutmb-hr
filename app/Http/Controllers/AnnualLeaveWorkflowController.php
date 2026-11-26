@@ -181,8 +181,8 @@ class AnnualLeaveWorkflowController extends Controller
                     'can_resubmit' => $page === $history && $row->leave_type === 'AL' && $row->status === 'DRAFT'
                         && $returnedForCorrection && $row->session_mode !== 'UNSUPPORTED',
                     'can_request_partial' => $sameYear && $page === $history && $row->leave_type === 'AL' && $row->status === 'APPROVED'
-                        && $row->starts_on !== null && $row->starts_on <= $today && $row->ends_on > $today
-                        && (int) $row->tabung_units === 0 && ! in_array($partialStatus, ['REQUESTED', 'HR_VERIFIED'], true),
+                        && $row->starts_on !== null && $row->starts_on <= $today && $row->ends_on >= $today
+                        && ! in_array($partialStatus, ['REQUESTED', 'HR_VERIFIED', 'CONFIRMED'], true),
                     'can_withdraw' => $ownFutureAnnual && $row->current_step_order !== null,
                     'can_request_cancellation' => $ownFutureAnnual && $row->status === 'APPROVED',
                 ];
@@ -404,12 +404,13 @@ class AnnualLeaveWorkflowController extends Controller
         $data = $request->validate([
             'key' => ['required', 'uuid'], 'reason' => ['required', 'string', 'max:1000'],
             'actual_return_date' => ['required', 'date_format:Y-m-d'],
+            'actual_return_session' => ['required', 'in:AM,PM'],
         ]);
         $requestId = $this->partialCases($actor->id, true, false, $data['key'])->where('partial.id', $case)->select('partial.request_id')->value('partial.request_id');
         abort_if($requestId === null, 404);
 
         try {
-            $workflow->verifyApprovedAnnualLeavePartialCancellation($actor->id, $requestId, $case, $data['key'], $data['actual_return_date'], $data['reason']);
+            $workflow->verifyApprovedAnnualLeavePartialCancellation($actor->id, $requestId, $case, $data['key'], $data['actual_return_date'], $data['reason'], $data['actual_return_session']);
         } catch (DomainException $exception) {
             throw ValidationException::withMessages(['actual_return_date' => $exception->getMessage()]);
         }
@@ -451,7 +452,7 @@ class AnnualLeaveWorkflowController extends Controller
                     ->where('partial.hr_verified_by', $actor)->where('partial.hr_operation_key', $key)))
                 ->when($key !== null && $gm, fn (Builder $query) => $query->orWhere(fn (Builder $query) => $query
                     ->where('partial.general_manager_user_id', $actor)->where('partial.decision_operation_key', $key))))
-            ->select('partial.id', 'partial.status', 'partial.request_reason', 'partial.actual_return_date',
+            ->select('partial.id', 'partial.status', 'partial.request_reason', 'partial.actual_return_date', 'partial.actual_return_session',
                 'partial.unused_half_day_units', 'employee.display_name', 'leave.request_key');
     }
 

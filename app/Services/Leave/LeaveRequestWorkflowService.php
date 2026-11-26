@@ -972,15 +972,19 @@ class LeaveRequestWorkflowService
             $dates = DB::table('leave_request_days')->where('revision_id', $revision->id)->orderBy('leave_date')->pluck('leave_date')->all();
             $today = now('Asia/Kuala_Lumpur')->toDateString();
             if ($dates === [] || ! collect($dates)->contains(fn (string $date): bool => $date <= $today)
-                || ! collect($dates)->contains(fn (string $date): bool => $date > $today)) {
+                || ! collect($dates)->contains(fn (string $date): bool => $date >= $today)) {
                 throw new DomainException('Partial cancellation is limited to an approved leave period that has started and not yet ended.');
             }
             $reservation = DB::table('leave_reservations')->where('id', $revision->reservation_id)->lockForUpdate()->first();
-            if ($reservation === null || $reservation->status !== 'COMMITTED' || (int) $reservation->annual_units < 1) {
+            if ($reservation === null || $reservation->status !== 'COMMITTED' || (int) $reservation->requested_units < 1) {
                 throw new DomainException('A committed approved Annual Leave reservation is required.');
             }
-            if ((int) $reservation->tabung_units !== 0) {
-                throw new DomainException('Partial cancellation of Tabung-funded leave is deferred until the current entitlement cap and source split can be verified.');
+            if (DB::table('leave_request_partial_cancellations')->where('request_id', $requestId)->where('status', 'CONFIRMED')->exists()) {
+                throw new DomainException('Sesi cuti yang telah dipulangkan tidak boleh dipulangkan semula. Rujuk HR untuk pembetulan.');
+            }
+            if ((int) $reservation->tabung_units > 0 && (! DB::table('leave_reservation_slot_allocations')->where('reservation_id', $reservation->id)->exists()
+                || (new TabungCapacity)->confirmedCapFor((int) $employee->id, (int) now('Asia/Kuala_Lumpur')->format('Y')) === null)) {
+                throw new DomainException('Pemetaan sumber asal dan kadar penuh Tabung yang disahkan diperlukan.');
             }
             if (DB::table('leave_annual_commitments')->where('reservation_id', $reservation->id)->where('status', 'COMMITTED')->exists()
                 || collect($dates)->map(fn (string $date): string => substr($date, 0, 4))->unique()->count() > 1) {
@@ -1017,17 +1021,17 @@ class LeaveRequestWorkflowService
     }
 
     /** @return array{request_id:int,status:string,current_step_order:null,reservation_id:int,partial_cancellation_id:int,actual_return_date:string,unused_half_day_units:int,replayed:bool} */
-    public function verifyApprovedAnnualLeavePartialCancellation(int $hrActorId, int $requestId, int $partialCancellationId, string $operationKey, string $actualReturnDate, string $reason): array
+    public function verifyApprovedAnnualLeavePartialCancellation(int $hrActorId, int $requestId, int $partialCancellationId, string $operationKey, string $actualReturnDate, string $reason, string $actualReturnSession = 'AM'): array
     {
         $this->assertLocal();
         $this->assertOperationKey($operationKey);
         $actualReturnDate = $this->parseDate($actualReturnDate)->format('Y-m-d');
         $reason = $this->normalizeReason($reason);
-        if ($hrActorId < 1 || $requestId < 1 || $partialCancellationId < 1 || $reason === null) {
+        if ($hrActorId < 1 || $requestId < 1 || $partialCancellationId < 1 || $reason === null || ! in_array($actualReturnSession, ['AM', 'PM'], true)) {
             throw new DomainException('An active HR reviewer, actual return date, and review reason are required.');
         }
 
-        return DB::transaction(function () use ($hrActorId, $requestId, $partialCancellationId, $operationKey, $actualReturnDate, $reason): array {
+        return DB::transaction(function () use ($hrActorId, $requestId, $partialCancellationId, $operationKey, $actualReturnDate, $reason, $actualReturnSession): array {
             $this->lockCancellationGuards();
             $candidate = DB::table('leave_requests')->where('id', $requestId)->first(['employee_id']);
             if ($candidate === null) {
@@ -1043,9 +1047,10 @@ class LeaveRequestWorkflowService
             $existingEvent = DB::table('leave_request_partial_cancellation_events')->where('operation_key', $operationKey)->lockForUpdate()->first();
             if ($existingEvent !== null) {
                 $expectedHash = $this->partialCancellationPayloadHash('HR_VERIFIED', $hrActorId, $requestId, (int) $partialCancellation->revision_id,
-                    (int) $partialCancellation->cycle, null, $reason, $actualReturnDate, (int) $existingEvent->unused_half_day_units);
+                    (int) $partialCancellation->cycle, null, $reason, $actualReturnDate, (int) $existingEvent->unused_half_day_units, $existingEvent->actual_return_session === null ? null : $actualReturnSession);
                 if ((int) $existingEvent->partial_cancellation_id !== $partialCancellationId || $existingEvent->event_code !== 'HR_VERIFIED'
                     || (int) $existingEvent->actor_id !== $hrActorId || $existingEvent->actual_return_date !== $actualReturnDate
+                    || ($existingEvent->actual_return_session !== null && $existingEvent->actual_return_session !== $actualReturnSession)
                     || $existingEvent->reason !== $reason || ! hash_equals($existingEvent->payload_hash, $expectedHash)) {
                     throw new DomainException('The HR verification key was already used for a different review.');
                 }
@@ -1082,26 +1087,33 @@ class LeaveRequestWorkflowService
             $slots = DB::table('leave_request_days')->where('revision_id', $revision->id)->orderBy('leave_date')->get(['leave_date', 'session_code']);
             $dates = $slots->pluck('leave_date')->unique()->values();
             $today = now('Asia/Kuala_Lumpur')->toDateString();
-            if ($dates->isEmpty() || ! $dates->contains(fn (string $date): bool => $date <= $today)
-                || ! $dates->contains(fn (string $date): bool => $date > $today)
-                || $actualReturnDate > $today || $actualReturnDate < (string) $dates->first()
-                || $actualReturnDate >= (string) $dates->last() || $slots->contains(fn (object $slot): bool => $slot->leave_date === $actualReturnDate)) {
-                throw new DomainException('The verified return date must be during the active leave period and cannot share a requested half-day date.');
+            if ($dates->isEmpty() || $actualReturnDate > $today || $actualReturnDate < (string) $dates->first()
+                || $actualReturnDate > (string) $dates->last()) {
+                throw new DomainException('Tarikh kembali bertugas mesti dalam tempoh cuti dan tidak boleh pada masa hadapan.');
             }
-            $unusedUnits = $slots->filter(fn (object $slot): bool => $slot->leave_date > $actualReturnDate)->count();
+            if ($actualReturnDate === $today) {
+                $schedule = $this->versions->workingScheduleFor($actualReturnDate);
+                $sessionStart = $actualReturnSession === 'AM' ? $schedule->work_start : $schedule->session_boundary;
+                if (now('Asia/Kuala_Lumpur')->format('H:i:s') < $sessionStart) {
+                    throw new DomainException('HR hanya boleh mengesahkan selepas sesi kembali bertugas bermula.');
+                }
+            }
+            $unusedUnits = $slots->filter(fn (object $slot): bool => $slot->leave_date > $actualReturnDate
+                || ($slot->leave_date === $actualReturnDate && ($actualReturnSession === 'AM' || $slot->session_code === 'PM')))->count();
             if ($unusedUnits < 1) {
                 throw new DomainException('At least one unused future half-day session must remain after the verified return date.');
             }
             $reservation = DB::table('leave_reservations')->where('id', $revision->reservation_id)->lockForUpdate()->first();
-            if ($reservation === null || $reservation->status !== 'COMMITTED' || (int) $reservation->tabung_units !== 0
-                || (int) $reservation->annual_units < $unusedUnits) {
-                throw new DomainException('Only a committed Annual-funded reservation with enough refundable units is supported.');
+            if ($reservation === null || $reservation->status !== 'COMMITTED'
+                || (int) $reservation->requested_units < $unusedUnits) {
+                throw new DomainException('Only a committed reservation with enough refundable units is supported.');
             }
             $payloadHash = $this->partialCancellationPayloadHash('HR_VERIFIED', $hrActorId, $requestId, (int) $revision->id,
-                (int) $partialCancellation->cycle, null, $reason, $actualReturnDate, $unusedUnits);
+                (int) $partialCancellation->cycle, null, $reason, $actualReturnDate, $unusedUnits, $actualReturnSession);
             DB::table('leave_request_partial_cancellations')->where('id', $partialCancellationId)->update([
                 'status' => 'HR_VERIFIED',
                 'actual_return_date' => $actualReturnDate,
+                'actual_return_session' => $actualReturnSession,
                 'unused_half_day_units' => $unusedUnits,
                 'hr_verified_by' => $hrActorId,
                 'hr_reason' => $reason,
@@ -1110,7 +1122,7 @@ class LeaveRequestWorkflowService
                 'verified_at' => now(),
                 'updated_at' => now(),
             ]);
-            $this->recordPartialCancellationEvent($partialCancellationId, 'HR_VERIFIED', $hrActorId, null, $reason, $actualReturnDate, $unusedUnits, $operationKey, $payloadHash);
+            $this->recordPartialCancellationEvent($partialCancellationId, 'HR_VERIFIED', $hrActorId, null, $reason, $actualReturnDate, $unusedUnits, $operationKey, $payloadHash, $actualReturnSession);
             $this->audit('hr.leave.partial_cancellation_hr_verified', $requestId, $hrActorId, $operationKey);
 
             return [
@@ -1301,8 +1313,10 @@ class LeaveRequestWorkflowService
         ?string $reason,
         ?string $actualReturnDate,
         ?int $unusedUnits,
+        ?string $actualReturnSession = null,
     ): string {
         return $this->hash([
+            ...($actualReturnSession === null ? [] : ['actual_return_session' => $actualReturnSession]),
             'action_code' => $eventCode,
             'actor_id' => $actorId,
             'actual_return_date' => $actualReturnDate,
@@ -1325,9 +1339,11 @@ class LeaveRequestWorkflowService
         ?int $unusedUnits,
         string $operationKey,
         string $payloadHash,
+        ?string $actualReturnSession = null,
     ): void {
         DB::table('leave_request_partial_cancellation_events')->insert([
             'partial_cancellation_id' => $partialCancellationId,
+            'actual_return_session' => $actualReturnSession,
             'event_code' => $eventCode,
             'actor_id' => $actorId,
             'assignment_id' => $assignmentId,
