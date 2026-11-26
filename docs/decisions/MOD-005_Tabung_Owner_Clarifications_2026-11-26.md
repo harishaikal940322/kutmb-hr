@@ -18,5 +18,6 @@ Do not treat these as approval of unstated exact entitlement-band boundaries, pa
 - TB-01: effective-dated confirmed full cap, source implemented; promotion AL top-up and lower-cap handling outstanding.
 - TB-02: FIFO same-year allocation across cohorts, per-source pending totals, approval and retrospective EL debit; header source is oldest cohort for compatibility; per-slot map authoritative, additive forward trigger migration 000052. Cross-year shortage routing and old-year reconciliation remain gated.
 - TB-03: current-year pre-start cancellation refunds all original cohorts and disposes new excess via FIFO free units. Partial cancellation and full audit snapshots outstanding.
-- TB-04–06: approved development decisions above, implementation pending.
+- TB-04: manual close transfer/burn and FIFO Tabung excess disposal implemented; 000053 required. Existing both-credited manual prerequisite remains; midnight automation and sequence pending.
+- TB-05–06: approved development decisions above, implementation pending.
 - No runtime/database/build execution by remote editor. Owner review required.

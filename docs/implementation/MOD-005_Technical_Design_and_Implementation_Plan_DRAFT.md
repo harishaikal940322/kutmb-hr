@@ -432,6 +432,10 @@ CT-DEC-016 requires exact original-source refund, current confirmed full-rate ca
 
 See [Owner TB-Q01–06](../decisions/MOD-005_Tabung_Owner_Clarifications_2026-11-26.md). Development decisions resolve cohort order, disposal order, close timing/order, reconciliation capacity and interim exit settlement tracker; formal HR/IT approval remains outstanding. Same-year per-session FIFO and original-source full pre-start refunds now support multiple cohorts. Migration 000052 replaces source guards without rewriting historical rows. Legacy header is oldest source, authoritative allocation rows drive per-cohort holds/debits/refunds. Unimplemented paths remain fail-closed. Sections 8W/8X single-cohort restrictions are superseded only for these paths.
 
+## 8Z. TB-04 manual close burn
+
+Owner TB-Q02/03: manual authorized close now posts only eligible carry into remaining capacity and permanently burns free prior-year AL excess with a separate ledger debit, and disposes existing over-cap Tabung via FIFO free source balances. Migration 000053 extends immutable close history without editing old rows. Pending holds remain intact; insufficient free disposal capacity and negative AL block posting. Both credited years prerequisite retained for manual recovery path only; automatic midnight ordering, retry/reporting, reconciliation and exit module not yet implemented.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.

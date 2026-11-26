@@ -1,3 +1,7 @@
+## 26 November 2026 — TB-04 manual close burn and excess disposal
+
+- Forward migration 000053 adds immutable close burn amount/entry and total Tabung disposal. For the existing authorized manual close with both annual awards credited, free prior-year AL = transfer + burn. Distinct annual_year_close_burn debit removes uncarriable old-year free AL; never deduct receiving-year AL. Existing over-cap Tabung disposed FIFO from free source units only, distinct ledger entries linked to close operation. Existing close records retain zero defaults; no repeat. Holds, negative-AL gate, closed-year guard, synthetic-only environment remain. No automatic scheduler or new-year credit sequencing yet. No runtime verification.
+
 ## 26 November 2026 — Owner TB-Q01–06 and FIFO Tabung
 
 - Recorded all six Owner development decisions in `docs/decisions/MOD-005_Tabung_Owner_Clarifications_2026-11-26.md`; HR source unchanged. Added forward migration 000052, FIFO per-session sources, actual per-cohort pending, per-cohort approved/rejected-retrospective usage, source-exact current-year full cancellation and FIFO excess disposal. Header `tabung_source_year` now oldest allocated year, not sole authoritative cohort. Existing historical rows unchanged. Adjustments honor per-cohort holds. No local runtime validation.

@@ -65,7 +65,7 @@ function days(value: unknown) {
 const previewFields = [
     ['posted_annual_half_day_units', 'Baki AL dipos'], ['pending_annual_hold_half_day_units', 'Tempahan pending'],
     ['free_annual_half_day_units', 'Baki AL bebas'], ['tabung_capacity_half_day_units', 'Kapasiti Tabung'],
-    ['transfer_half_day_units', 'Cadangan pindahan'], ['untransferred_half_day_units', 'Baki perlu semakan HR'],
+    ['transfer_half_day_units', 'Cadangan pindahan'], ['untransferred_half_day_units', 'Lebihan AL untuk burn'],
 ];
 </script>
 
@@ -108,9 +108,9 @@ const previewFields = [
                     <form v-if="closeEligibility?.can_post" class="space-y-4 rounded-xl border border-border bg-card p-4" @submit.prevent="postClose">
                         <h2 class="font-semibold">Pengesahan pindahan</h2>
                         <label class="space-y-1 text-sm font-medium">Sebab / rujukan pengesahan<textarea v-model="closeForm.reason" required maxlength="1000" :class="input" /></label>
-                        <label class="flex gap-2 text-sm"><input v-model="closeForm.acknowledged" type="checkbox" required class="accent-primary" /> Saya telah menyemak baki, tempahan dan cap. Pos pindahan yang dipratonton sahaja.</label>
+                        <label class="flex gap-2 text-sm"><input v-model="closeForm.acknowledged" type="checkbox" required class="accent-primary" /> Saya telah menyemak baki, tempahan dan had. Pos pindahan, burn lebihan AL dan pelupusan lebihan Tabung (jika ada) mengikut FIFO.</label>
                         <p v-for="error in closeForm.errors" :key="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
-                        <button :class="button" :disabled="closeForm.processing" type="submit">Sahkan dan pos pindahan</button>
+                        <button :class="button" :disabled="closeForm.processing" type="submit">Sahkan penutupan tahun</button>
                     </form>
                 </template>
                 <form v-else class="max-w-3xl space-y-5 rounded-xl border border-border bg-card p-5" @submit.prevent="submit">

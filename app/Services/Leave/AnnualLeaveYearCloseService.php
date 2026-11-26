@@ -7,7 +7,7 @@ use App\Models\User;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
-/** Explicit local-only close for the unambiguous positive carry subset; no scheduled expiry or negative settlement. */
+/** Local-only explicit close: eligible free AL transfers within cap; remainder burns once. */
 class AnnualLeaveYearCloseService
 {
     public function __construct(private readonly LedgerPostedTotals $totals, private readonly AnnualLeaveYearEndPreview $preview) {}
@@ -69,8 +69,25 @@ class AnnualLeaveYearCloseService
                 'payload_hash' => hash('sha256', json_encode([$employeeId, $year, $cap, $snapshot, $actorId, $reason], JSON_THROW_ON_ERROR)),
                 'created_at' => now(),
             ]);
+            $burn = $snapshot['annual'] - $snapshot['pending'] - $transfer;
+            $disposal = max(0, $snapshot['tabung'] - $cap);
             $out = null;
             $in = null;
+            $burnEntry = null;
+            foreach ($this->totals->allocateTabungFifo((int) $tabung->id, $disposal) as $sourceYear => $units) {
+                DB::table('leave_ledger_entries')->insert([
+                    'tabung_account_id' => $tabung->id, 'balance_operation_id' => $operation,
+                    'signed_half_day_units' => -$units, 'kind' => 'tabung_year_close_excess_disposal',
+                    'source_year' => $sourceYear, 'operation_key' => $key.':excess:'.$sourceYear, 'actor_id' => $actorId,
+                ]);
+            }
+            if ($burn > 0) {
+                $burnEntry = DB::table('leave_ledger_entries')->insertGetId([
+                    'annual_account_id' => $annual->id, 'balance_operation_id' => $operation,
+                    'signed_half_day_units' => -$burn, 'kind' => 'annual_year_close_burn',
+                    'source_year' => null, 'operation_key' => $key.':burn', 'actor_id' => $actorId,
+                ]);
+            }
             if ($transfer > 0) {
                 $out = DB::table('leave_ledger_entries')->insertGetId([
                     'annual_account_id' => $annual->id, 'balance_operation_id' => $operation,
@@ -89,6 +106,7 @@ class AnnualLeaveYearCloseService
                 'balance_operation_id' => $operation, 'operation_key' => $key, 'reason' => $reason,
                 'cap_units' => $cap, 'annual_before' => $snapshot['annual'], 'annual_pending' => $snapshot['pending'],
                 'tabung_before' => $snapshot['tabung'], 'transfer_units' => $transfer, 'annual_entry_id' => $out, 'tabung_entry_id' => $in,
+                'burn_units' => $burn, 'burn_entry_id' => $burnEntry, 'tabung_disposal_units' => $disposal,
             ]);
             AuditEvent::query()->create([
                 'occurred_at' => now(), 'actor_id' => $actorId, 'action_code' => 'hr.leave.year_close_posted',
@@ -131,18 +149,17 @@ class AnnualLeaveYearCloseService
         if ($cap !== $confirmedCaps[1]) {
             throw new DomainException('Cap mesti sepadan dengan kelayakan disahkan tahun penerima.');
         }
-        if ($confirmedCaps[1] < $confirmedCaps[0]) {
-            throw new DomainException('Penurunan cap memerlukan semakan HR; tiada pelupusan automatik.');
-        }
-        if (DB::table('leave_ledger_entries')->where('tabung_account_id', $tabung->id)->where('source_year', $year)->exists()) {
+         if (DB::table('leave_ledger_entries')->where('tabung_account_id', $tabung->id)->where('source_year', $year)->exists()) {
             throw new DomainException('Sumber tahun ini sudah mempunyai sejarah Tabung dan memerlukan rekonsiliasi berasingan.');
         }
         $posted = $this->totals->forAccounts((int) $annual->id, (int) $tabung->id);
         $hold = $this->totals->pendingAnnualUnits((int) $annual->id);
         $result = $this->preview->previewCloseTransfer($employeeId, $year, $posted['annual_half_day_units'], $hold, $posted['tabung_half_day_units'], $cap);
-        if ($result['free_annual_half_day_units'] < 0 || $result['untransferred_half_day_units'] !== 0 || $posted['tabung_half_day_units'] > $cap) {
-            throw new DomainException('Defisit, lebihan atau pelupusan Tabung memerlukan peraturan penutupan berasingan.');
+        if ($result['free_annual_half_day_units'] < 0) {
+            throw new DomainException('Defisit AL memerlukan peraturan penyelesaian tahun berasingan.');
         }
+        // Validate disposal capacity against per-cohort pending holds before posting.
+        $this->totals->allocateTabungFifo((int) $tabung->id, max(0, $posted['tabung_half_day_units'] - $cap));
 
         return ['annual' => $annual, 'next' => $next, 'tabung' => $tabung, 'snapshot' => [
             'annual' => $posted['annual_half_day_units'], 'pending' => $hold,
