@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Services\Leave\BalanceProjection;
 use App\Services\Leave\LeaveRequestWorkflowService;
 use App\Services\Leave\LedgerPostedTotals;
@@ -17,12 +18,42 @@ use Illuminate\Validation\ValidationException;
 
 class AnnualLeaveWorkflowController extends Controller
 {
-    public static function hasAccess(int $userId, bool $canReviewPartial = false): bool
+    /** Permissions are necessary; linked employee and office scope remain independent. */
+    public static function capabilities(User $user): array
     {
         $today = now('Asia/Kuala_Lumpur')->toDateString();
+        $linked = DB::table('employees')->where('user_id', $user->id)->exists();
+        $self = $user->can('leave.request.self');
+        $decision = $user->can('leave.request.decide');
+        $team = $user->can('leave.calendar.team.view');
+        $review = $user->can('leave.partial-cancellation.review');
+        $entitlements = $user->can('leave.entitlement.view');
+        $technical = $user->can('iam.rbac.manage');
 
-        return $canReviewPartial || DB::table('employees')->where('user_id', $userId)->exists()
-            || self::isApprover($userId, $today);
+        $sections = [];
+        if ($self && $linked) {
+            $sections[] = 'apply';
+            $sections[] = 'requests';
+        }
+        if ($review || ($decision && self::isApprover($user->id, $today))) {
+            $sections[] = 'approvals';
+        }
+        if ($team && $linked) {
+            $sections[] = 'team';
+        }
+        if ($entitlements) {
+            $sections[] = 'staff';
+        }
+
+        return [
+            'sections' => $sections,
+            'module' => $self || $decision || $team || $review || $entitlements || $technical,
+            'technical' => $technical,
+            'needs_employee' => ($self || $team) && ! $linked,
+            'needs_office' => $decision && ! self::isApprover($user->id, $today),
+            'can_decide' => $decision,
+            'can_review_partial' => $review,
+        ];
     }
 
     private static function isApprover(int $userId, string $today): bool
@@ -35,10 +66,13 @@ class AnnualLeaveWorkflowController extends Controller
     }
 
     /** @return array<string, mixed> */
-    public function workspace(int $userId, LedgerPostedTotals $totals, BalanceProjection $projection, bool $canReviewPartial = false): array
+    public function workspace(int $userId, LedgerPostedTotals $totals, BalanceProjection $projection, array $access): array
     {
         $today = now('Asia/Kuala_Lumpur')->toDateString();
-        $accounts = $this->accounts($userId, (int) substr($today, 0, 4));
+        $canSelf = in_array('requests', $access['sections'], true);
+        $canDecide = $access['can_decide'];
+        $canReviewPartial = $access['can_review_partial'];
+        $accounts = $canSelf ? $this->accounts($userId, (int) substr($today, 0, 4)) : null;
         $balance = $accounts === null ? null : DB::transaction(function () use ($accounts, $totals, $projection): array {
             $posted = $totals->forAccounts($accounts->annual_id, $accounts->tabung_id);
             $holds = DB::table('leave_reservations')->where('status', 'ACTIVE');
@@ -58,12 +92,14 @@ class AnnualLeaveWorkflowController extends Controller
             ->orderByDesc('leave.id');
         /** @var Paginator<int, \stdClass> $history */
         $history = $this->owned(clone $requests, $userId)
+            ->when(! $canSelf, fn (Builder $query) => $query->whereRaw('1 = 0'))
             ->simplePaginate(20, pageName: 'history_page');
         /** @var Paginator<int, \stdClass> $inbox */
         $inbox = $this->assigned(clone $requests, $userId)
+            ->when(! $canDecide, fn (Builder $query) => $query->whereRaw('1 = 0'))
             ->addSelect('step.is_final')->simplePaginate(20, pageName: 'approval_page');
 
-        $generalManager = $this->isCurrentGeneralManager($userId);
+        $generalManager = $canDecide && $this->isCurrentGeneralManager($userId);
         /** @var Paginator<int, \stdClass>|null $cancellations */
         $cancellations = $generalManager ? $this->cancellations($requests, $userId)
             ->addSelect('cancellation.reason as cancellation_reason')
@@ -72,7 +108,7 @@ class AnnualLeaveWorkflowController extends Controller
         $partialReviews = $canReviewPartial || $generalManager
             ? $this->partialCases($userId, $canReviewPartial, $generalManager)
                 ->orderByDesc('partial.id')->simplePaginate(20, pageName: 'partial_page')
-                ->appends(['view' => 'workflow'])
+                ->appends(['view' => 'workflow', 'section' => 'approvals'])
             : null;
 
         foreach ([$history, $inbox, $cancellations] as $page) {
@@ -117,13 +153,15 @@ class AnnualLeaveWorkflowController extends Controller
 
         return [
             'today' => $today,
-            'approver' => $canReviewPartial || self::isApprover($userId, $today),
+            'approver' => in_array('approvals', $access['sections'], true),
+            'can_decide' => $canDecide && self::isApprover($userId, $today),
             'partial_reviews' => $partialReviews,
-            'linked' => DB::table('employees')->where('user_id', $userId)->exists(),
+            'linked' => $canSelf,
+            'can_view_team' => in_array('team', $access['sections'], true),
             'balance' => $balance,
-            'history' => $history->appends(['view' => 'workflow', ...request()->only(['approval_page', 'cancellation_page'])]),
-            'cancellations' => $cancellations?->appends(['view' => 'workflow', ...request()->only(['history_page', 'approval_page'])]),
-            'inbox' => $inbox->appends(['view' => 'workflow', ...request()->only(['history_page', 'cancellation_page'])]),
+            'history' => $history->appends(['view' => 'workflow', 'section' => 'requests']),
+            'cancellations' => $cancellations?->appends(['view' => 'workflow', 'section' => 'approvals', ...request()->only(['approval_page', 'partial_page'])]),
+            'inbox' => $inbox->appends(['view' => 'workflow', 'section' => 'approvals', ...request()->only(['cancellation_page', 'partial_page'])]),
         ];
     }
 
@@ -142,6 +180,7 @@ class AnnualLeaveWorkflowController extends Controller
 
     public function store(Request $request, LeaveRequestWorkflowService $workflow): RedirectResponse
     {
+        abort_unless($request->user()->can('leave.request.self'), 403);
         $userId = $request->user()->id;
         abort_unless(DB::table('employees')->where('user_id', $userId)->exists(), 403);
         $data = $request->validate([
@@ -182,6 +221,7 @@ class AnnualLeaveWorkflowController extends Controller
 
     public function resubmit(Request $request, int $leaveRequest, LeaveRequestWorkflowService $workflow): RedirectResponse
     {
+        abort_unless($request->user()->can('leave.request.self'), 403);
         $actor = $request->user()->id;
         abort_unless($this->owned($this->requests(), $actor)->where('leave.id', $leaveRequest)->exists(), 404);
         $data = $request->validate([
@@ -214,6 +254,7 @@ class AnnualLeaveWorkflowController extends Controller
 
     public function decide(Request $request, int $leaveRequest, LeaveRequestWorkflowService $workflow): RedirectResponse
     {
+        abort_unless($request->user()->can('leave.request.decide'), 403);
         $actor = $request->user()->id;
         $assigned = $this->assigned($this->requests(), $actor)->where('leave.id', $leaveRequest)->exists();
         $key = $request->input('key');
@@ -239,6 +280,7 @@ class AnnualLeaveWorkflowController extends Controller
 
     public function withdraw(Request $request, int $leaveRequest, LeaveRequestWorkflowService $workflow): RedirectResponse
     {
+        abort_unless($request->user()->can('leave.request.self'), 403);
         $actor = $request->user()->id;
         abort_unless($this->owned($this->requests(), $actor)->where('leave.id', $leaveRequest)->exists(), 404);
         $data = $request->validate(['key' => ['required', 'uuid']]);
@@ -254,6 +296,7 @@ class AnnualLeaveWorkflowController extends Controller
 
     public function requestCancellation(Request $request, int $leaveRequest, LeaveRequestWorkflowService $workflow): RedirectResponse
     {
+        abort_unless($request->user()->can('leave.request.self'), 403);
         $actor = $request->user()->id;
         abort_unless($this->owned($this->requests(), $actor)->where('leave.id', $leaveRequest)->exists(), 404);
         $data = $request->validate(['key' => ['required', 'uuid'], 'reason' => ['required', 'string', 'max:1000']]);
@@ -269,6 +312,7 @@ class AnnualLeaveWorkflowController extends Controller
 
     public function decideCancellation(Request $request, int $leaveRequest, LeaveRequestWorkflowService $workflow): RedirectResponse
     {
+        abort_unless($request->user()->can('leave.request.decide'), 403);
         $actor = $request->user()->id;
         abort_unless($this->isCurrentGeneralManager($actor), 404);
         $data = $request->validate([
@@ -292,6 +336,7 @@ class AnnualLeaveWorkflowController extends Controller
 
     public function requestPartial(Request $request, int $leaveRequest, LeaveRequestWorkflowService $workflow): RedirectResponse
     {
+        abort_unless($request->user()->can('leave.request.self'), 403);
         $actor = $request->user()->id;
         abort_unless($this->owned($this->requests(), $actor)->where('leave.id', $leaveRequest)->exists(), 404);
         $data = $request->validate(['key' => ['required', 'uuid'], 'reason' => ['required', 'string', 'max:1000']]);
@@ -327,6 +372,7 @@ class AnnualLeaveWorkflowController extends Controller
 
     public function decidePartial(Request $request, int $case, LeaveRequestWorkflowService $workflow): RedirectResponse
     {
+        abort_unless($request->user()->can('leave.request.decide'), 403);
         $actor = $request->user()->id;
         abort_unless($this->isCurrentGeneralManager($actor), 403);
         $data = $request->validate([

@@ -33,6 +33,14 @@ return [
             'label' => 'Lihat profil dan kelayakan cuti',
             'description' => 'View minimum employee profile and confirmed annual entitlement in local development.',
             'group' => 'Annual leave', 'submodule' => 'Profil & kelayakan', 'action' => 'View', 'system_only' => false,
+        ], 'leave.request.self' => [
+            'label' => 'Urus permohonan cuti sendiri',
+            'description' => 'View own leave and submit or manage supported requests for a linked employee.',
+            'group' => 'Annual leave', 'submodule' => 'Permohonan saya', 'action' => 'Manage', 'system_only' => false,
+        ], 'leave.request.decide' => [
+            'label' => 'Sokongan dan kelulusan cuti',
+            'description' => 'Act only on requests assigned to a current authorized approval office.',
+            'group' => 'Annual leave', 'submodule' => 'Sokongan & kelulusan', 'action' => 'Decide', 'system_only' => false,
         ], 'leave.calendar.team.view' => [
             'label' => 'Lihat jadual cuti unit',
             'description' => 'View approved absence names, dates and sessions for the linked employee’s current unit.',
@@ -105,20 +113,20 @@ return [
     'development_role_defaults' => in_array($appEnvironment, ['local', 'testing'], true) ? [
         'staff' => [
             'label' => 'Staf',
-            'permissions' => ['hr.profile.self.view', 'leave.calendar.team.view'],
+            'permissions' => ['leave.request.self', 'hr.profile.self.view', 'leave.calendar.team.view'],
         ],
         'unit-manager' => [
             'label' => 'Pengurus Unit',
-            'permissions' => ['hr.profile.self.view', 'leave.calendar.team.view'],
+            'permissions' => ['leave.request.self', 'leave.request.decide', 'hr.profile.self.view', 'leave.calendar.team.view'],
         ],
         'general-manager' => [
             'label' => 'Pengurus Besar',
-            'permissions' => ['hr.profile.self.view', 'leave.calendar.team.view'],
+            'permissions' => ['leave.request.self', 'leave.request.decide', 'hr.profile.self.view', 'leave.calendar.team.view'],
         ],
         'alk-secretary' => [
             'label' => 'Setiausaha ALK',
             // Current approval authority requires an effective office assignment, not this role name.
-            'permissions' => [],
+            'permissions' => ['leave.request.decide'],
         ],
         'hr-executive' => [
             'label' => 'Eksekutif HR',
@@ -178,7 +186,7 @@ return [
                 'permission' => 'leave.entitlement.view', 'editable' => false,
             ],
             'leave.annual.index' => [
-                'label' => 'Cuti Tahunan (semakan reka bentuk)', 'href' => '/leave/annual', 'icon' => 'calendar',
+                'label' => 'Cuti Tahunan', 'href' => '/leave/annual', 'icon' => 'calendar',
                 'permission' => 'iam.rbac.manage', 'editable' => false,
             ],
             'employees.self' => [

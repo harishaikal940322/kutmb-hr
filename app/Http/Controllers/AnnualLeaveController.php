@@ -19,27 +19,24 @@ class AnnualLeaveController extends Controller
     public function __invoke(Request $request, AnnualLeaveWorkflowController $workflow, LedgerPostedTotals $totals, BalanceProjection $projection): Response
     {
         $user = $request->user();
-        $canReview = $user->can('iam.rbac.manage');
-        $canView = $user->can('leave.entitlement.view');
-        $canReviewPartial = $user->can('leave.partial-cancellation.review');
-        $canWork = AnnualLeaveWorkflowController::hasAccess($user->id, $canReviewPartial);
-        abort_unless($canReview || $canView || $canWork, 403);
+        $access = AnnualLeaveWorkflowController::capabilities($user);
+        abort_unless($access['module'], 403);
 
-        if ($canWork && ($request->query('view') === 'workflow' || (! $canView && $request->query('view') !== 'design'))) {
+        $sections = $access['sections'];
+        $canView = in_array('staff', $sections, true);
+        $workflowSections = array_values(array_diff($sections, ['staff']));
+        $section = $request->query('section');
+        abort_if($section !== null && (! is_string($section) || ! in_array($section, $sections, true)), 403);
+        $section ??= $request->query('view') === 'workflow'
+            ? ($workflowSections[0] ?? ($canView ? 'staff' : null))
+            : ($canView ? 'staff' : ($workflowSections[0] ?? null));
+
+        if ($section !== 'staff') {
             return Inertia::render('leave/AnnualLeave', [
-                'canViewEntitlements' => $canView,
-                'workspace' => [
-                    ...$workflow->workspace($user->id, $totals, $projection, $canReviewPartial),
-                    'can_view_team' => $user->can('leave.calendar.team.view'),
-                ],
+                'access' => $access,
+                'section' => $section,
+                'workspace' => $section === null ? null : $workflow->workspace($user->id, $totals, $projection, $access),
             ]);
-        }
-
-        // Design fixtures must never be mixed with employee data or used as authorization.
-        if ($request->query('view') === 'design' || ! $canView) {
-            abort_unless($canReview, 403);
-
-            return Inertia::render('leave/AnnualLeave', ['canViewEntitlements' => $canView]);
         }
 
         $today = now('Asia/Kuala_Lumpur')->toDateString();
@@ -108,8 +105,7 @@ class AnnualLeaveController extends Controller
             'filters' => ['search' => $search, 'year' => $year],
             'currentYear' => $currentYear,
             'asOf' => $today,
-            'canReviewDesign' => $canReview,
-            'canUseWorkflow' => $canWork,
+            'access' => $access,
             'canCreditEntitlement' => $today === sprintf('%04d-01-01', $year) && $user->can('leave.entitlement.credit'),
             'canConfirmEntitlement' => $year >= $currentYear && $user->can('leave.entitlement.confirm'),
             'canManageEmployees' => $user->can('hr.employees.view'),

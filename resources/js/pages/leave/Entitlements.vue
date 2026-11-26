@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { CalendarDays, ChevronDown, Search, UsersRound } from '@lucide/vue';
+import { ChevronDown, Search } from '@lucide/vue';
+import AnnualLeaveNavigation, { type AnnualAccess } from './AnnualLeaveNavigation.vue';
 import { ref, watch } from 'vue';
 
 type Employee = {
@@ -24,8 +25,7 @@ const props = defineProps<{
     filters: { search: string; year: number };
     currentYear: number;
     asOf: string;
-    canReviewDesign: boolean;
-    canUseWorkflow: boolean;
+    access: AnnualAccess;
     canConfirmEntitlement: boolean;
     canCreditEntitlement: boolean;
     canManageEmployees: boolean;
@@ -142,26 +142,14 @@ function date(value: string | null) {
                 <p class="text-xs font-semibold tracking-[0.12em] text-primary uppercase">KUTMB · MOD-005</p>
                 <p class="text-sm font-semibold">Cuti Tahunan</p>
             </div>
-            <Link v-if="canUseWorkflow" href="/leave/annual?view=workflow" class="inline-flex min-h-10 items-center rounded-lg border border-border px-4 text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Permohonan &amp; kelulusan</Link>
-            <Link v-if="canReviewDesign" href="/leave/annual?view=design" class="inline-flex min-h-10 items-center rounded-lg border border-border px-4 text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Semakan reka bentuk</Link>
+
         </header>
         <div class="border-b border-border bg-muted/40 px-4 py-3 text-xs leading-5 text-muted-foreground sm:px-6">
             <strong class="mr-2 text-foreground">DATA PEMBANGUNAN</strong>
             Rekod pangkalan data pembangunan sahaja. Gunakan amaun yang disahkan untuk data sintetik pembangunan.
         </div>
         <div class="grid min-w-0 items-start gap-4 px-3 py-4 sm:gap-5 sm:px-5 @min-[960px]/leave-module:grid-cols-[14rem_minmax(0,1fr)]">
-            <aside class="min-w-0 rounded-xl border border-border bg-card shadow-sm @min-[960px]/leave-module:sticky @min-[960px]/leave-module:top-4">
-                <div class="flex items-center gap-2.5 border-b border-border px-4 py-4">
-                    <div class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted"><CalendarDays class="size-4" aria-hidden="true" /></div>
-                    <div><p class="text-sm font-semibold">Submodul cuti</p><p class="text-xs text-muted-foreground">Pengurusan HR</p></div>
-                </div>
-                <nav class="space-y-1 p-2.5" aria-label="Submodul Cuti Tahunan">
-                    <p class="px-2.5 pt-1 text-xs font-medium text-muted-foreground">Pengurusan cuti</p>
-                    <Link href="/leave/annual" aria-current="page" class="flex min-h-10 items-center gap-2.5 rounded-md border-l-2 border-primary bg-primary/10 px-2.5 py-2 text-sm font-semibold text-primary focus-visible:ring-2 focus-visible:ring-ring">
-                        <UsersRound class="size-4 shrink-0" aria-hidden="true" /> Profil &amp; kelayakan
-                    </Link>
-                </nav>
-            </aside>
+            <AnnualLeaveNavigation :access="access" active="staff" />
             <section class="min-w-0 space-y-6 px-1 py-2" aria-labelledby="entitlement-heading">
                 <header class="flex flex-wrap items-end justify-between gap-3">
                     <div>

@@ -32,8 +32,14 @@ class NavigationMenuService
 
             $permission = $menu['editable'] ? ($permissionMap[$key] ?? $menu['permission']) : $menu['permission'];
 
-            if ($user->can($permission)
-                || ($key === 'leave.annual.index' && AnnualLeaveWorkflowController::hasAccess($user->id, $user->can('leave.partial-cancellation.review')))) {
+            if ($key === 'leave.annual.index') {
+                if (AnnualLeaveWorkflowController::capabilities($user)['module']) {
+                    $visible[] = $key;
+                }
+                continue;
+            }
+
+            if ($user->can($permission)) {
                 $visible[] = $key;
             }
         }
