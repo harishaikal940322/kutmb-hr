@@ -81,6 +81,42 @@ class AnnualLeaveEntitlementViewTest extends TestCase
         $this->assertGreaterThan(0, DB::transactionLevel());
     }
 
+    public function test_confirmation_creates_missing_accounts_requires_both_permissions_and_replays(): void
+    {
+        Carbon::setTestNow('2026-11-25T09:00:00+08:00');
+        $suffix = Str::lower(Str::random(12));
+        $viewOnly = $this->actor('view'.$suffix);
+        $viewOnly->givePermissionTo('leave.entitlement.view');
+        $confirmOnly = $this->actor('confirm'.$suffix);
+        $confirmOnly->givePermissionTo('leave.entitlement.confirm');
+        $employee = DB::table('employees')->insertGetId([
+            'employee_no' => 'e'.$suffix,
+            'display_name' => 'Synthetic employee '.$suffix,
+            'service_start' => '2020-01-01',
+        ]);
+        $url = '/leave/annual?search=e'.$suffix.'&year=2027';
+        $action = '/leave/annual/entitlements/'.$employee.'/confirm';
+        $payload = ['year' => 2027, 'units' => 21, 'reference' => 'Synthetic confirmation', 'key' => (string) Str::uuid()];
+        $this->withSession(['_token' => 'synthetic-token'])->withHeader('X-CSRF-TOKEN', 'synthetic-token');
+        $this->actingAs($viewOnly)->post($action, $payload)->assertForbidden();
+        $this->actingAs($confirmOnly)->post($action, $payload)->assertForbidden();
+        $confirmOnly->givePermissionTo('leave.entitlement.view');
+
+        $this->from($url)->post($action, [...$payload, 'units' => 0])->assertSessionHasErrors('units');
+        $this->assertDatabaseMissing('leave_annual_accounts', ['employee_id' => $employee]);
+        $this->post($action, $payload)->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->post($action, $payload)->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->post($action, [...$payload, 'units' => 20])->assertSessionHasErrors('units');
+
+        $this->assertSame(1, DB::table('leave_annual_accounts')->where('employee_id', $employee)->count());
+        $this->assertSame(1, DB::table('leave_tabung_accounts')->where('employee_id', $employee)->count());
+        $this->assertSame(1, DB::table('leave_annual_entitlement_confirmations')->where('employee_id', $employee)->count());
+        $this->get($url)->assertInertia(fn (Assert $page) => $page
+            ->where('canConfirmEntitlement', true)
+            ->where('employees.data.0.entitlement_status', 'CONFIRMED')
+            ->where('employees.data.0.confirmed_half_day_units', 21));
+    }
+
     public function test_admin_preview_is_separate_and_production_is_denied(): void
     {
         $suffix = Str::lower(Str::random(12));

@@ -404,6 +404,10 @@ CT-DEC-016/017/022 connect the future pending AL withdrawal and annual-funded pr
 
 CT-DEC-052 uses the existing read service through `GET /leave/annual/team?month=YYYY-MM` and the Jadual unit screen. Current in-service membership and explicit permission are checked server-side. JSON rows contain only name, approved working date and AM/PM. A pending cancellation continues to show its approved committed sessions until confirmation. A partial refund removes only released slots. Reads are audited. The Vue calendar handles month navigation, selected dates, loading, errors and empty results. HTTP and service checks cover minimum projection, unit boundary, pending and released slots, permission, invalid month and production denial.
 
+## 8S. Local explicit entitlement confirmation (26 November 2026)
+
+CT-DEC-035/037 use explicit synthetic entitlement input until rates and mappings are confirmed. `POST /leave/annual/entitlements/{employee}/confirm` takes year, positive integer half-day units, source reference and UUID. The protected local/testing route requires both view and confirmation permissions. It records confirmation and initializes missing accounts atomically under the employee lock using the existing immutable confirmation service. Profil & Kelayakan exposes the action for current and next-year unconfirmed records. January 1 posting remains a separate permissioned service. Focused routes and service tests ran before the development database reset. See CURRENT_HANDOFF for the incident, exact CI failure and verification limits.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.

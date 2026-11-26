@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { CalendarDays, ChevronDown, Search, UsersRound } from '@lucide/vue';
 import { ref, watch } from 'vue';
 
@@ -26,6 +26,7 @@ const props = defineProps<{
     asOf: string;
     canReviewDesign: boolean;
     canUseWorkflow: boolean;
+    canConfirmEntitlement: boolean;
     canManageEmployees: boolean;
 }>();
 defineOptions({
@@ -34,10 +35,34 @@ defineOptions({
 const search = ref(props.filters.search);
 const year = ref(props.filters.year);
 const expanded = ref<number | null>(null);
-watch(() => props.filters, (filters) => {
-    search.value = filters.search;
-    year.value = filters.year;
+const confirmation = useForm({ year: props.filters.year, units: '', reference: '', key: '' });
+const confirmed = ref('');
+
+function expand(row: Employee) {
+    expanded.value = expanded.value === row.id ? null : row.id;
+    confirmation.reset();
+    confirmation.clearErrors();
+    confirmed.value = '';
+}
+
+function confirm(row: Employee) {
+    confirmation.year = props.filters.year;
+    confirmation.key ||= crypto.randomUUID();
+    confirmation.post(`/leave/annual/entitlements/${row.id}/confirm`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            confirmation.reset();
+            confirmed.value = 'Kelayakan disahkan.';
+        },
+    });
+}
+watch([() => props.filters.search, () => props.filters.year], ([nextSearch, nextYear]) => {
+    search.value = nextSearch;
+    year.value = nextYear;
     expanded.value = null;
+    confirmation.reset();
+    confirmation.clearErrors();
+    confirmed.value = '';
 });
 const statusLabels = {
     NO_ACCOUNT: 'Akaun belum tersedia',
@@ -75,7 +100,7 @@ function date(value: string | null) {
         </header>
         <div class="border-b border-border bg-muted/40 px-4 py-3 text-xs leading-5 text-muted-foreground sm:px-6">
             <strong class="mr-2 text-foreground">DATA PEMBANGUNAN</strong>
-            Rekod pangkalan data pembangunan sahaja. Paparan baca sahaja; kelayakan tidak dikira atau dikreditkan secara automatik.
+            Rekod pangkalan data pembangunan sahaja. Gunakan amaun yang disahkan untuk data sintetik pembangunan.
         </div>
         <div class="grid min-w-0 items-start gap-4 px-3 py-4 sm:gap-5 sm:px-5 @min-[960px]/leave-module:grid-cols-[14rem_minmax(0,1fr)]">
             <aside class="min-w-0 rounded-xl border border-border bg-card shadow-sm @min-[960px]/leave-module:sticky @min-[960px]/leave-module:top-4">
@@ -129,7 +154,7 @@ function date(value: string | null) {
                                         <td class="px-3 py-4"><span v-if="row.assignment_status === 'CURRENT'">{{ row.unit }}<span class="block text-xs text-muted-foreground">{{ row.category }}</span></span><span v-else class="text-muted-foreground">{{ row.assignment_status === 'REVIEW' ? 'Perlu semakan penempatan' : 'Tiada penempatan semasa' }}</span></td>
                                         <td class="px-3 py-4 font-medium">{{ days(row.confirmed_half_day_units) }}</td>
                                         <td class="px-3 py-4"><span class="inline-block rounded-full px-2.5 py-1 text-xs font-medium" :class="row.entitlement_status === 'CREDITED' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-muted text-foreground'">{{ statusLabels[row.entitlement_status] }}</span><span class="mt-1 block text-xs text-muted-foreground">{{ employmentLabels[row.employment_status] }}</span></td>
-                                        <td class="px-3 py-4"><button type="button" :aria-expanded="expanded === row.id" :aria-controls="'employee-detail-' + row.id" class="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-sm font-medium text-primary hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" @click="expanded = expanded === row.id ? null : row.id">Profil <ChevronDown class="size-4" :class="expanded === row.id ? 'rotate-180' : ''" aria-hidden="true" /></button></td>
+                                        <td class="px-3 py-4"><button type="button" :aria-expanded="expanded === row.id" :aria-controls="'employee-detail-' + row.id" class="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-sm font-medium text-primary hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" :disabled="confirmation.processing" @click="expand(row)">Profil <ChevronDown class="size-4" :class="expanded === row.id ? 'rotate-180' : ''" aria-hidden="true" /></button></td>
                                     </tr>
                                     <tr v-show="expanded === row.id" :id="'employee-detail-' + row.id">
                                         <td colspan="5" class="bg-muted/30 px-4 py-4">
@@ -139,6 +164,26 @@ function date(value: string | null) {
                                                 <div><dt class="text-xs text-muted-foreground">Tarikh tamat</dt><dd class="mt-1 font-medium">{{ date(row.service_end) }}</dd></div>
                                                 <div><dt class="text-xs text-muted-foreground">Tarikh pengesahan kelayakan</dt><dd class="mt-1 font-medium">{{ date(row.confirmed_at) }}</dd></div>
                                             </dl>
+                                            <p v-if="expanded === row.id && confirmed" role="status" class="mt-4 text-sm">{{ confirmed }}</p>
+                                            <form
+                                                v-if="expanded === row.id && canConfirmEntitlement && ['NO_ACCOUNT', 'UNCONFIRMED'].includes(row.entitlement_status)"
+                                                class="mt-4 space-y-3 border-t border-border pt-4"
+                                                @submit.prevent="confirm(row)"
+                                            >
+                                                <fieldset :disabled="confirmation.processing" class="grid gap-3 sm:grid-cols-2">
+                                                    <legend class="mb-2 font-semibold">Sahkan kelayakan sintetik {{ filters.year }}</legend>
+                                                    <label class="space-y-1 text-sm">Bilangan unit separuh hari
+                                                        <input v-model="confirmation.units" type="number" required min="1" step="1" class="block h-10 w-full rounded-lg border border-input bg-background px-3" />
+                                                    </label>
+                                                    <label class="space-y-1 text-sm">Rujukan pengesahan
+                                                        <input v-model="confirmation.reference" type="text" required maxlength="120" class="block h-10 w-full rounded-lg border border-input bg-background px-3" />
+                                                    </label>
+                                                </fieldset>
+                                                <p v-for="error in confirmation.errors" :key="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
+                                                <button type="submit" :disabled="confirmation.processing" class="min-h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+                                                    {{ confirmation.processing ? 'Mengesahkan…' : 'Sahkan kelayakan' }}
+                                                </button>
+                                            </form>
                                         </td>
                                     </tr>
                                 </template>

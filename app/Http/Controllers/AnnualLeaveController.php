@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Leave\AnnualEntitlementCreditService;
 use App\Services\Leave\BalanceProjection;
 use App\Services\Leave\LedgerPostedTotals;
+use DomainException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -104,7 +108,39 @@ class AnnualLeaveController extends Controller
             'asOf' => $today,
             'canReviewDesign' => $canReview,
             'canUseWorkflow' => $canWork,
+            'canConfirmEntitlement' => $year >= $currentYear && $user->can('leave.entitlement.confirm'),
             'canManageEmployees' => $user->can('hr.employees.view'),
         ]);
+    }
+
+    public function confirm(Request $request, int $employee, AnnualEntitlementCreditService $entitlements): RedirectResponse
+    {
+        $currentYear = (int) now('Asia/Kuala_Lumpur')->format('Y');
+        $data = $request->validate([
+            'year' => ['required', 'integer', 'min:'.$currentYear, 'max:'.($currentYear + 1)],
+            'units' => ['required', 'integer', 'min:1'],
+            'reference' => ['required', 'string', 'max:120'],
+            'key' => ['required', 'uuid'],
+        ]);
+        $actor = $request->user()->id;
+        $year = (int) $data['year'];
+        try {
+            DB::transaction(function () use ($employee, $year, $data, $actor, $entitlements): void {
+                abort_unless(DB::table('employees')->where('id', $employee)->lockForUpdate()->first(['id']) !== null, 404);
+                $accounts = DB::table('leave_annual_accounts');
+                $annualId = (clone $accounts)->where('employee_id', $employee)->where('leave_year', $year)->value('id')
+                    ?? $accounts->insertGetId(['employee_id' => $employee, 'leave_year' => $year]);
+                $tabung = DB::table('leave_tabung_accounts');
+                if (! (clone $tabung)->where('employee_id', $employee)->exists()) {
+                    $tabung->insert(['employee_id' => $employee]);
+                }
+
+                $entitlements->confirmAnnualEntitlement($actor, $annualId, (int) $data['units'], $data['reference'], $data['key']);
+            }, 3);
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages(['units' => $exception->getMessage()]);
+        }
+
+        return back();
     }
 }

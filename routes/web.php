@@ -78,6 +78,10 @@ Route::get('/leave/annual', AnnualLeaveController::class)
     ->middleware(['protected', EnsureLocalHrDevelopment::class])
     ->name('leave.annual.index');
 
+Route::post('/leave/annual/entitlements/{employee}/confirm', [AnnualLeaveController::class, 'confirm'])
+    ->middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:leave.entitlement.view', 'permission:leave.entitlement.confirm'])
+    ->whereNumber('employee')->name('leave.annual.entitlements.confirm');
+
 Route::get('/leave/annual/team', [AnnualLeaveWorkflowController::class, 'team'])
     ->middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:leave.calendar.team.view'])
     ->name('leave.annual.team');
