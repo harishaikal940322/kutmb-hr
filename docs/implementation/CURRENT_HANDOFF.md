@@ -1,3 +1,9 @@
+## 26 November 2026 — TB-01 separate confirmed full-year Tabung rate
+
+- CT-DEC-033 distinguishes a prorated annual award (22.5 days in HR example) from the full-year new rate (25 days). Added append-only effective-dated `leave_tabung_cap_confirmations`, explicit HR confirmation through Profil & Kelayakan, same entitlement-confirm authority, audit and idempotency. Current/next-year records only; next-year opening date only, current-year dates up to today, no decrease or same-date overwrite. No ledger mutation or automatic promotion award. Full rate never inferred from prorated award; unconfirmed legacy cap is unavailable until explicit confirmation. Existing fixture seeder backfills only provenance-matched synthetic confirmations with its explicit demo rate, preserves existing rate records.
+- Year-end and Tabung adjustment now require separate confirmed full rates. Existing closed-year history unchanged; excess, decreases, multi-source, refunds, carry-forward automation and exit remain pending TB-02–06. Existing source-year close restriction remains; full rate change at promotion is separately recordable, automatic prorated AL difference still not implemented.
+- Additive migration 000051 required; no data reset. Owner run migrate, dev:data (or specific DevelopmentLeaveConfigurationSeeder), build. Optional owner-run focused scenario added; previous tests not rerun. No local DB access or runtime verification.
+
 ## 26 November 2026 — dynamic Tabung capacity
 
 - Owner approved linking Tabung capacity to confirmed annual entitlement. Added shared TabungCapacity arithmetic and confirmed-cap lookup; Profil & Kelayakan displays selected-year confirmed cap against current posted Tabung, remaining room and excess, not a historical or future balance projection. Missing confirmation/account is not treated as zero. Seniority rate suggestions and prorata previews do not change cap or ledger.

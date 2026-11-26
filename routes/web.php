@@ -103,6 +103,10 @@ Route::post('/leave/annual/entitlements/{employee}/confirm', [AnnualLeaveControl
     ->middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:leave.entitlement.view', 'permission:leave.entitlement.confirm'])
     ->whereNumber('employee')->name('leave.annual.entitlements.confirm');
 
+Route::post('/leave/annual/entitlements/{employee}/tabung-rate', [AnnualLeaveController::class, 'confirmTabungRate'])
+    ->middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:leave.entitlement.view', 'permission:leave.entitlement.confirm'])
+    ->whereNumber('employee')->name('leave.annual.entitlements.tabung-rate');
+
 Route::get('/leave/annual/entitlements/{employee}/prorata', [AnnualLeaveController::class, 'previewNewHireProrata'])
     ->middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:leave.entitlement.view', 'permission:leave.entitlement.confirm'])
     ->whereNumber('employee')->name('leave.annual.entitlements.prorata');

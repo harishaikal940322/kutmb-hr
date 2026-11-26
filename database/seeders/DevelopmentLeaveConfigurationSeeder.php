@@ -6,6 +6,7 @@ use App\Models\AuditEvent;
 use App\Models\User;
 use App\Services\Leave\AnnualEntitlementCreditService;
 use App\Services\Leave\ConfirmedVersionLookup;
+use App\Services\Leave\TabungCapacity;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -130,6 +131,27 @@ class DevelopmentLeaveConfigurationSeeder extends Seeder
                 ]);
                 $service->confirmAnnualEntitlement($actor->id, $futureId, $units,
                     'DEV-FIXTURE-FUTURE-'.$nextYear, 'dev-fixture-future:'.$futureId.':'.$nextYear);
+            }
+
+            // Explicit synthetic full-rate values, separate from the AL award.
+            // Backfill only matching original fixture confirmations, never HR-entered rates.
+            $capacity = app(TabungCapacity::class);
+            foreach ($employees as [$employee, $units]) {
+                foreach ([$year, $nextYear] as $capYear) {
+                    $account = DB::table('leave_annual_accounts')->where('employee_id', $employee->id)->where('leave_year', $capYear)->first();
+                    if ($account === null || DB::table('leave_tabung_cap_confirmations')->where('annual_account_id', $account->id)->exists()) {
+                        continue;
+                    }
+                    $fixtureKey = ($capYear === $year ? 'dev-fixture-entitlement:' : 'dev-fixture-future:').$account->id.':'.$capYear;
+                    $fixtureReference = ($capYear === $year ? 'DEV-FIXTURE-OPENING-' : 'DEV-FIXTURE-FUTURE-').$capYear;
+                    $confirmation = DB::table('leave_annual_entitlement_confirmations')->where('annual_account_id', $account->id)
+                        ->where('confirmation_key', $fixtureKey)->where('confirmation_reference', $fixtureReference)
+                        ->where('confirmed_half_day_units', $units)->where('confirmed_by', $actor->id)->first();
+                    if ($confirmation !== null) {
+                        $capacity->confirmRate($actor->id, (int) $account->id, sprintf('%04d-01-01', $capYear), $units,
+                            'DEV-FIXTURE-TABUNG-'.$capYear, 'dev-fixture-tabung:'.$account->id.':'.$capYear);
+                    }
+                }
             }
 
             return [$year, $credited, $preserved];

@@ -168,6 +168,20 @@ class AnnualLeaveReviewTest extends TestCase
         $this->assertDatabaseHas('leave_requests', ['id' => $result['request_id'], 'status' => 'CANCELLED']);
     }
 
+    public function test_ct_033_tabung_full_rate_is_independent_of_annual_credit(): void
+    {
+        $f = $this->fixture();
+        $capacity = app(\App\Services\Leave\TabungCapacity::class);
+        $key = $this->key();
+        $capacity->confirmRate($f['hr']->id, $f['annual'], $this->year.'-07-01', 50, 'Synthetic promotion rate', $key);
+        $capacity->confirmRate($f['hr']->id, $f['annual'], $this->year.'-07-01', 50, 'Synthetic promotion rate', $key);
+        $this->assertSame(50, $capacity->confirmedCapFor($f['employee'], $this->year));
+        $this->assertSame(40, $this->annual($f['annual']));
+        $this->assertSame(0, $this->tabung($f['tabung']));
+        $this->assertSame(2, DB::table('leave_tabung_cap_confirmations')->where('annual_account_id', $f['annual'])->count());
+        $this->denied(fn () => $capacity->confirmRate($f['hr']->id, $f['annual'], $this->year.'-08-01', 40, 'Synthetic decrease', $this->key()));
+    }
+
     public function test_ct_038_manual_close_retains_pending_and_carries_only_free_balance(): void
     {
         $f = $this->fixture();
@@ -328,6 +342,9 @@ class AnnualLeaveReviewTest extends TestCase
         $service->creditConfirmedEntitlementOnJanuaryFirst($hr->id, $confirmation['confirmation_id']);
         Carbon::setTestNow(Carbon::parse($this->year.'-12-15 09:00:00', 'Asia/Kuala_Lumpur'));
         $future = $service->confirmAnnualEntitlement($hr->id, $next, 40, 'Synthetic QA future', $this->key());
+        $capacity = app(\App\Services\Leave\TabungCapacity::class);
+        $capacity->confirmRate($hr->id, $annual, $this->year.'-01-01', 40, 'Synthetic QA current full rate', $this->key());
+        $capacity->confirmRate($hr->id, $next, ($this->year + 1).'-01-01', 40, 'Synthetic QA future full rate', $this->key());
 
         return ['employee' => $employee, 'staff' => $staff, 'hr' => $hr, 'pu' => $pu, 'pb' => $pb,
             'annual' => $annual, 'next' => $next, 'tabung' => $tabung, 'next_confirmation' => $future['confirmation_id']];

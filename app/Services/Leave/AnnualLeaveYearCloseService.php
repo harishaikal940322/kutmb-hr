@@ -122,7 +122,11 @@ class AnnualLeaveYearCloseService
                 ->where('kind', 'annual_entitlement_credit')->where('signed_half_day_units', $confirmed->confirmed_half_day_units)->exists()) {
                 throw new DomainException('Kelayakan kedua-dua tahun mesti disahkan dan dikreditkan.');
             }
-            $confirmedCaps[] = (int) $confirmed->confirmed_half_day_units;
+            $fullRate = (new TabungCapacity)->confirmedCapFor($employeeId, (int) $account->leave_year);
+            if ($fullRate === null) {
+                throw new DomainException('Kadar tahunan penuh Tabung bagi kedua-dua tahun mesti disahkan secara berasingan.');
+            }
+            $confirmedCaps[] = $fullRate;
         }
         if ($cap !== $confirmedCaps[1]) {
             throw new DomainException('Cap mesti sepadan dengan kelayakan disahkan tahun penerima.');

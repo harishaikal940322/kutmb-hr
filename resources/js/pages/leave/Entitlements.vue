@@ -18,6 +18,7 @@ type Employee = {
     confirmed_half_day_units: number | null;
     entitlement_status: 'NO_ACCOUNT' | 'UNCONFIRMED' | 'CONFIRMED' | 'CREDITED';
     confirmed_at: string | null;
+    tabung_cap_effective_from: string | null;
     tabung_capacity: { cap_units: number | null; posted_units: number | null; remaining_units: number | null; excess_units: number | null };
     rate_suggestion: {
         status: 'REVIEW' | 'NOT_IN_SERVICE' | 'PROBATION' | 'SUGGESTED';
@@ -45,6 +46,23 @@ const expanded = ref<number | null>(null);
 const confirmation = useForm({ year: props.filters.year, units: '', annual_units: null as number | null, reference: '', key: '' });
 const confirmed = ref('');
 const credit = useForm({});
+const tabungRate = useForm({ year: props.filters.year, units: 0, effective_from: '', reference: '', key: '' });
+const tabungRateDays = ref('');
+function resetTabungRate() {
+    tabungRate.reset();
+    tabungRate.clearErrors();
+    tabungRateDays.value = '';
+    tabungRate.effective_from = props.filters.year > props.currentYear ? props.filters.year + '-01-01' : props.asOf;
+}
+function saveTabungRate(row: Employee) {
+    tabungRate.year = props.filters.year;
+    tabungRate.units = Number(tabungRateDays.value) * 2;
+    tabungRate.key ||= crypto.randomUUID();
+    tabungRate.post('/leave/annual/entitlements/' + row.id + '/tabung-rate', {
+        preserveScroll: true,
+        onSuccess: () => { resetTabungRate(); confirmed.value = 'Kadar tahunan penuh Tabung disahkan. Baki tidak berubah.'; },
+    });
+}
 const prorataLoading = ref(false);
 type ProrataResult = {
     calculation_type: 'FULL_YEAR' | 'NEW_HIRE' | 'TERMINATION' | 'NEW_HIRE_TERMINATION';
@@ -118,6 +136,7 @@ function expand(row: Employee) {
     credit.clearErrors();
     confirmed.value = '';
     resetPreview();
+    resetTabungRate();
 }
 
 function postCredit(row: Employee) {
@@ -149,6 +168,7 @@ watch([() => props.filters.search, () => props.filters.year], ([nextSearch, next
     credit.clearErrors();
     confirmed.value = '';
     resetPreview();
+    resetTabungRate();
 });
 const statusLabels = {
     NO_ACCOUNT: 'Akaun belum tersedia',
@@ -255,7 +275,7 @@ function date(value: string | null) {
                                                 <button v-if="canConfirmEntitlement && row.rate_suggestion.status === 'SUGGESTED' && row.rate_suggestion.annual_half_day_units !== null" type="button" class="min-h-10 rounded-lg border border-border px-3 text-sm font-semibold" @click="rateDays = String(row.rate_suggestion.annual_half_day_units / 2)">Guna kadar cadangan untuk pratonton</button>
                                             </section>
                                             <section v-if="expanded === row.id" class="mt-4 space-y-3 rounded-lg border border-border bg-card p-4">
-                                                <div><h2 class="font-semibold">Kapasiti Tabung Cuti</h2><p class="mt-1 text-xs text-muted-foreground">Had berdasarkan kelayakan disahkan {{ filters.year }} · dibandingkan dengan baki Tabung dipos semasa, bukan baki sejarah atau ramalan.</p></div>
+                                                <div><h2 class="font-semibold">Kapasiti Tabung Cuti</h2><p class="mt-1 text-xs text-muted-foreground">Had berdasarkan kadar tahunan penuh yang disahkan secara berasingan untuk {{ filters.year }}, bukan jumlah AL selepas prorata. Baki dipos ialah baki Tabung semasa.</p></div>
                                                 <div class="grid gap-3 sm:grid-cols-3">
                                                     <div><p class="text-xs text-muted-foreground">Had disahkan</p><p class="mt-1 text-xl font-semibold">{{ days(row.tabung_capacity.cap_units) }}</p></div>
                                                     <div><p class="text-xs text-muted-foreground">Baki Tabung semasa</p><p class="mt-1 text-xl font-semibold">{{ row.tabung_capacity.posted_units === null ? 'Tiada akaun' : days(row.tabung_capacity.posted_units) }}</p></div>
@@ -265,7 +285,18 @@ function date(value: string | null) {
                                                     <div class="h-full rounded-full bg-primary" :style="{ width: Math.min(100, row.tabung_capacity.posted_units / row.tabung_capacity.cap_units * 100) + '%' }" />
                                                 </div>
                                                 <p v-if="(row.tabung_capacity.excess_units ?? 0) > 0" class="text-sm text-destructive">Lebihan {{ days(row.tabung_capacity.excess_units) }} memerlukan semakan HR. Tiada pelupusan automatik.</p>
-                                                <p class="text-xs text-muted-foreground">Kadar cadangan tidak mengubah had. Apabila kelayakan tahun dipilih disahkan, kapasiti dikira semula tanpa kredit ke Tabung.</p>
+                                                <p class="text-xs text-muted-foreground">Kadar cadangan dan kelayakan AL selepas prorata tidak mengubah had. Tarikh kuat kuasa kadar: {{ date(row.tabung_cap_effective_from) }}. Tiada kredit automatik ke Tabung.</p>
+                                                <form v-if="canConfirmEntitlement && ['CONFIRMED', 'CREDITED'].includes(row.entitlement_status)" class="space-y-3 border-t border-border pt-3" @submit.prevent="saveTabungRate(row)">
+                                                    <h3 class="text-sm font-semibold">Sahkan kadar tahunan penuh Tabung</h3>
+                                                    <div class="grid gap-3 sm:grid-cols-2">
+                                                        <label class="space-y-1 text-sm">Kadar penuh (hari)<input v-model="tabungRateDays" type="number" min="0.5" max="50000" step="0.5" required class="block h-10 w-full rounded-lg border border-input bg-background px-3" /></label>
+                                                        <label class="space-y-1 text-sm">Tarikh kuat kuasa<input v-model="tabungRate.effective_from" type="date" :min="filters.year + '-01-01'" :max="filters.year > currentYear ? filters.year + '-01-01' : asOf" required class="block h-10 w-full rounded-lg border border-input bg-background px-3" /></label>
+                                                    </div>
+                                                    <label class="block space-y-1 text-sm">Rujukan pengesahan HR<input v-model="tabungRate.reference" required maxlength="120" class="block h-10 w-full rounded-lg border border-input bg-background px-3" /></label>
+                                                    <p class="text-xs text-muted-foreground">Contoh: AL prorata 22.5 hari, kadar penuh 25 hari. Rekod baharu tidak mengubah baki. Penurunan kadar belum dibenarkan.</p>
+                                                    <p v-for="error in tabungRate.errors" :key="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
+                                                    <button type="submit" :disabled="tabungRate.processing" class="min-h-10 rounded-lg border border-border px-3 text-sm font-semibold disabled:opacity-50">Sahkan had Tabung</button>
+                                                </form>
                                             </section>
                                             <p v-if="expanded === row.id && confirmed" role="status" class="mt-4 text-sm">{{ confirmed }}</p>
                                             <form v-if="expanded === row.id && canConfirmEntitlement"

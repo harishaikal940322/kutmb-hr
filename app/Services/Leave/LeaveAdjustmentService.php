@@ -113,8 +113,11 @@ class LeaveAdjustmentService
                     throw new DomainException('Pengurangan yang menyebabkan kekurangan baki atau mengganggu tempahan memerlukan semakan khusus HR.');
                 }
                 if ($row->bucket === 'TABUNG') {
-                    $cap = (new TabungCapacity)->snapshot((int) $confirmed->confirmed_half_day_units, $before);
-                    if ($after < 0 || $after > $cap['cap_units']) {
+                    $cap = (new TabungCapacity)->confirmedCapFor((int) $employee->id, (int) $row->leave_year);
+                    if ($cap === null) {
+                        throw new DomainException('Sahkan kadar tahunan penuh Tabung dahulu.');
+                    }
+                    if ($after < 0 || $after > $cap) {
                         throw new DomainException('Baki Tabung mesti dalam had kelayakan tahunan disahkan.');
                     }
                     $sourceBalance = (int) DB::table('leave_ledger_entries')->where('tabung_account_id', $tabung->id)

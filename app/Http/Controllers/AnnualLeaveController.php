@@ -108,6 +108,8 @@ class AnnualLeaveController extends Controller
             $rate = $rateResolver->resolve($employee->service_start, $employee->confirmation_date, $employee->service_end,
                 $rateAssignment->count() === 1 ? $rateAssignment->first()->category_code : null, $rateDate);
 
+            $capRate = $capacity->confirmedRateFor((int) $employee->id, (int) substr($rateDate, 0, 4));
+
             return [
                 'id' => (int) $employee->id,
                 'employee_no' => $employee->employee_no,
@@ -123,7 +125,8 @@ class AnnualLeaveController extends Controller
                 'entitlement_status' => $account === null ? 'NO_ACCOUNT' : ($units === null ? 'UNCONFIRMED' : ($account->credited ? 'CREDITED' : 'CONFIRMED')),
                 'confirmed_at' => $units === null ? null : $account->confirmed_at,
                 'rate_suggestion' => $rate,
-                'tabung_capacity' => $capacity->snapshot($units === null ? null : (int) $units,
+                'tabung_cap_effective_from' => $capRate?->effective_from,
+                'tabung_capacity' => $capacity->snapshot($capRate === null ? null : (int) $capRate->annual_rate_units,
                     $tabungBalances->has($employee->id) ? (int) $tabungBalances->get($employee->id)->posted_units : null),
             ];
         });
@@ -156,6 +159,31 @@ class AnnualLeaveController extends Controller
         }
 
         return response()->json($result, headers: ['Cache-Control' => 'private, no-store']);
+    }
+
+    public function confirmTabungRate(Request $request, int $employee, TabungCapacity $capacity): RedirectResponse
+    {
+        $year = (int) now('Asia/Kuala_Lumpur')->format('Y');
+        $data = $request->validate([
+            'year' => ['required', 'integer', 'min:'.$year, 'max:'.($year + 1)],
+            'units' => ['required', 'integer', 'min:1', 'max:100000'],
+            'effective_from' => ['required', 'date_format:Y-m-d'],
+            'reference' => ['required', 'string', 'max:120'],
+            'key' => ['required', 'uuid'],
+        ]);
+        $annualId = DB::table('leave_annual_accounts')->where('employee_id', $employee)
+            ->where('leave_year', $data['year'])->value('id');
+        if ($annualId === null) {
+            throw ValidationException::withMessages(['units' => 'Sahkan kelayakan AL dahulu.']);
+        }
+        try {
+            $capacity->confirmRate($request->user()->id, (int) $annualId, $data['effective_from'],
+                (int) $data['units'], $data['reference'], $data['key']);
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages(['units' => $exception->getMessage()]);
+        }
+
+        return back();
     }
 
     public function credit(Request $request, int $employee, AnnualEntitlementCreditService $entitlements): RedirectResponse

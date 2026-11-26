@@ -420,6 +420,10 @@ CT-DEC-005: local synthetic category codes DEV-PENGURUS and DEV-PEKERJA map to t
 
 CT-DEC-004/038: owner approved dynamic cap linkage to confirmed annual entitlement. Preview compares the selected year's confirmed cap with the current posted continuous Tabung balance, without modifying the ledger. Year-close uses the next year's confirmed cap, permits a higher cap only when both years' own credits are posted and the entire free positive AL fits. Same-cap close remains supported; lower cap, excess disposition, late reconciliation and unsettled midyear entitlement changes remain separately gated. No automatic increase in Tabung balance on entitlement confirmation. Runtime verification pending.
 
+## 8W. Tabung audit correction TB-01 (26 November 2026)
+
+CT-DEC-033 explicitly distinguishes full-year rate for Tabung from prorated annual award. Section 8V's derivation from confirmed award is superseded. Append-only effective-dated full-rate confirmations now supply the cap for profile, year close and adjustment. HR records the rate and effective date separately; no automatic AL top-up, no mutation of existing award or ledger. Legacy records require explicit rate confirmation; synthetic fixture seeding is limited to original provenanced records. Lower caps and automatic disposal are deferred, not policy-complete. TB-02–06 remain pending, as does CT-DEC-033's promotion prorata transaction and pending reallocation. No production readiness or runtime claim.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.
