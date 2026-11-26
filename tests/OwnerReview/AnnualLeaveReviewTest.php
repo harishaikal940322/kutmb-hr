@@ -55,7 +55,7 @@ class AnnualLeaveReviewTest extends TestCase
             throw new RuntimeException('Owner review refused: nontransactional table found.');
         }
         foreach (['leave_balance_adjustments', 'leave_annual_commitments', 'leave_annual_year_closes', 'leave_attendance_review_outcomes',
-            'leave_reservation_slot_allocations', 'approval_assignments', 'leave_ledger_entries', 'users', 'audit_events'] as $table) {
+            'leave_reservation_slot_allocations', 'leave_tabung_cap_confirmations', 'approval_assignments', 'leave_ledger_entries', 'users', 'audit_events'] as $table) {
             if (! $tables->contains('name', $table)) {
                 throw new RuntimeException('Required migration missing: '.$table);
             }
@@ -180,6 +180,42 @@ class AnnualLeaveReviewTest extends TestCase
         $this->assertSame(0, $this->tabung($f['tabung']));
         $this->assertSame(2, DB::table('leave_tabung_cap_confirmations')->where('annual_account_id', $f['annual'])->count());
         $this->denied(fn () => $capacity->confirmRate($f['hr']->id, $f['annual'], $this->year.'-08-01', 40, 'Synthetic decrease', $this->key()));
+    }
+
+    public function test_ct_016_tabung_full_cancellation_restores_source_and_disposes_unambiguous_excess(): void
+    {
+        $f = $this->fixture();
+        $maker = $this->actor('maker', ['leave.adjustment.prepare']);
+        $checker = $this->actor('checker', ['leave.adjustment.decide']);
+        $adjust = app(LeaveAdjustmentService::class);
+        $post = function (string $bucket, int $units) use ($adjust, $maker, $checker, $f): void {
+            $id = $adjust->prepare($maker->id, ['employee' => $f['employee'], 'bucket' => $bucket,
+                'source_year' => $this->year, 'units' => $units, 'reason' => 'Synthetic adjustment',
+                'evidence_reference' => 'SYNTHETIC', 'key' => $this->key()]);
+            $adjust->decide($checker->id, $id, ['decision' => 'APPROVED', 'reason' => 'Synthetic checked', 'key' => $this->key()]);
+        };
+        $post('AL', -40);
+        $post('TABUNG', 40);
+        $date = $this->workingDate($this->year.'-12-23', $this->year.'-12-31');
+        $workflow = app(LeaveRequestWorkflowService::class);
+        $result = $workflow->submit($f['staff']->id, $f['annual'], $f['tabung'], $this->key(), 'AL',
+            [['date' => $date, 'session' => 'AM'], ['date' => $date, 'session' => 'PM']]);
+        $this->approve($f, $result['request_id']);
+        $this->assertSame(38, $this->tabung($f['tabung']));
+        $post('TABUNG', 2);
+        $workflow->requestApprovedAnnualLeaveCancellation($f['staff']->id, $result['request_id'], $this->key(), 'Synthetic cancellation');
+        $decision = $this->key();
+        $workflow->decideApprovedAnnualLeaveCancellation($f['pb']->id, $result['request_id'], $decision, 'CONFIRM');
+        $workflow->decideApprovedAnnualLeaveCancellation($f['pb']->id, $result['request_id'], $decision, 'CONFIRM');
+        $this->assertSame(40, $this->tabung($f['tabung']));
+        $this->assertSame(0, $this->annual($f['annual']));
+        $this->assertDatabaseHas('leave_requests', ['id' => $result['request_id'], 'status' => 'CANCELLED']);
+        $this->assertDatabaseHas('leave_ledger_entries', ['tabung_account_id' => $f['tabung'], 'kind' => 'approved_leave_cancellation',
+            'source_year' => $this->year, 'signed_half_day_units' => 2]);
+        $this->assertDatabaseHas('leave_ledger_entries', ['tabung_account_id' => $f['tabung'], 'kind' => 'tabung_cancellation_excess_disposal',
+            'source_year' => $this->year, 'signed_half_day_units' => -2]);
+        $this->assertSame(1, DB::table('leave_ledger_entries')->where('tabung_account_id', $f['tabung'])
+            ->where('kind', 'tabung_cancellation_excess_disposal')->count());
     }
 
     public function test_ct_038_manual_close_retains_pending_and_carries_only_free_balance(): void

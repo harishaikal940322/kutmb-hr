@@ -763,8 +763,10 @@ class LeaveRequestWorkflowService
             if ($reservation === null || $reservation->status !== 'COMMITTED') {
                 throw new DomainException('The approved leave must have a committed reservation before cancellation.');
             }
-            if ((int) $reservation->tabung_units !== 0) {
-                throw new DomainException('Tabung-funded cancellation is deferred until the current annual entitlement cap can be verified.');
+            if ((int) $reservation->tabung_units > 0
+                && ((int) $reservation->leave_year !== (int) now('Asia/Kuala_Lumpur')->format('Y')
+                    || (new TabungCapacity)->confirmedCapFor((int) $employee->id, (int) $reservation->leave_year) === null)) {
+                throw new DomainException('Sahkan kadar penuh Tabung tahun semasa sebelum memohon pembatalan.');
             }
 
             $cycle = (int) DB::table('leave_request_cancellation_actions')->where('request_id', $requestId)->max('cycle') + 1;

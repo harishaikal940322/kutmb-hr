@@ -445,7 +445,8 @@ class LeaveBalanceTransactionService
 
     /**
      * Reverse an approved AL reservation only after an immutable General Manager confirmation exists.
-     * Tabung-funded cancellations remain fail-closed until the current annual entitlement cap is available.
+     * CT-DEC-016: restore original single-cohort Tabung usage and enforce the
+     * confirmed full-year cap. Ambiguous multi-cohort disposal remains gated.
      *
      * @return array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int}
      */
@@ -518,11 +519,37 @@ class LeaveBalanceTransactionService
             if ($reservation->status !== 'COMMITTED') {
                 throw new DomainException('Only a committed approved Annual Leave reservation can be cancelled.');
             }
-            if ((int) $reservation->tabung_units !== 0) {
-                throw new DomainException('Tabung-funded cancellation is deferred until the current annual entitlement cap can be verified.');
+            $tabungRefundUnits = (int) $reservation->tabung_units;
+            if ((int) $reservation->annual_units + $tabungRefundUnits < 1) {
+                throw new DomainException('This cancellation has no source units to restore.');
             }
-            if ((int) $reservation->annual_units < 1) {
-                throw new DomainException('This cancellation has no Annual Leave source units to restore.');
+            $tabungExcess = 0;
+            if ($tabungRefundUnits > 0) {
+                $currentYear = (int) now('Asia/Kuala_Lumpur')->format('Y');
+                $cap = (new TabungCapacity)->confirmedCapFor((int) $employee->id, $currentYear);
+                if ($cap === null || (int) $reservation->leave_year !== $currentYear
+                    || $reservation->tabung_source_year === null) {
+                    throw new DomainException('Sahkan kadar penuh Tabung tahun semasa; pemulangan tahun lain memerlukan rekonsiliasi.');
+                }
+                $posted = $this->totals->forAccounts((int) $annual->id, (int) $tabung->id)['tabung_half_day_units'];
+                if ($posted < 0 || $posted > $cap || $tabungRefundUnits > PHP_INT_MAX - $posted) {
+                    throw new DomainException('Baki Tabung sedia ada memerlukan semakan sebelum pemulangan.');
+                }
+                $tabungExcess = max(0, $posted + $tabungRefundUnits - $cap);
+                if ($tabungExcess > 0) {
+                    // Do not choose a disposal priority between multiple sources.
+                    // If the original refund cohort is the only positive cohort
+                    // after restoration, the disposal source is unambiguous.
+                    $cohorts = DB::table('leave_ledger_entries')->where('tabung_account_id', $tabung->id)
+                        ->select('source_year')->selectRaw('SUM(signed_half_day_units) AS units')->groupBy('source_year')->get();
+                    foreach ($cohorts as $cohort) {
+                        $units = $this->integerTotal((string) $cohort->units);
+                        if ($units < 0 || ($units > 0 && ($cohort->source_year === null
+                            || (int) $cohort->source_year !== (int) $reservation->tabung_source_year))) {
+                            throw new DomainException('Pelupusan lebihan beberapa tahun sumber memerlukan kaedah yang disahkan HR.');
+                        }
+                    }
+                }
             }
 
             $committedEvent = DB::table('leave_reservation_events')->where('reservation_id', $reservationId)
@@ -546,8 +573,13 @@ class LeaveBalanceTransactionService
             }
             $usageEntries = DB::table('leave_ledger_entries')->where('balance_operation_id', $committedEvent->balance_operation_id)
                 ->where('kind', 'approved_leave_use')->lockForUpdate()->get();
-            $usageEntriesByAnnualAccount = $usageEntries->keyBy('annual_account_id');
-            if ($usageEntries->count() !== count($postedUnitsByAccount) || $usageEntriesByAnnualAccount->count() !== count($postedUnitsByAccount)) {
+            $annualUsage = $usageEntries->whereNotNull('annual_account_id');
+            $tabungUsage = $usageEntries->whereNotNull('tabung_account_id');
+            $usageEntriesByAnnualAccount = $annualUsage->keyBy('annual_account_id');
+            if ($usageEntries->count() !== count($postedUnitsByAccount) + ($tabungRefundUnits > 0 ? 1 : 0)
+                || $annualUsage->count() !== count($postedUnitsByAccount)
+                || $usageEntriesByAnnualAccount->count() !== count($postedUnitsByAccount)
+                || $tabungUsage->count() !== ($tabungRefundUnits > 0 ? 1 : 0)) {
                 throw new DomainException('The original annual usage entries do not match the per-date source allocation.');
             }
             foreach ($postedUnitsByAccount as $accountId => $units) {
@@ -565,6 +597,32 @@ class LeaveBalanceTransactionService
                     'operation_key' => $allocations->isEmpty() ? $operationKey.':annual' : $operationKey.':annual:'.$accountYear,
                     'reverses_entry_id' => $usage->id, 'actor_id' => $actorId,
                 ]);
+            }
+
+            if ($tabungRefundUnits > 0) {
+                $usage = $tabungUsage->first();
+                if ($usage->annual_account_id !== null || (int) $usage->tabung_account_id !== (int) $tabung->id
+                    || (int) $usage->signed_half_day_units !== -$tabungRefundUnits
+                    || (int) $usage->source_year !== (int) $reservation->tabung_source_year
+                    || $usage->reverses_entry_id !== null
+                    || DB::table('leave_ledger_entries')->where('reverses_entry_id', $usage->id)->exists()) {
+                    throw new DomainException('An original Tabung usage entry is inconsistent or already reversed.');
+                }
+                DB::table('leave_ledger_entries')->insert([
+                    'tabung_account_id' => $tabung->id, 'balance_operation_id' => $operation['id'],
+                    'signed_half_day_units' => $tabungRefundUnits, 'kind' => 'approved_leave_cancellation',
+                    'source_year' => $reservation->tabung_source_year, 'operation_key' => $operationKey.':tabung',
+                    'reverses_entry_id' => $usage->id, 'actor_id' => $actorId,
+                ]);
+                if ($tabungExcess > 0) {
+                    DB::table('leave_ledger_entries')->insert([
+                        'tabung_account_id' => $tabung->id, 'balance_operation_id' => $operation['id'],
+                        'signed_half_day_units' => -$tabungExcess, 'kind' => 'tabung_cancellation_excess_disposal',
+                        'source_year' => $reservation->tabung_source_year, 'operation_key' => $operationKey.':excess',
+                        'actor_id' => $actorId,
+                    ]);
+                    $this->audit('hr.leave.tabung_excess_disposed', $reservationId, $operationKey);
+                }
             }
 
             $updated = DB::table('leave_reservations')->where('id', $reservationId)->where('status', 'COMMITTED')

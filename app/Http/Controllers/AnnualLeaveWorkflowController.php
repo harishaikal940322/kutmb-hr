@@ -184,7 +184,7 @@ class AnnualLeaveWorkflowController extends Controller
                         && $row->starts_on !== null && $row->starts_on <= $today && $row->ends_on > $today
                         && (int) $row->tabung_units === 0 && ! in_array($partialStatus, ['REQUESTED', 'HR_VERIFIED'], true),
                     'can_withdraw' => $ownFutureAnnual && $row->current_step_order !== null,
-                    'can_request_cancellation' => $ownFutureAnnual && $row->status === 'APPROVED' && (int) $row->tabung_units === 0,
+                    'can_request_cancellation' => $ownFutureAnnual && $row->status === 'APPROVED',
                 ];
                 $result = (array) $row;
                 unset($result['current_step_order'], $result['tabung_units'], $result['current_revision']);

@@ -424,6 +424,10 @@ CT-DEC-004/038: owner approved dynamic cap linkage to confirmed annual entitleme
 
 CT-DEC-033 explicitly distinguishes full-year rate for Tabung from prorated annual award. Section 8V's derivation from confirmed award is superseded. Append-only effective-dated full-rate confirmations now supply the cap for profile, year close and adjustment. HR records the rate and effective date separately; no automatic AL top-up, no mutation of existing award or ledger. Legacy records require explicit rate confirmation; synthetic fixture seeding is limited to original provenanced records. Lower caps and automatic disposal are deferred, not policy-complete. TB-02–06 remain pending, as does CT-DEC-033's promotion prorata transaction and pending reallocation. No production readiness or runtime claim.
 
+## 8X. TB-03 bounded pre-start Tabung cancellation (26 November 2026)
+
+CT-DEC-016 requires exact original-source refund, current confirmed full-rate cap and separate disposal of excess. Current-year full pre-start cancellation now restores original AL and single-cohort Tabung usage atomically after GM approval, including Tabung-only requests. An excess newly caused by the refund is disposed only if the refunded cohort is the sole positive cohort; no choice of disposal priority is made. Existing over-cap balance, ambiguous multiple cohorts, closed-year reconciliation and partial cancellation remain gated. No automatic restoration of previously disposed units. TB-02 cohort ordering is not specified in the inspected decisions; do not infer FIFO/LIFO. TB-04–06 still require further work within documented scope.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.
