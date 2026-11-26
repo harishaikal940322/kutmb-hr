@@ -739,11 +739,10 @@ class LeaveBalanceTransactionService
                 }
             }
             $currentYear = (int) now('Asia/Kuala_Lumpur')->format('Y');
-            foreach ($unusedUnitsByAccount as $accountId => $units) {
-                if ((int) $lockedAccounts['annual_accounts']->get($accountId)->leave_year !== $currentYear) {
-                    throw new DomainException('Pemulangan AL tahun lain memerlukan rekonsiliasi atau pembatalan komitmen.');
-                }
-            }
+            // Original-year accounts remain authoritative. Closed-year refunds are reconciled
+            // in this same operation; unposted commitments are handled without ledger credit.
+            $historicalRefunds = [];
+            $postedUnitsByAccount = $annualUnitsByAccount;
             $tabungExcess = 0;
             if ($unusedTabungBySource !== []) {
                 $cap = (new TabungCapacity)->confirmedCapFor((int) $employee->id, $currentYear);
@@ -766,13 +765,45 @@ class LeaveBalanceTransactionService
             }
             $usageEntries = DB::table('leave_ledger_entries')->where('balance_operation_id', $committedEvent->balance_operation_id)
                 ->where('kind', 'approved_leave_use')->lockForUpdate()->get();
+            $commitment = DB::table('leave_annual_commitments')->where('reservation_id', $reservationId)->lockForUpdate()->first();
+            if ($commitment !== null) {
+                $accountId = (int) $commitment->annual_account_id;
+                if (($annualUnitsByAccount[$accountId] ?? 0) !== (int) $commitment->units
+                    || (int) $commitment->approval_operation_id !== (int) $committedEvent->balance_operation_id) {
+                    throw new DomainException('Komitmen tidak sepadan dengan sumber sesi asal.');
+                }
+                if ($commitment->status === 'COMMITTED') {
+                    $refund = $unusedUnitsByAccount[$accountId] ?? 0;
+                    if ($usageEntries->contains(fn ($entry): bool => (int) $entry->annual_account_id === $accountId)
+                        || DB::table('leave_ledger_entries')->where('annual_account_id', $accountId)->where('kind', 'annual_entitlement_credit')->exists()) {
+                        throw new DomainException('Komitmen belum dipos mempunyai rekod debit atau kredit yang tidak konsisten.');
+                    }
+                    if ($refund !== 0 && $refund !== (int) $commitment->units) {
+                        throw new DomainException('Sebahagian komitmen belum dipos masih digunakan. Kredit tahun tersebut dan selesaikan komitmen dahulu, kemudian sahkan semula.');
+                    }
+                    if ($refund > 0) {
+                        DB::table('leave_annual_commitments')->where('id', $commitment->id)->update([
+                            'status' => 'CANCELLED', 'cancel_operation_id' => $operation['id'], 'resolved_at' => now(),
+                        ]);
+                        $this->audit('hr.leave.future_commitment_cancelled', $reservationId, $operationKey);
+                    }
+                    unset($postedUnitsByAccount[$accountId], $unusedUnitsByAccount[$accountId]);
+                } elseif ($commitment->status === 'SETTLED') {
+                    if (! $usageEntries->contains(fn ($entry): bool => (int) $entry->id === (int) $commitment->settled_ledger_entry_id
+                        && (int) $entry->annual_account_id === $accountId)) {
+                        throw new DomainException('Debit komitmen yang telah diselesaikan tidak ditemui.');
+                    }
+                } else {
+                    throw new DomainException('Komitmen telah dibatalkan sebelum ini.');
+                }
+            }
             $usageEntriesByAnnualAccount = $usageEntries->whereNotNull('annual_account_id')->keyBy('annual_account_id');
             $tabungUsage = $usageEntries->whereNotNull('tabung_account_id')->keyBy('source_year');
-            if ($usageEntries->count() !== count($annualUnitsByAccount) + count($originalTabungBySource)
-                || $usageEntriesByAnnualAccount->count() !== count($annualUnitsByAccount) || $tabungUsage->count() !== count($originalTabungBySource)) {
+            if ($usageEntries->count() !== count($postedUnitsByAccount) + count($originalTabungBySource)
+                || $usageEntriesByAnnualAccount->count() !== count($postedUnitsByAccount) || $tabungUsage->count() !== count($originalTabungBySource)) {
                 throw new DomainException('The original annual usage entries do not match the per-date source allocation.');
             }
-            foreach ($annualUnitsByAccount as $accountId => $originalUnits) {
+            foreach ($postedUnitsByAccount as $accountId => $originalUnits) {
                 $usage = $usageEntriesByAnnualAccount->get($accountId);
                 if ($usage === null || $usage->tabung_account_id !== null || (int) $usage->signed_half_day_units !== -$originalUnits
                     || $usage->source_year !== null || $usage->reverses_entry_id !== null) {
@@ -788,6 +819,20 @@ class LeaveBalanceTransactionService
                     throw new DomainException('The partial refund would exceed the original Annual Leave usage.');
                 }
                 $accountYear = (int) $lockedAccounts['annual_accounts']->get($accountId)->leave_year;
+                if ($accountYear > $currentYear) {
+                    throw new DomainException('Debit AL tahun hadapan tidak boleh dipulangkan sebagai AL semasa.');
+                }
+                if ($accountYear < $currentYear) {
+                    $closed = DB::table('leave_annual_year_closes')->where('annual_account_id', $accountId)->first();
+                    $posted = $this->totals->forAccounts((int) $accountId, (int) $tabung->id);
+                    $pending = $this->totals->pendingAnnualUnits((int) $accountId);
+                    if ($closed === null || (int) $closed->employee_id !== (int) $employee->id
+                        || (int) $closed->tabung_account_id !== (int) $tabung->id || $posted['annual_half_day_units'] < $pending) {
+                        throw new DomainException('Tahun asal belum ditutup atau mempunyai defisit. Rujuk proses rekonsiliasi HR.');
+                    }
+                    $historicalRefunds[$accountId] = ['year' => $accountYear, 'units' => $refundUnits,
+                        'annual_before' => $posted['annual_half_day_units'], 'pending' => $pending];
+                }
                 DB::table('leave_ledger_entries')->insert([
                     'annual_account_id' => $accountId,
                     'balance_operation_id' => $operation['id'],
@@ -829,6 +874,57 @@ class LeaveBalanceTransactionService
                     ]);
                 }
                 $this->audit('hr.leave.tabung_excess_disposed', $reservationId, $operationKey);
+            }
+            // TB-Q04/Q05: only the newly returned historical AL is eligible, never old burned amounts.
+            // Reconcile after Tabung source returns/disposals, using actual current capacity.
+            if ($historicalRefunds !== []) {
+                $rate = (new TabungCapacity)->confirmedRateFor((int) $employee->id, $currentYear);
+                if ($rate === null) {
+                    throw new DomainException('Sahkan kadar penuh Tabung berkuat kuasa sebelum rekonsiliasi.');
+                }
+                $cap = (int) $rate->annual_rate_units;
+                uasort($historicalRefunds, fn (array $left, array $right): int => $left['year'] <=> $right['year']);
+                foreach ($historicalRefunds as $accountId => $history) {
+                    $posted = $this->totals->forAccounts((int) $accountId, (int) $tabung->id);
+                    $before = $posted['tabung_half_day_units'];
+                    $eligible = $history['units'];
+                    if ($before < 0 || $before > $cap
+                        || $posted['annual_half_day_units'] !== $history['annual_before'] + $eligible
+                        || $this->totals->pendingAnnualUnits((int) $accountId) !== $history['pending']) {
+                        throw new DomainException('Baki untuk rekonsiliasi tidak konsisten.');
+                    }
+                    $transfer = min($eligible, $cap - $before);
+                    $burn = $eligible - $transfer;
+                    $sourceYear = $history['year'];
+                    if ($transfer > 0) {
+                        DB::table('leave_ledger_entries')->insert([
+                            'annual_account_id' => $accountId, 'balance_operation_id' => $operation['id'],
+                            'signed_half_day_units' => -$transfer, 'kind' => 'annual_reconcile_transfer_out',
+                            'source_year' => null, 'operation_key' => $operationKey.':ro:'.$sourceYear, 'actor_id' => $actorId,
+                        ]);
+                        DB::table('leave_ledger_entries')->insert([
+                            'tabung_account_id' => $tabung->id, 'balance_operation_id' => $operation['id'],
+                            'signed_half_day_units' => $transfer, 'kind' => 'annual_reconcile_transfer_in',
+                            'source_year' => $sourceYear, 'operation_key' => $operationKey.':ri:'.$sourceYear, 'actor_id' => $actorId,
+                        ]);
+                    }
+                    if ($burn > 0) {
+                        DB::table('leave_ledger_entries')->insert([
+                            'annual_account_id' => $accountId, 'balance_operation_id' => $operation['id'],
+                            'signed_half_day_units' => -$burn, 'kind' => 'annual_reconcile_burn',
+                            'source_year' => null, 'operation_key' => $operationKey.':rb:'.$sourceYear, 'actor_id' => $actorId,
+                        ]);
+                    }
+                    DB::table('leave_partial_refund_reconciliations')->insert([
+                        'partial_cancellation_id' => $partialCancellationId, 'balance_operation_id' => $operation['id'],
+                        'annual_account_id' => $accountId, 'tabung_account_id' => $tabung->id,
+                        'source_year' => $sourceYear, 'cap_units' => $cap, 'cap_effective_from' => $rate->effective_from,
+                        'annual_before' => $history['annual_before'], 'annual_pending' => $history['pending'],
+                        'tabung_before' => $before, 'eligible_units' => $eligible, 'transfer_units' => $transfer,
+                        'burn_units' => $burn, 'actor_id' => $actorId, 'created_at' => now(),
+                    ]);
+                    $this->audit('hr.leave.partial_refund_reconciled', $reservationId, $operationKey);
+                }
             }
             $releasedSlots = DB::table('leave_active_slots')->where('reservation_id', $reservationId)->where('status', 'COMMITTED')
                 ->whereIn('id', $refundSlots->pluck('id'))

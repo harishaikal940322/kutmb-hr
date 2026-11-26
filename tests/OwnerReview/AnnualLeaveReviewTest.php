@@ -383,6 +383,31 @@ class AnnualLeaveReviewTest extends TestCase
         $this->denied(fn () => $workflow->prepareAfterEndCancellation($maker->id, $id, $this->key(), 'Duplicate', 'SYNTHETIC'));
     }
 
+    public function test_cr_q04_cross_year_partial_refund_cancels_unused_unposted_commitment(): void
+    {
+        $f = $this->fixture();
+        $reviewer = $this->actor('cross-year-reviewer', ['leave.partial-cancellation.review']);
+        $dec = $this->workingDate($this->year.'-12-23', $this->year.'-12-31');
+        $jan = $this->workingDate(($this->year + 1).'-01-05', ($this->year + 1).'-01-20');
+        $workflow = app(LeaveRequestWorkflowService::class);
+        $result = $workflow->submit($f['staff']->id, $f['annual'], $f['tabung'], $this->key(), 'AL',
+            [['date' => $dec, 'session' => 'AM'], ['date' => $dec, 'session' => 'PM'], ['date' => $jan, 'session' => 'AM']]);
+        $id = $result['request_id'];
+        $this->approve($f, $id);
+        $this->assertSame(38, $this->annual($f['annual']));
+        Carbon::setTestNow(Carbon::parse($dec.' 14:00:00', 'Asia/Kuala_Lumpur'));
+        $case = $workflow->requestApprovedAnnualLeavePartialCancellation($f['staff']->id, $id, $this->key(), 'Synthetic early return')['partial_cancellation_id'];
+        $workflow->verifyApprovedAnnualLeavePartialCancellation($reviewer->id, $id, $case, $this->key(), $dec, 'Synthetic verified', 'PM');
+        $key = $this->key();
+        $workflow->decideApprovedAnnualLeavePartialCancellation($f['pb']->id, $id, $case, $key, 'CONFIRM');
+        $workflow->decideApprovedAnnualLeavePartialCancellation($f['pb']->id, $id, $case, $key, 'CONFIRM');
+        $this->assertSame(39, $this->annual($f['annual']));
+        $this->assertSame(0, $this->annual($f['next']));
+        $this->assertDatabaseHas('leave_annual_commitments', ['reservation_id' => $result['reservation_id'], 'status' => 'CANCELLED']);
+        $this->assertSame(2, DB::table('leave_active_slots')->where('reservation_id', $result['reservation_id'])->where('status', 'RELEASED')->count());
+        $this->assertSame(1, DB::table('leave_active_slots')->where('reservation_id', $result['reservation_id'])->where('status', 'COMMITTED')->count());
+    }
+
     private function fixture(): array
     {
         $suffix = Str::lower(Str::random(10));

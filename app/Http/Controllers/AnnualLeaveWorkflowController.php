@@ -170,8 +170,7 @@ class AnnualLeaveWorkflowController extends Controller
             $page->through(static function ($row) use ($actions, $cancellationActions, $partialStates, $page, $history, $today): array {
                 $ownFutureAnnual = $page === $history && $row->leave_type === 'AL' && $row->starts_on > $today;
                 $partialStatus = $partialStates->get($row->id);
-                $sameYear = substr((string) $row->starts_on, 0, 4) === substr((string) $row->ends_on, 0, 4);
-                $requestActions = $actions->get($row->id, collect());
+                 $requestActions = $actions->get($row->id, collect());
                 $returnedForCorrection = $requestActions->contains(fn ($action): bool => (int) $action->action_revision === (int) $row->current_revision
                     && $action->action_code === 'RETURN_FOR_CORRECTION');
                 $capabilities = [
@@ -180,7 +179,7 @@ class AnnualLeaveWorkflowController extends Controller
                         && $row->starts_on !== null && $row->starts_on > $today && $row->current_step_order !== null,
                     'can_resubmit' => $page === $history && $row->leave_type === 'AL' && $row->status === 'DRAFT'
                         && $returnedForCorrection && $row->session_mode !== 'UNSUPPORTED',
-                    'can_request_partial' => $sameYear && $page === $history && $row->leave_type === 'AL' && $row->status === 'APPROVED'
+                    'can_request_partial' => $page === $history && $row->leave_type === 'AL' && $row->status === 'APPROVED'
                         && $row->starts_on !== null && $row->starts_on <= $today && $row->ends_on >= $today
                         && ! in_array($partialStatus, ['REQUESTED', 'HR_VERIFIED', 'CONFIRMED'], true),
                     'can_withdraw' => $ownFutureAnnual && $row->current_step_order !== null,

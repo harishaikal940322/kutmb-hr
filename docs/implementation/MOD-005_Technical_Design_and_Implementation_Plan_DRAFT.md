@@ -444,6 +444,10 @@ See [CR-Q01–04](../decisions/MOD-005_Cancellation_Owner_Clarifications_2026-11
 
 Owner CR-Q03, CT-DEC-016/017 and CT-DEC-040: source implemented with distinct HR maker, HR checker and effective GM; immutable AFTER_END case, evidence reference, original request and AM/PM source refunds, audit and replay controls. Existing current-year same-year atomic refund reused; no standalone balance credit. Additive forward migration 000055. Ordinary cancellation stops at confirmed schedule final-session end. No historical-year/previous-partial correction automation, separate HR rejection before verification, or evidence upload. Runtime remains unverified.
 
+## 8AC. CR-Q04 cross-year partial cancellation
+
+Ordinary partial cancellation can span supported year accounts using exact per-session allocations. Whole unused unposted commitment cancelled with no credit; settled commitment checked against original debit; current-year AL reversed; closed-year newly returned AL reconciled immediately with TB-Q04/05 actual current capacity and distinct transfer/burn entries. 000056 immutable reconciliation amount snapshot linked to case/operation/source. Historical deficit/unclosed year, absent rate, partially unused unposted commitment, special historical preparation and cross-year shortage allocation remain fail-closed. Generic late release and HR adjustment reconciliation remain separate TB-05 work. Runtime unverified.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.

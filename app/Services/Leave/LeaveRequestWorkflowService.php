@@ -1023,9 +1023,9 @@ class LeaveRequestWorkflowService
                 || (new TabungCapacity)->confirmedCapFor((int) $employee->id, (int) now('Asia/Kuala_Lumpur')->format('Y')) === null)) {
                 throw new DomainException('Pemetaan sumber asal dan kadar penuh Tabung yang disahkan diperlukan.');
             }
-            if (DB::table('leave_annual_commitments')->where('reservation_id', $reservation->id)->where('status', 'COMMITTED')->exists()
-                || collect($dates)->map(fn (string $date): string => substr($date, 0, 4))->unique()->count() > 1) {
-                throw new DomainException('Partial cancellation of a cross-year or unsettled commitment requires the year-transition reconciliation process.');
+            if (collect($dates)->map(fn (string $date): string => substr($date, 0, 4))->unique()->count() > 1
+                && (int) DB::table('leave_reservation_slot_allocations')->where('reservation_id', $reservation->id)->count() !== (int) $reservation->requested_units) {
+                throw new DomainException('Pembatalan merentas tahun memerlukan pemetaan lengkap setiap sesi.');
             }
 
             $cycle = (int) DB::table('leave_request_partial_cancellations')->where('request_id', $requestId)->max('cycle') + 1;
