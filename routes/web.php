@@ -96,6 +96,12 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class])->prefix('leave
         ->whereNumber('leaveRequest')->name('leave.annual.requests.cancellation');
     Route::post('/{leaveRequest}/cancellation/decision', [AnnualLeaveWorkflowController::class, 'decideCancellation'])
         ->whereNumber('leaveRequest')->name('leave.annual.requests.cancellation.decide');
+    Route::post('/{leaveRequest}/partial', [AnnualLeaveWorkflowController::class, 'requestPartial'])
+        ->whereNumber('leaveRequest')->name('leave.annual.requests.partial');
+    Route::post('/partial/{case}/verify', [AnnualLeaveWorkflowController::class, 'verifyPartial'])
+        ->whereNumber('case')->name('leave.annual.requests.partial.verify');
+    Route::post('/partial/{case}/decision', [AnnualLeaveWorkflowController::class, 'decidePartial'])
+        ->whereNumber('case')->name('leave.annual.requests.partial.decide');
 });
 
 Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.organization.manage'])

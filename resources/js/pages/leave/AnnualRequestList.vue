@@ -15,6 +15,8 @@ type Entry = {
     is_final?: boolean;
     can_withdraw?: boolean;
     can_request_cancellation?: boolean;
+    can_request_partial?: boolean;
+    partial_status?: string | null;
     cancellation_reason?: string;
     actions: { action_code: string; created_at: string }[];
 };
@@ -38,6 +40,9 @@ const labels: Record<string, string> = {
     WAITING_GENERAL_MANAGER_FINAL: 'Menunggu kelulusan Pengurus Besar',
     WAITING_SECRETARY_FINAL: 'Menunggu kelulusan Setiausaha ALK',
     APPROVED: 'Diluluskan',
+    REQUESTED: 'Menunggu pengesahan HR',
+    HR_VERIFIED: 'Menunggu keputusan Pengurus Besar',
+    CONFIRMED: 'Disahkan',
     WAITING_CANCELLATION: 'Menunggu pembatalan',
     CANCELLED: 'Dibatalkan',
     CANCELLATION_REQUESTED: 'Pembatalan dimohon',
@@ -58,7 +63,7 @@ function open(id: number) {
 
 function submit(
     id: number,
-    action: 'decision' | 'withdraw' | 'cancellation' | 'cancellation/decision',
+    action: 'decision' | 'withdraw' | 'partial' | 'cancellation' | 'cancellation/decision',
 ) {
     form.key ||= crypto.randomUUID();
     message.value = '';
@@ -131,6 +136,9 @@ function submit(
                         {{ action.created_at }}
                     </li>
                 </ul>
+                <p v-if="row.partial_status" class="text-muted-foreground">
+                    Pembatalan separa · {{ labels[row.partial_status] ?? row.partial_status }}
+                </p>
                 <form
                     v-if="approvals"
                     class="max-w-xl space-y-3"
@@ -215,17 +223,17 @@ function submit(
                     </fieldset>
                 </form>
                 <form
-                    v-else-if="row.can_withdraw || row.can_request_cancellation"
+                    v-else-if="row.can_withdraw || row.can_request_cancellation || row.can_request_partial"
                     class="max-w-xl space-y-3"
                     @submit.prevent="
                         submit(
                             row.id,
-                            row.can_withdraw ? 'withdraw' : 'cancellation',
+                            row.can_withdraw ? 'withdraw' : row.can_request_partial ? 'partial' : 'cancellation',
                         )
                     "
                 >
                     <label
-                        v-if="row.can_request_cancellation"
+                        v-if="row.can_request_cancellation || row.can_request_partial"
                         class="block space-y-1"
                     >
                         <span>Alasan pembatalan</span>
@@ -255,7 +263,7 @@ function submit(
                                 ? 'Merekod…'
                                 : row.can_withdraw
                                   ? 'Tarik balik permohonan'
-                                  : 'Mohon pembatalan'
+                                  : row.can_request_partial ? 'Mohon pembatalan separa' : 'Mohon pembatalan'
                         }}
                     </button>
                 </form>

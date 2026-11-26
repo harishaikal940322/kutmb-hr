@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
 import AnnualRequestList, { type RequestPage } from '@/pages/leave/AnnualRequestList.vue';
+import PartialCancellationQueue, { type PartialReviewPage } from '@/pages/leave/PartialCancellationQueue.vue';
 import TeamAvailabilityPanel from '@/pages/leave/TeamAvailabilityPanel.vue';
 
 export type AnnualWorkspace = {
@@ -19,6 +20,7 @@ export type AnnualWorkspace = {
     history: RequestPage;
     inbox: RequestPage;
     cancellations: RequestPage | null;
+    partial_reviews: PartialReviewPage | null;
 };
 
 const props = defineProps<{ workspace?: AnnualWorkspace }>();
@@ -1366,6 +1368,7 @@ const CalendarRow = defineComponent({
                             :page="screen === 'approvals' ? workspace.inbox : workspace.history"
                             :approvals="screen === 'approvals'"
                         />
+                        <PartialCancellationQueue v-if="screen === 'approvals' && workspace.partial_reviews" :page="workspace.partial_reviews" :today="workspace.today" />
                         <section v-if="screen === 'approvals' && workspace.cancellations" class="space-y-3">
                             <h2 class="font-semibold">Pembatalan cuti</h2>
                             <AnnualRequestList :page="workspace.cancellations" approvals cancellations />

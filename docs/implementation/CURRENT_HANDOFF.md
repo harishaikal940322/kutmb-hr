@@ -1,3 +1,10 @@
+## 26 November 2026 — owner-directed implementation resumed
+
+- Owner authorized implementation-first development and deferred automated QA and recovery. The REC-01 assessment remains preserved locally. No restoration, role grants or authentication bypass occurred.
+- CT-DEC-016/017: linked staff can request supported in-progress annual-funded partial cancellation. A separately authorized HR reviewer records the actual return date; the current General Manager can confirm or reject the verified case. The Vue history and approval area expose the scoped actions through the existing services and ledger. Ambiguous return-date sessions, Tabung-funded cases and special adjustments remain gated.
+- Laravel destructive commands now require the existing explicitly isolated testing configuration. Shared development and unknown targets fail closed, including explicit connection overrides. This is an Artisan safeguard. Database privilege changes were outside this work.
+- PHP syntax and Vue asset build passed. Chromium opened the app and followed the protected module to login (200, no page errors). The bootstrap route returned 404 and the database has zero users. Authenticated functional review remains blocked. No schema change or formal test execution.
+
 ## 26 November 2026 — development database incident and CI blocker
 
 - A consolidated command mistakenly included `DisabledAuthFeaturesTest`, which uses `RefreshDatabase`, while targeting the existing development MySQL database. This reset the schema. MySQL confirms a DROP TABLE event at 10:10:11 MYT, followed by recreation of identity, HR and migration tables. Read-only inspection found zero users, roles, employees, assignments, leave requests and ledger rows. The pre-reset row counts were not captured. Binary logging is enabled and the reset event is retained. No recovery replay, credential changes or subsequent database writes were performed. Recovery requires owner authorization and verification of a compatible backup/log chain.

@@ -1,5 +1,11 @@
 # KUTMB HR coding instructions
 
+## Owner directive — Implementation First, Formal Testing Later
+
+- Resume documented MOD-005 and required MOD-004 development with synthetic data. Implement backend and Vue functionality slice by slice, use focused Chromium review where practical, and continue independently when a policy-dependent operation is gated.
+- Defer automated tests and formal QA until Owner approval after functional review. Syntax checks, compilation and asset builds are permitted. Do not initiate CI troubleshooting or manually dispatch workflows during this phase. Formal testing remains required before release. This section supersedes conflicting testing and sequencing instructions below.
+- Recovery is deferred. Preserve the incident evidence. Use the existing development application and authorized setup flows. Destructive database operations remain prohibited. Verify the existing target and inspect each additive migration before applying it.
+
 ## Scope and authority
 
 - Treat the repository's SRS, RTM, decisions and current handoff as the source of truth. Requirements are DRAFT unless explicitly approved; a commit or merge is not HR/IT sign-off.

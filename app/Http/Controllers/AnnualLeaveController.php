@@ -20,14 +20,15 @@ class AnnualLeaveController extends Controller
         $user = $request->user();
         $canReview = $user->can('iam.rbac.manage');
         $canView = $user->can('leave.entitlement.view');
-        $canWork = AnnualLeaveWorkflowController::hasAccess($user->id);
+        $canReviewPartial = $user->can('leave.partial-cancellation.review');
+        $canWork = AnnualLeaveWorkflowController::hasAccess($user->id, $canReviewPartial);
         abort_unless($canReview || $canView || $canWork, 403);
 
         if ($canWork && ($request->query('view') === 'workflow' || (! $canView && $request->query('view') !== 'design'))) {
             return Inertia::render('leave/AnnualLeave', [
                 'canViewEntitlements' => $canView,
                 'workspace' => [
-                    ...$workflow->workspace($user->id, $totals, $projection),
+                    ...$workflow->workspace($user->id, $totals, $projection, $canReviewPartial),
                     'can_view_team' => $user->can('leave.calendar.team.view'),
                 ],
             ]);

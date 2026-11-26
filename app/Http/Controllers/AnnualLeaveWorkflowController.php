@@ -17,11 +17,11 @@ use Illuminate\Validation\ValidationException;
 
 class AnnualLeaveWorkflowController extends Controller
 {
-    public static function hasAccess(int $userId): bool
+    public static function hasAccess(int $userId, bool $canReviewPartial = false): bool
     {
         $today = now('Asia/Kuala_Lumpur')->toDateString();
 
-        return DB::table('employees')->where('user_id', $userId)->exists()
+        return $canReviewPartial || DB::table('employees')->where('user_id', $userId)->exists()
             || self::isApprover($userId, $today);
     }
 
@@ -35,7 +35,7 @@ class AnnualLeaveWorkflowController extends Controller
     }
 
     /** @return array<string, mixed> */
-    public function workspace(int $userId, LedgerPostedTotals $totals, BalanceProjection $projection): array
+    public function workspace(int $userId, LedgerPostedTotals $totals, BalanceProjection $projection, bool $canReviewPartial = false): array
     {
         $today = now('Asia/Kuala_Lumpur')->toDateString();
         $accounts = $this->accounts($userId, (int) substr($today, 0, 4));
@@ -67,6 +67,12 @@ class AnnualLeaveWorkflowController extends Controller
             ->addSelect('cancellation.reason as cancellation_reason')
             ->simplePaginate(20, pageName: 'cancellation_page') : null;
 
+        $partialReviews = $canReviewPartial || $generalManager
+            ? $this->partialCases($userId, $canReviewPartial, $generalManager)
+                ->orderByDesc('partial.id')->simplePaginate(20, pageName: 'partial_page')
+                ->appends(['view' => 'workflow'])
+            : null;
+
         foreach ([$history, $inbox, $cancellations] as $page) {
             if ($page === null) {
                 continue;
@@ -80,9 +86,18 @@ class AnnualLeaveWorkflowController extends Controller
             $cancellationActions = $page !== $inbox ? DB::table('leave_request_cancellation_actions')->whereIn('request_id', $ids)
                 ->select('request_id', 'created_at')->selectRaw("CONCAT('CANCELLATION_', action_code) AS action_code")
                 ->orderBy('id')->get()->groupBy('request_id') : collect();
-            $page->through(static function ($row) use ($actions, $cancellationActions, $page, $history, $today): array {
+            $partialStates = $page === $history
+                ? DB::table('leave_request_partial_cancellations')->whereIn('request_id', $ids)
+                    ->orderBy('cycle')->pluck('status', 'request_id')
+                : collect();
+            $page->through(static function ($row) use ($actions, $cancellationActions, $partialStates, $page, $history, $today): array {
                 $ownFutureAnnual = $page === $history && $row->leave_type === 'AL' && $row->starts_on > $today;
+                $partialStatus = $partialStates->get($row->id);
                 $capabilities = [
+                    'partial_status' => $partialStatus,
+                    'can_request_partial' => $page === $history && $row->leave_type === 'AL' && $row->status === 'APPROVED'
+                        && $row->starts_on !== null && $row->starts_on <= $today && $row->ends_on > $today
+                        && (int) $row->tabung_units === 0 && ! in_array($partialStatus, ['REQUESTED', 'HR_VERIFIED'], true),
                     'can_withdraw' => $ownFutureAnnual && $row->current_step_order !== null,
                     'can_request_cancellation' => $ownFutureAnnual && $row->status === 'APPROVED' && (int) $row->tabung_units === 0,
                 ];
@@ -95,7 +110,8 @@ class AnnualLeaveWorkflowController extends Controller
 
         return [
             'today' => $today,
-            'approver' => self::isApprover($userId, $today),
+            'approver' => $canReviewPartial || self::isApprover($userId, $today),
+            'partial_reviews' => $partialReviews,
             'linked' => DB::table('employees')->where('user_id', $userId)->exists(),
             'balance' => $balance,
             'history' => $history->appends(['view' => 'workflow', ...request()->only(['approval_page', 'cancellation_page'])]),
@@ -233,6 +249,78 @@ class AnnualLeaveWorkflowController extends Controller
         }
 
         return back();
+    }
+
+    public function requestPartial(Request $request, int $leaveRequest, LeaveRequestWorkflowService $workflow): RedirectResponse
+    {
+        $actor = $request->user()->id;
+        abort_unless($this->owned($this->requests(), $actor)->where('leave.id', $leaveRequest)->exists(), 404);
+        $data = $request->validate(['key' => ['required', 'uuid'], 'reason' => ['required', 'string', 'max:1000']]);
+
+        try {
+            $workflow->requestApprovedAnnualLeavePartialCancellation($actor, $leaveRequest, $data['key'], $data['reason']);
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages(['reason' => $exception->getMessage()]);
+        }
+
+        return back();
+    }
+
+    public function verifyPartial(Request $request, int $case, LeaveRequestWorkflowService $workflow): RedirectResponse
+    {
+        $actor = $request->user();
+        abort_unless($actor->can('leave.partial-cancellation.review'), 403);
+        $data = $request->validate([
+            'key' => ['required', 'uuid'], 'reason' => ['required', 'string', 'max:1000'],
+            'actual_return_date' => ['required', 'date_format:Y-m-d'],
+        ]);
+        $requestId = $this->partialCases($actor->id, true, false, $data['key'])->where('partial.id', $case)->select('partial.request_id')->value('partial.request_id');
+        abort_if($requestId === null, 404);
+
+        try {
+            $workflow->verifyApprovedAnnualLeavePartialCancellation($actor->id, $requestId, $case, $data['key'], $data['actual_return_date'], $data['reason']);
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages(['actual_return_date' => $exception->getMessage()]);
+        }
+
+        return back();
+    }
+
+    public function decidePartial(Request $request, int $case, LeaveRequestWorkflowService $workflow): RedirectResponse
+    {
+        $actor = $request->user()->id;
+        abort_unless($this->isCurrentGeneralManager($actor), 403);
+        $data = $request->validate([
+            'key' => ['required', 'uuid'], 'decision' => ['required', 'in:CONFIRM,REJECT'],
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+        $requestId = $this->partialCases($actor, false, true, $data['key'])->where('partial.id', $case)->select('partial.request_id')->value('partial.request_id');
+        abort_if($requestId === null, 404);
+
+        try {
+            $workflow->decideApprovedAnnualLeavePartialCancellation($actor, $requestId, $case, $data['key'], $data['decision'], $data['reason'] ?? null);
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages(['decision' => $exception->getMessage()]);
+        }
+
+        return back();
+    }
+
+    private function partialCases(int $actor, bool $hr, bool $gm, ?string $key = null): Builder
+    {
+        $statuses = array_merge($hr ? ['REQUESTED'] : [], $gm ? ['HR_VERIFIED'] : []);
+
+        return $this->requests()
+            ->join('leave_request_partial_cancellations as partial', 'partial.revision_id', '=', 'revision.id')
+            ->whereColumn('employee.user_id', 'leave.requester_user_id')
+            ->where('leave.requester_user_id', '<>', $actor)
+            ->where(fn (Builder $query) => $query->whereIn('partial.status', $statuses)
+                ->when($key !== null && $hr, fn (Builder $query) => $query->orWhere(fn (Builder $query) => $query
+                    ->where('partial.hr_verified_by', $actor)->where('partial.hr_operation_key', $key)))
+                ->when($key !== null && $gm, fn (Builder $query) => $query->orWhere(fn (Builder $query) => $query
+                    ->where('partial.general_manager_user_id', $actor)->where('partial.decision_operation_key', $key))))
+            ->select('partial.id', 'partial.status', 'partial.request_reason', 'partial.actual_return_date',
+                'partial.unused_half_day_units', 'employee.display_name', 'leave.request_key');
     }
 
     private function owned(Builder $query, int $actor): Builder
