@@ -1,3 +1,9 @@
+## 26 November 2026 — synthetic development user seed
+
+- Requestor explicitly authorized a development account for every non-System Admin seed role with the shared synthetic password `password`. Added `DevelopmentUserSeeder`, invoked explicitly with `php artisan db:seed --class=DevelopmentUserSeeder`; not invoked by ordinary DatabaseSeeder. Restricted to APP_ENV=local and the existing MySQL database kutmb_hr_dev.
+- Uses existing role definitions and Spatie assignment, creates active username-based accounts with the dev- prefix and the existing hashed password cast, records a non-sensitive audit event. Requires a previously registered active System Admin; never creates a second protected administrator, changes existing passwords/status/MFA, or grants additional roles to existing users. Repeated invocations preserve existing accounts; mismatched usernames/roles fail closed.
+- Account fixtures only. Employee associations, unit/office assignments and leave configuration are independent and not created here. No migrations, database access, tests or builds executed remotely; owner will pull and run explicitly. Never use these fixture credentials outside local development.
+
 ## 26 November 2026 — development role and permission seed
 
 - Requestor authorized direct remote source implementation and will review after pulling; formal automated tests remain deferred. Added `DevelopmentRoleSeeder` for the existing local `kutmb_hr_dev` MySQL target. Run `php artisan db:seed --class=DevelopmentRoleSeeder` after existing migrations. No account, user-role association, employee, office appointment, migration, or data reset is created by this seeder.
