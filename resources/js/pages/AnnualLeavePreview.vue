@@ -1,4 +1,25 @@
 <script setup lang="ts">
+import { useForm } from '@inertiajs/vue3';
+import AnnualRequestList, { type RequestPage } from '@/pages/leave/AnnualRequestList.vue';
+
+export type AnnualWorkspace = {
+    today: string;
+    linked: boolean;
+    approver: boolean;
+    balance: {
+        annual_half_day_units: number;
+        tabung_half_day_units: number;
+        annual_available: number;
+        tabung_available: number;
+        combined_available: number;
+        pending: number;
+    } | null;
+    history: RequestPage;
+    inbox: RequestPage;
+};
+
+const props = defineProps<{ workspace?: AnnualWorkspace }>();
+const submission = useForm({ start: '', end: '', session: 'FULL', reason: '', key: '' });
 import { computed, defineComponent, h, nextTick, ref, watch, type Component } from 'vue';
 import {
     ArrowRight,
@@ -51,8 +72,8 @@ type Screen =
     | 'coverage';
 
 const role = ref<Role>('Staf');
-const screen = ref<Screen>('overview');
-const lastNavScreen = ref<Screen>('overview');
+const screen = ref<Screen>(props.workspace ? (props.workspace.linked ? 'apply' : 'approvals') : 'overview');
+const lastNavScreen = ref<Screen>(screen.value);
 const moduleNavOpen = ref(false);
 const moduleNavToggle = ref<HTMLButtonElement | null>(null);
 const pageHeading = ref<HTMLHeadingElement | null>(null);
@@ -60,8 +81,8 @@ const selectedRequest = ref('AL-2026-052');
 const search = ref('');
 const activeFilter = ref('Semua');
 const leaveType = ref<'AL' | 'EL'>('AL');
-const startDate = ref('2026-12-14');
-const endDate = ref('2026-12-16');
+const startDate = ref(props.workspace ? '' : '2026-12-14');
+const endDate = ref(props.workspace ? '' : '2026-12-16');
 const leaveLength = ref<'Penuh hari' | 'Separuh hari'>('Penuh hari');
 const session = ref<'Pagi' | 'Petang'>('Pagi');
 const reason = ref('');
@@ -167,7 +188,10 @@ const icons: Partial<Record<Screen, Component>> = {
 };
 
 const activeTitle = computed(() => screens[screen.value].label);
-const visibleNav = computed(() => navByRole[role.value]);
+const visibleNav = computed<Screen[]>(() => props.workspace
+    ? [...(props.workspace.linked ? ['apply', 'requests'] as const : []),
+        ...(props.workspace.approver ? ['approvals'] as const : [])]
+    : navByRole[role.value]);
 const currentNavScreen = computed(() =>
     screen.value === 'detail' ? lastNavScreen.value : screen.value,
 );
@@ -621,7 +645,25 @@ function showPreviewMessage(message: string) {
     }, 3200);
 }
 
-function previewSubmit() {
+function submitRequest() {
+    if (props.workspace) {
+        submission.start = startDate.value;
+        submission.end = leaveLength.value === 'Separuh hari' ? startDate.value : endDate.value;
+        submission.session = leaveLength.value === 'Separuh hari' ? (session.value === 'Pagi' ? 'AM' : 'PM') : 'FULL';
+        submission.reason = reason.value;
+        submission.key ||= crypto.randomUUID();
+        submission.post('/leave/annual/requests', {
+            preserveScroll: true,
+            onSuccess: () => {
+                submission.reset();
+                reason.value = '';
+                navigate('requests');
+                showPreviewMessage('Permohonan dihantar.');
+            },
+        });
+        return;
+    }
+
     if (!projectedBalance.value) {
         showPreviewMessage('Pilih tarikh dan tempoh cuti bekerja yang sah.');
         return;
@@ -1111,7 +1153,7 @@ const CalendarRow = defineComponent({
                     </p>
                 </div>
             </div>
-            <div class="flex min-w-0 flex-wrap items-center gap-3">
+            <div v-if="!workspace" class="flex min-w-0 flex-wrap items-center gap-3">
                 <label
                     for="preview-role"
                     class="text-xs font-medium text-muted-foreground"
@@ -1135,14 +1177,15 @@ const CalendarRow = defineComponent({
         <div
             class="border-b border-primary/15 bg-primary/[0.045] px-4 py-2.5 text-xs leading-5 text-muted-foreground sm:px-6"
         >
-            <span
+            <span v-if="!workspace"
                 class="mr-2 inline-flex items-center gap-1.5 font-semibold text-primary"
                 ><Info class="size-3.5" aria-hidden="true" />REKA BENTUK
                 SAHAJA</span
             >
-            Semakan reka bentuk admin dalam persekitaran pembangunan sahaja.
+            <span v-if="workspace">Persekitaran pembangunan · data sintetik</span>
+            <span v-else>Semakan reka bentuk admin dalam persekitaran pembangunan sahaja.
             Simulasi peranan bukan kebenaran akaun. Semua rekod dan baki adalah
-            contoh sintetik; tiada permohonan, kelulusan atau pelarasan sebenar.
+            contoh sintetik; tiada permohonan, kelulusan atau pelarasan sebenar.</span>
         </div>
 
         <div
@@ -1158,7 +1201,7 @@ const CalendarRow = defineComponent({
                         </div>
                         <div class="min-w-0">
                             <p class="text-sm font-semibold">Submodul cuti</p>
-                            <p class="mt-0.5 text-xs text-muted-foreground">{{ role }}</p>
+                            <p class="mt-0.5 text-xs text-muted-foreground">{{ workspace ? 'Permohonan & kelulusan' : role }}</p>
                         </div>
                     </div>
                 </div>
@@ -1190,7 +1233,7 @@ const CalendarRow = defineComponent({
                     id="annual-leave-subnav"
                     class="space-y-4 border-t border-border p-2.5 @min-[960px]/leave-module:block @min-[960px]/leave-module:border-t-0"
                     :class="moduleNavOpen ? 'block' : 'hidden'"
-                    aria-label="Submodul Cuti Tahunan (simulasi)"
+                    aria-label="Submodul Cuti Tahunan"
                     @keydown.esc="closeModuleNav"
                 >
                     <div v-for="group in visibleNavGroups" :key="group.label" class="space-y-1">
@@ -1255,7 +1298,7 @@ const CalendarRow = defineComponent({
                                 }}
                             </h1>
                             <p
-                                class="max-w-3xl text-sm leading-6 text-muted-foreground"
+                                v-if="!workspace" class="max-w-3xl text-sm leading-6 text-muted-foreground"
                             >
                                 {{
                                     screen === 'overview'
@@ -1312,7 +1355,14 @@ const CalendarRow = defineComponent({
                         </div>
                     </header>
 
-                    <template v-if="screen === 'overview'">
+                    <AnnualRequestList
+                        v-if="workspace && (screen === 'requests' || screen === 'approvals')"
+                        :key="screen"
+                        :page="screen === 'approvals' ? workspace.inbox : workspace.history"
+                        :approvals="screen === 'approvals'"
+                    />
+
+                    <template v-else-if="screen === 'overview'">
                         <section
                             v-if="role === 'Pentadbir IT'"
                             class="rounded-2xl border border-border bg-card p-6 shadow-sm @min-[560px]/leave-content:p-8"
@@ -1733,9 +1783,16 @@ const CalendarRow = defineComponent({
                         <section aria-label="Baki kelayakan cuti" class="mb-5 space-y-3">
                             <div>
                                 <h2 class="font-semibold">Baki kelayakan cuti</h2>
-                                <p class="text-sm text-muted-foreground">Data contoh · AL dan EL berkongsi baki yang sama.</p>
+                                <p v-if="!workspace" class="text-sm text-muted-foreground">Data contoh · AL dan EL berkongsi baki yang sama.</p>
                             </div>
-                            <div class="grid grid-cols-2 gap-3 @min-[960px]/leave-content:grid-cols-4">
+                            <div v-if="workspace?.balance" class="grid grid-cols-2 gap-3 @min-[960px]/leave-content:grid-cols-4">
+                                <MetricCard label="Cuti Tahunan (AL)" :value="(workspace.balance.annual_half_day_units / 2).toFixed(1)" note="hari · sebelum tempahan" icon="wallet" />
+                                <MetricCard label="Tabung Cuti tersedia" :value="(workspace.balance.tabung_available / 2).toFixed(1)" note="hari · selepas tempahan" icon="landmark" />
+                                <MetricCard label="Tempahan pending" :value="(workspace.balance.pending / 2).toFixed(1)" note="hari · belum ditolak rasmi" icon="clock" />
+                                <MetricCard label="Jumlah baki tersedia" :value="(workspace.balance.combined_available / 2).toFixed(1)" note="hari · selepas tempahan" icon="gauge" />
+                            </div>
+                            <p v-else-if="workspace" class="text-sm text-muted-foreground">Kelayakan tahun semasa perlu disahkan dan dikreditkan sebelum permohonan.</p>
+                            <div v-else class="grid grid-cols-2 gap-3 @min-[960px]/leave-content:grid-cols-4">
                                 <MetricCard label="Cuti Tahunan (AL)" :value="previewBalance.annual.toFixed(1)" note="hari · sebelum tempahan" icon="wallet" />
                                 <MetricCard label="Tabung Cuti" :value="previewBalance.tabung.toFixed(1)" note="hari · baki berasingan" icon="landmark" />
                                 <MetricCard label="Tempahan pending" :value="previewBalance.pending.toFixed(1)" note="hari · belum ditolak rasmi" icon="clock" />
@@ -1743,14 +1800,15 @@ const CalendarRow = defineComponent({
                             </div>
                         </section>
                         <div
-                            class="grid gap-5 @min-[960px]/leave-content:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.75fr)]"
+                            class="grid gap-5"
+                            :class="workspace ? 'max-w-3xl' : '@min-[960px]/leave-content:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.75fr)]'"
                         >
                             <form
                                 class="space-y-5 rounded-2xl border border-border bg-card p-5 shadow-sm @min-[560px]/leave-content:p-7"
-                                @submit.prevent="previewSubmit"
+                                @submit.prevent="submitRequest"
                             >
                                 <section class="space-y-4">
-                                    <div>
+                                    <div v-if="!workspace">
                                         <h2 class="font-semibold">
                                             1. Jenis permohonan
                                         </h2>
@@ -1768,10 +1826,10 @@ const CalendarRow = defineComponent({
                                             class="block min-h-11 w-full rounded-lg border border-input bg-background px-3 text-sm"
                                         >
                                             <option value="AL">Cuti Tahunan (AL)</option>
-                                            <option value="EL">Emergency Leave (EL)</option>
+                                            <option v-if="!workspace" value="EL">Emergency Leave (EL)</option>
                                         </select>
                                         <span class="block text-xs font-normal text-muted-foreground">
-                                            {{ leaveType === 'AL' ? 'Permohonan Cuti Tahunan biasa. Alasan pilihan.' : 'Alasan kecemasan wajib; dokumen sokongan pilihan.' }}
+                                            {{ leaveType === 'AL' ? (workspace ? 'Alasan diperlukan untuk permohonan dengan notis singkat.' : 'Permohonan Cuti Tahunan biasa. Alasan pilihan.') : 'Alasan kecemasan wajib; dokumen sokongan pilihan.' }}
                                         </span>
                                     </label>
                                 </section>
@@ -1785,8 +1843,7 @@ const CalendarRow = defineComponent({
                                         <p
                                             class="mt-1 text-sm text-muted-foreground"
                                         >
-                                            Pilih tempoh cuti untuk melihat
-                                            anggaran reka bentuk.
+                                            {{ workspace ? 'Hari bekerja dikira mengikut kalendar dan jadual yang disahkan.' : 'Pilih tempoh cuti untuk melihat anggaran reka bentuk.' }}
                                         </p>
                                     </div>
                                     <div class="grid gap-4 @min-[560px]/leave-content:grid-cols-2">
@@ -1794,12 +1851,15 @@ const CalendarRow = defineComponent({
                                             class="space-y-2 text-sm font-medium"
                                             >Tarikh mula<input
                                                 v-model="startDate"
+                                                :min="workspace?.today"
+                                                :required="!!workspace"
                                                 type="date"
                                                 class="block h-11 w-full rounded-lg border border-input bg-background px-3 text-sm" /></label
                                         ><label
                                             class="space-y-2 text-sm font-medium"
                                             >Tarikh akhir<input
                                                 v-model="endDate"
+                                                :required="!!workspace"
                                                 type="date"
                                                 :min="startDate"
                                                 :disabled="leaveLength === 'Separuh hari'"
@@ -1836,14 +1896,14 @@ const CalendarRow = defineComponent({
                                         >
                                             <option>Pagi</option>
                                             <option>Petang</option></select
-                                        ><span
+                                        ><span v-if="!workspace"
                                             class="block text-xs font-normal text-muted-foreground"
                                             >Pagi: cuti 8:00–13:00. Petang: cuti
                                             13:00–17:00.</span
                                         ></label
                                     >
                                     <div
-                                        class="flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/[0.035] p-4 text-sm"
+                                        v-if="!workspace" class="flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/[0.035] p-4 text-sm"
                                     >
                                         <Info
                                             class="mt-0.5 size-4 shrink-0 text-primary"
@@ -1925,28 +1985,30 @@ const CalendarRow = defineComponent({
                                         bukan kepada pelulus (CT-DEC-027/028).
                                     </p>
                                 </section>
+                                <p v-for="error in submission.errors" :key="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
                                 <div
                                     class="flex flex-wrap justify-end gap-2 border-t border-border pt-5"
                                 >
                                     <button
                                         type="button"
                                         class="min-h-11 rounded-lg border border-border px-4 text-sm font-semibold hover:bg-muted"
-                                        @click="previewAction('Simpan draf')"
+                                        v-if="!workspace" @click="previewAction('Simpan draf')"
                                     >
                                         Simpan draf (pratonton)</button
                                     ><button
                                         type="submit"
-                                        class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                                        :disabled="submission.processing || (!!workspace && !workspace.balance)"
+                                        class="disabled:opacity-50 inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
                                     >
                                         <ArrowRight
                                             class="size-4"
                                             aria-hidden="true"
                                         />
-                                        Semak permohonan
+                                        {{ submission.processing ? 'Menghantar…' : (workspace ? 'Hantar permohonan' : 'Semak permohonan') }}
                                     </button>
                                 </div>
                             </form>
-                            <aside
+                            <aside v-if="!workspace"
                                 class="h-fit space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm"
                             >
                                 <div>

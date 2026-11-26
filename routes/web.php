@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\AnnualLeaveController;
+use App\Http\Controllers\AnnualLeaveWorkflowController;
 use App\Http\Controllers\ApprovalOfficeController;
 use App\Http\Controllers\EmployeeAccountLinkController;
 use App\Http\Controllers\EmployeeAssignmentController;
@@ -9,7 +11,6 @@ use App\Http\Controllers\IdentityMenuAccessController;
 use App\Http\Controllers\IdentityPermissionController;
 use App\Http\Controllers\IdentityRoleController;
 use App\Http\Controllers\KeycloakController;
-use App\Http\Controllers\AnnualLeaveController;
 use App\Http\Controllers\LeaveCalendarDraftController;
 use App\Http\Controllers\LeavePolicyDraftController;
 use App\Http\Controllers\LeaveSessionSimulationController;
@@ -76,6 +77,12 @@ Route::middleware('protected')->group(function () {
 Route::get('/leave/annual', AnnualLeaveController::class)
     ->middleware(['protected', EnsureLocalHrDevelopment::class])
     ->name('leave.annual.index');
+
+Route::middleware(['protected', EnsureLocalHrDevelopment::class])->prefix('leave/annual/requests')->group(function (): void {
+    Route::post('/', [AnnualLeaveWorkflowController::class, 'store'])->name('leave.annual.requests.store');
+    Route::post('/{leaveRequest}/decision', [AnnualLeaveWorkflowController::class, 'decide'])
+        ->whereNumber('leaveRequest')->name('leave.annual.requests.decide');
+});
 
 Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.organization.manage'])
     ->prefix('organization')->name('organization.')->group(function (): void {

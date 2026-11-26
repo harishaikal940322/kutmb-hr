@@ -25,6 +25,7 @@ const props = defineProps<{
     currentYear: number;
     asOf: string;
     canReviewDesign: boolean;
+    canUseWorkflow: boolean;
     canManageEmployees: boolean;
 }>();
 defineOptions({
@@ -69,6 +70,7 @@ function date(value: string | null) {
                 <p class="text-xs font-semibold tracking-[0.12em] text-primary uppercase">KUTMB · MOD-005</p>
                 <p class="text-sm font-semibold">Cuti Tahunan</p>
             </div>
+            <Link v-if="canUseWorkflow" href="/leave/annual?view=workflow" class="inline-flex min-h-10 items-center rounded-lg border border-border px-4 text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Permohonan &amp; kelulusan</Link>
             <Link v-if="canReviewDesign" href="/leave/annual?view=design" class="inline-flex min-h-10 items-center rounded-lg border border-border px-4 text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">Semakan reka bentuk</Link>
         </header>
         <div class="border-b border-border bg-muted/40 px-4 py-3 text-xs leading-5 text-muted-foreground sm:px-6">

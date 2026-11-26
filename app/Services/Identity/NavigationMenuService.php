@@ -2,6 +2,7 @@
 
 namespace App\Services\Identity;
 
+use App\Http\Controllers\AnnualLeaveWorkflowController;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
@@ -27,7 +28,8 @@ class NavigationMenuService
 
             $permission = $menu['editable'] ? ($permissionMap[$key] ?? $menu['permission']) : $menu['permission'];
 
-            if ($user->can($permission)) {
+            if ($user->can($permission)
+                || ($key === 'leave.annual.index' && AnnualLeaveWorkflowController::hasAccess($user->id))) {
                 $visible[] = $key;
             }
         }

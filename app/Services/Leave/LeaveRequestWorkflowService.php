@@ -51,6 +51,45 @@ class LeaveRequestWorkflowService
         );
     }
 
+    /** @return array{request_id:int,request_key:string,status:string,current_step_order:?int,reservation_id:int,replayed:bool} */
+    public function submitAnnualRange(
+        int $userId, int $annualId, int $tabungId, string $key, string $start, string $end, string $session, ?string $reason,
+    ): array {
+        $this->assertLocal();
+
+        return DB::transaction(function () use ($userId, $annualId, $tabungId, $key, $start, $end, $session, $reason): array {
+            $this->lockSubmissionGuards();
+            if (DB::table('employees')->where('user_id', $userId)->lockForUpdate()->first(['id']) === null) {
+                throw new DomainException('Only the linked employee can submit this request.');
+            }
+            $slots = [];
+            $last = $this->parseDate($end);
+            for ($date = $this->parseDate($start); $date <= $last; $date = $date->add(new DateInterval('P1D'))) {
+                $value = $date->format('Y-m-d');
+                if (! $this->isWorkingDate($value, (int) $date->format('N'))) {
+                    continue;
+                }
+                foreach ($session === 'FULL' ? ['AM', 'PM'] : [$session] as $code) {
+                    $slots[] = ['date' => $value, 'session' => $code];
+                }
+            }
+
+            return $this->submit($userId, $annualId, $tabungId, $key, 'AL', $slots, $reason);
+        });
+    }
+
+    private function isWorkingDate(string $date, int $weekday): bool
+    {
+        try {
+            $schedule = $this->versions->workingScheduleFor($date);
+            $calendar = $this->versions->calendarFor($date);
+        } catch (RuntimeException) {
+            throw new DomainException('Jadual kerja atau kalendar yang disahkan tidak tersedia untuk tarikh tersebut.');
+        }
+
+        return in_array($weekday, $schedule->working_weekdays, true) && ! in_array($date, $calendar['holidays'], true);
+    }
+
     /** @param list<array{date:string,session:string}> $requestedSlots
      * @return array{request_id:int,request_key:string,status:string,current_step_order:?int,reservation_id:int,replayed:bool}
      */
@@ -1154,20 +1193,11 @@ class LeaveRequestWorkflowService
         $leaveIsWorking = false;
         while ($cursor <= $leaveDate) {
             $date = $cursor->format('Y-m-d');
-            if ((int) $cursor->format('N') <= 5) {
-                $calendar = $this->versions->calendarFor($date);
-                $working = ! in_array($date, $calendar['holidays'], true);
-                if ($date === $today && $working) {
-                    $todayIsWorking = true;
-                }
-                if ($date === $firstLeaveDate && $working) {
-                    $leaveIsWorking = true;
-                }
-                if ($date !== $today && $date !== $firstLeaveDate && $working) {
-                    $leadWeekdays++;
-                    if ($leadWeekdays >= 3) {
-                        return ['short_notice' => false, 'min_days' => null, 'max_days' => null];
-                    }
+            if ($this->isWorkingDate($date, (int) $cursor->format('N'))) {
+                $todayIsWorking = $todayIsWorking || $date === $today;
+                $leaveIsWorking = $leaveIsWorking || $date === $firstLeaveDate;
+                if ($date !== $today && $date !== $firstLeaveDate && ++$leadWeekdays >= 3) {
+                    return ['short_notice' => false, 'min_days' => null, 'max_days' => null];
                 }
             }
             $cursor = $cursor->add(new DateInterval('P1D'));

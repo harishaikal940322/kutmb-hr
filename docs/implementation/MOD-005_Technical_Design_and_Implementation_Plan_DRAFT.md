@@ -380,6 +380,18 @@ Do not claim the remaining integration limits are unanswered policy. Other docum
 
 Next scope: one end-to-end same-year AL local/testing vertical slice with explicit synthetic entitlement and approved route, utilizing existing service contracts and frozen Vue design. Authenticate, authorize, submit, support/decide, show history/balance and verify one complete scenario. Keep actual unresolved policy branches fail closed. Do not loop through more planning, speculative safeguards or unrelated tasks. The requestor explicitly authorized remote correction; required local checkout/MySQL is unavailable in this chat, so revised tests are committed but not executed. Previous results refer to the previous source only. Verify locally before any functional exposure.
 
+## 8O. Local same-year AL implementation mapping (26 November 2026)
+
+| Scope | Requirement references | Implementation and evidence |
+|---|---|---|
+| Calendar and session calculation | CT-DEC-009/011/012/043/044/055 | Confirmed schedule and public-holiday lookup expands requested dates under the calendar guards; only working sessions reach the existing reservation engine. Ambiguous short-notice endpoints continue to fail closed. The HTTP fixture verifies weekend exclusion. |
+| Reservation and deduction | CT-DEC-002/014/018/020/056 | Existing annual and Tabung accounts, per-session source map, active slots, holds, ledger, and idempotency keys. Inertia reads posted totals and active reservations; final approval deducts once. Focused service regressions and HTTP balance assertions ran. |
+| Support, final decision and access | CT-DEC-001/006/007/008/013/019/046/048/050 | Existing effective approval assignment resolver, persisted route, transition planner and audit. Inertia filters queue access by current step and effective assignment; writes recheck under transaction locks. HTTP coverage includes wrong actor, stale step replay, support, final approval and production denial. |
+| Explicit synthetic entitlement | CT-DEC-035 | HTTP submission requires the linked current-year account and matching recorded confirmation and credit. Test supplies a synthetic amount and runs the existing January 1 credit service. Entitlement inputs remain a prerequisite. |
+| Remaining work | CT-DEC-003/005/010/016/017/022–029/031–040/051–054 | Several supported operations are service-only. Cross-year multi-account booking, pre-credit commitment, changed-calendar pending recalculation and year-end posting remain unconnected or incomplete. Actual rate mapping, some prorata inputs, year-end capacity/cutoff and real authorities remain unresolved. |
+
+No new migration is needed for this slice. Use the existing migrated local/testing environment and synthetic fixtures. The local boundary continues to apply before any operational deployment.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.

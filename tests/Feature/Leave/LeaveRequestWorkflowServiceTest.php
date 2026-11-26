@@ -3,12 +3,14 @@
 namespace Tests\Feature\Leave;
 
 use App\Models\User;
+use App\Services\Leave\AnnualEntitlementCreditService;
 use App\Services\Leave\LeaveRequestWorkflowService;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class LeaveRequestWorkflowServiceTest extends TestCase
@@ -25,6 +27,69 @@ class LeaveRequestWorkflowServiceTest extends TestCase
     {
         Carbon::setTestNow();
         parent::tearDown();
+    }
+
+    public function test_annual_workspace_submits_working_sessions_and_records_authorized_decisions(): void
+    {
+        $fixture = $this->fixture('workspace');
+        $approvers = $this->staffApprovers($fixture);
+        $creditor = $this->user('creditor');
+        $creditor->givePermissionTo(['leave.entitlement.confirm', 'leave.entitlement.credit']);
+        $credits = app(AnnualEntitlementCreditService::class);
+        Carbon::setTestNow('2026-01-01T09:00:00+08:00');
+        $confirmed = $credits->confirmAnnualEntitlement($creditor->id, $fixture['annual_id'], 20, 'synthetic-input', 'confirm-'.$fixture['suffix']);
+        $credits->creditConfirmedEntitlementOnJanuaryFirst($creditor->id, $confirmed['confirmation_id']);
+        Carbon::setTestNow('2026-03-02T09:00:00+08:00');
+
+        $staff = $fixture['user'];
+        $outsider = $this->user('outsider');
+        foreach ([$staff, $outsider, $approvers['pu'], $approvers['pb']] as $actor) {
+            $actor->forceFill(['two_factor_secret' => 'synthetic', 'two_factor_confirmed_at' => now()])->save();
+        }
+
+        $url = '/leave/annual';
+        $this->withSession(['_token' => 'synthetic-token'])->withHeader('X-CSRF-TOKEN', 'synthetic-token');
+        $submission = [
+            'start' => '2026-03-13',
+            'end' => '2026-03-16',
+            'session' => 'FULL',
+            'key' => (string) Str::uuid(),
+        ];
+        $this->actingAs($outsider)->get($url)->assertForbidden();
+        $this->post($url.'/requests', $submission)->assertForbidden();
+        $this->actingAs($staff)->from($url)->post($url.'/requests', $submission)->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->post($url.'/requests', $submission)->assertRedirect($url)->assertSessionHasNoErrors();
+        $requestId = DB::table('leave_requests')->where('submission_key', $submission['key'])->value('id');
+        $this->assertNotNull($requestId);
+        $this->get($url)->assertInertia(fn (Assert $page) => $page->component('leave/AnnualLeave')
+            ->where('workspace.balance.pending', 4)->where('workspace.balance.annual_available', 16)
+            ->where('workspace.history.data.0.requested_units', 4)->has('workspace.inbox.data', 0));
+        $this->post($url.'/requests', [...$submission, 'key' => (string) Str::uuid()])->assertSessionHasErrors('start');
+
+        $decisionUrl = $url.'/requests/'.$requestId.'/decision';
+        $support = ['decision' => 'SUPPORT', 'key' => (string) Str::uuid()];
+        $this->post($decisionUrl, $support)->assertNotFound();
+        $this->actingAs($approvers['pb'])->post($decisionUrl, $support)->assertNotFound();
+        $this->actingAs($approvers['pu'])->get($url)->assertInertia(fn (Assert $page) => $page
+            ->where('workspace.approver', true)->where('workspace.inbox.data.0.id', $requestId)->has('workspace.history.data', 0));
+        $this->from($url)->post($decisionUrl, $support)->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->post($decisionUrl, $support)->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->actingAs($approvers['pb'])->post($decisionUrl, ['decision' => 'APPROVE', 'key' => (string) Str::uuid()])
+            ->assertRedirect($url)->assertSessionHasNoErrors();
+
+        $this->actingAs($staff)->get($url)->assertInertia(fn (Assert $page) => $page
+            ->where('workspace.balance.pending', 0)->where('workspace.balance.annual_half_day_units', 16)
+            ->where('workspace.history.data.0.status', 'APPROVED')->has('workspace.history.data.0.actions', 2));
+
+        $env = app()->environment();
+        try {
+            app()->instance('env', 'production');
+            $this->get($url)->assertNotFound();
+            $this->post($url.'/requests', $submission)->assertNotFound();
+            $this->post($decisionUrl, $support)->assertNotFound();
+        } finally {
+            app()->instance('env', $env);
+        }
     }
 
     public function test_submission_is_atomic_snapshots_the_route_and_replays_by_payload_key(): void

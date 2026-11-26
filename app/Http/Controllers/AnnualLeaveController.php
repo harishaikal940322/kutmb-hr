@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Leave\BalanceProjection;
+use App\Services\Leave\LedgerPostedTotals;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -9,12 +11,20 @@ use Inertia\Response;
 
 class AnnualLeaveController extends Controller
 {
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request, AnnualLeaveWorkflowController $workflow, LedgerPostedTotals $totals, BalanceProjection $projection): Response
     {
         $user = $request->user();
         $canReview = $user->can('iam.rbac.manage');
         $canView = $user->can('leave.entitlement.view');
-        abort_unless($canReview || $canView, 403);
+        $canWork = AnnualLeaveWorkflowController::hasAccess($user->id);
+        abort_unless($canReview || $canView || $canWork, 403);
+
+        if ($canWork && ($request->query('view') === 'workflow' || (! $canView && $request->query('view') !== 'design'))) {
+            return Inertia::render('leave/AnnualLeave', [
+                'canViewEntitlements' => $canView,
+                'workspace' => $workflow->workspace($user->id, $totals, $projection),
+            ]);
+        }
 
         // Design fixtures must never be mixed with employee data or used as authorization.
         if ($request->query('view') === 'design' || ! $canView) {
@@ -90,6 +100,7 @@ class AnnualLeaveController extends Controller
             'currentYear' => $currentYear,
             'asOf' => $today,
             'canReviewDesign' => $canReview,
+            'canUseWorkflow' => $canWork,
             'canManageEmployees' => $user->can('hr.employees.view'),
         ]);
     }
