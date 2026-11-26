@@ -67,6 +67,8 @@ class AnnualLeaveReviewTest extends TestCase
     {
         parent::setUp();
         $this->assertGreaterThan(0, DB::transactionLevel());
+        // These tests assert backend authorization and Inertia props, not assets.
+        $this->withoutVite();
         $this->year = (int) now('Asia/Kuala_Lumpur')->format('Y');
         Carbon::setTestNow(Carbon::parse($this->year.'-12-15 09:00:00', 'Asia/Kuala_Lumpur'));
         // Read existing synthetic calendar/schedule and office configuration, never overwrite it.
@@ -194,19 +196,30 @@ class AnnualLeaveReviewTest extends TestCase
     {
         $f = $this->fixture();
         $date = $this->workingDate($this->year.'-12-23', $this->year.'-12-31');
+        // MySQL's immutable consent trigger checks its real clock, while Carbon
+        // is frozen in December for leave scenarios. Consent must predate both.
+        $databaseNow = CarbonImmutable::parse(DB::selectOne('SELECT UTC_TIMESTAMP() AS utc_now')->utc_now, 'UTC');
+        $applicationNow = CarbonImmutable::instance(now('Asia/Kuala_Lumpur'))->utc();
+        $confirmed = ($databaseNow->lessThan($applicationNow) ? $databaseNow : $applicationNow)
+            ->subMinutes(30)->startOfMinute();
         $payload = ['employee' => $f['employee'], 'leave_type' => 'AL', 'start' => $date, 'end' => $date,
             'session' => 'AM', 'reason' => 'Synthetic leave', 'recording_reason' => 'Synthetic assistance',
-            'consent_reference' => 'SYNTHETIC-CONSENT', 'confirmed_at' => $this->year.'-12-15T08:30',
+            'consent_reference' => 'SYNTHETIC-CONSENT', 'confirmed_at' => $confirmed->setTimezone('Asia/Kuala_Lumpur')->format('Y-m-d\TH:i'),
             'consent_acknowledged' => true, 'key' => $this->key()];
         $this->actingAs($f['staff'])->post('/leave/annual/record', $payload)->assertForbidden();
         $this->actingAs($f['hr'])->from('/leave/annual/record')->post('/leave/annual/record', [...$payload, 'consent_acknowledged' => false])
             ->assertSessionHasErrors('consent_acknowledged');
+        $this->post('/leave/annual/record', [...$payload, 'confirmed_at' => now('Asia/Kuala_Lumpur')->addMinute()->format('Y-m-d\TH:i')])
+            ->assertSessionHasErrors('start');
+        $this->post('/leave/annual/record', $payload)->assertRedirect()->assertSessionHasNoErrors();
         $this->post('/leave/annual/record', $payload)->assertRedirect()->assertSessionHasNoErrors();
         $id = (int) DB::table('leave_requests')->where('submission_key', $payload['key'])->value('id');
         $this->assertGreaterThan(0, $id);
         $this->assertDatabaseHas('leave_requests', ['id' => $id, 'employee_id' => $f['employee'], 'requester_user_id' => $f['staff']->id]);
         $this->assertDatabaseHas('leave_request_on_behalf_submissions', ['request_id' => $id, 'hr_actor_user_id' => $f['hr']->id,
-            'applicant_user_id' => $f['staff']->id, 'consent_evidence_reference' => 'SYNTHETIC-CONSENT']);
+            'applicant_user_id' => $f['staff']->id, 'consent_evidence_reference' => 'SYNTHETIC-CONSENT',
+            'staff_confirmed_at' => $confirmed->utc()->format('Y-m-d H:i:s')]);
+        $this->assertSame(1, DB::table('leave_request_on_behalf_submissions')->where('request_id', $id)->count());
         $this->assertSame(40, $this->annual($f['annual']));
         $this->assertSame(1, app(LedgerPostedTotals::class)->pendingAnnualUnits($f['annual']));
     }

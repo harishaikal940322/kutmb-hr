@@ -1,3 +1,9 @@
+## 26 November 2026 — owner review targeted fixes
+
+- Owner execution of 243a5e3 reported 5/7 passed, 219 assertions, two failures (CT-051 consent trigger and stale Vite manifest). Owner approved Asia/Kuala_Lumpur business timezone and the permission-driven UI test update.
+- CT-051 now normalizes the explicit offset timestamp to UTC for storage, matching existing UTC app timestamps; business input/validation stays Malaysia-local. Existing immutable consent trigger and permissions remain unchanged. The review suite chooses a synthetic prior confirmation before both real MySQL UTC time and mocked application time; added future-confirmation rejection, UTC storage and replay assertions. Existing historical consent rows are not rewritten; any legacy replay mismatch requires separate review.
+- Owner review suite uses withoutVite() to test authorization and actual Inertia props independently of frontend asset builds. This is not a browser or Vite build check; owner still needs npm run build for browser review. No database changes, migrations, seed execution or testing performed remotely. Owner to pull and rerun explicit suite.
+
 ## 26 November 2026 — owner-run Annual Leave targeted tests
 
 - Added `phpunit.annual-leave.xml` and `tests/OwnerReview/AnnualLeaveReviewTest.php` for explicitly opted-in rollback-only review of the new CT-029/034/037/038/040/051 integration, plus permission-driven page visibility. Isolated from ordinary default PHPUnit suites; no migrations, seeders, destructive reset, DDL, parallel execution or CI are invoked by the suite. Pre-transaction guard verifies testing environment, uncached config, existing Docker MySQL host/database identity, InnoDB tables and required schema. Uses existing synthetic office/calendar configuration and creates temporary unique synthetic employees and HR actors, never resets fixtures.

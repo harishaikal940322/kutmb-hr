@@ -1579,7 +1579,9 @@ class LeaveRequestWorkflowService
             throw new DomainException('Staff confirmation must predate the assisted submission.');
         }
 
-        return $confirmed->setTimezone(new DateTimeZone('Asia/Kuala_Lumpur'))->format('Y-m-d H:i:s');
+        // Business input and validation use Malaysia time; persist the instant in
+        // UTC, consistently with the application's created_at timestamps.
+        return $confirmed->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
     }
 
     private function assertAuthorizedHrRecorder(int $actorId): void
