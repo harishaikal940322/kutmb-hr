@@ -31,6 +31,21 @@ class LedgerPostedTotals
         });
     }
 
+    /** Active holds include each per-date annual account, not only the reservation's first year. */
+    public function pendingAnnualUnits(int $annualAccountId): int
+    {
+        $legacy = (int) DB::table('leave_reservations as reservation')->where('reservation.annual_account_id', $annualAccountId)
+            ->where('reservation.status', 'ACTIVE')->whereNotExists(fn ($query) => $query->selectRaw('1')
+                ->from('leave_reservation_slot_allocations as allocation')->whereColumn('allocation.reservation_id', 'reservation.id'))
+            ->sum('reservation.annual_units');
+        $allocated = (int) DB::table('leave_reservation_slot_allocations as allocation')
+            ->join('leave_reservations as reservation', 'reservation.id', '=', 'allocation.reservation_id')
+            ->where('allocation.annual_account_id', $annualAccountId)->where('allocation.allocation_bucket', 'ANNUAL')
+            ->where('reservation.status', 'ACTIVE')->sum('allocation.units');
+
+        return $legacy + $allocated;
+    }
+
     private function totalFor(string $accountColumn, int $accountId): int
     {
         $total = DB::table('leave_ledger_entries')

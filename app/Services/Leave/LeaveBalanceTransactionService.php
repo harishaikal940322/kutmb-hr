@@ -47,7 +47,11 @@ class LeaveBalanceTransactionService
                 throw new DomainException('Annual and Tabung accounts must exist and belong to the same employee.');
             }
             $employee = DB::table('employees')->where('id', $annualCandidate->employee_id)->lockForUpdate()->first();
-            $annual = DB::table('leave_annual_accounts')->where('id', $annualAccountId)->lockForUpdate()->first();
+            $slotYears = array_values(array_unique(array_map(fn (array $slot): int => (int) substr($slot['date'], 0, 4), $slots)));
+            sort($slotYears, SORT_NUMERIC);
+            $annualAccounts = DB::table('leave_annual_accounts')->where('employee_id', $annualCandidate->employee_id)
+                ->whereIn('leave_year', $slotYears)->orderBy('id')->lockForUpdate()->get()->keyBy('leave_year');
+            $annual = $annualAccounts->firstWhere('id', $annualAccountId);
             $tabung = DB::table('leave_tabung_accounts')->where('id', $tabungAccountId)->lockForUpdate()->first();
             if ($annual === null || $tabung === null || (int) $annual->employee_id !== (int) $tabung->employee_id
                 || $employee === null || (int) $employee->id !== (int) $annual->employee_id) {
@@ -73,10 +77,12 @@ class LeaveBalanceTransactionService
                     throw new DomainException('A matching immutable applicant consent record is required before creating the balance reservation.');
                 }
             }
-            if (count(array_filter($slots, fn (array $slot): bool => (int) substr($slot['date'], 0, 4) !== (int) $annual->leave_year)) > 0) {
-                throw new DomainException('Cross-year allocation requires the per-leave-date multi-account transaction (CT-DEC-034); this internal slice supports a single calendar year only.');
-            }
             $currentYear = (int) now('Asia/Kuala_Lumpur')->format('Y');
+            $crossYear = count($slotYears) > 1;
+            if ($annualAccounts->count() !== count($slotYears) || (int) $annual->leave_year !== $slotYears[0]
+                || ($crossYear && ($slotYears !== [$currentYear, $currentYear + 1] || ! Schema::hasTable('leave_reservation_slot_allocations')))) {
+                throw new DomainException('A cross-year request needs separate current and next-year annual accounts.');
+            }
             if ((int) $annual->leave_year > $currentYear + 1) {
                 throw new DomainException('Only the current or immediately following year is supported by the documented future-year policy.');
             }
@@ -116,50 +122,93 @@ class LeaveBalanceTransactionService
             $this->assertNoActiveSlotConflicts((int) $employee->id, $slots);
 
             $historyMarkerId = $this->recordUsageSnapshots((int) $employee->id, $actorId, $requestKey, $revision, $slots);
-            $posted = $this->totals->forAccounts($annualAccountId, $tabungAccountId);
-            if ($registeredEntitlement !== null && (int) $annual->leave_year >= $currentYear) {
-                $creditEntry = DB::table('leave_ledger_entries')->where('annual_account_id', $annualAccountId)
-                    ->where('kind', 'annual_entitlement_credit')->first(['signed_half_day_units']);
-                if ($creditEntry === null) {
-                    if ((int) $annual->leave_year === $currentYear) {
-                        throw new DomainException('The current-year confirmed entitlement must be officially credited before use.');
+            if ($crossYear) {
+                // CT-DEC-034: reserve each working session from its calendar-year account.
+                // Shortage/Tabung/negative carry branches stay fail-closed, not guessed.
+                $annualUnits = $requestedUnits;
+                $tabungUnits = 0;
+                $tabungSourceYear = null;
+                foreach ($slotYears as $slotYear) {
+                    $account = $annualAccounts->get($slotYear);
+                    $confirmed = DB::table('leave_annual_entitlement_confirmations')->where('annual_account_id', $account->id)->lockForUpdate()->first();
+                    if ($confirmed === null) {
+                        throw new DomainException('Both calendar years require registered and confirmed entitlement.');
                     }
-                    $confirmedUnits = (int) $registeredEntitlement->confirmed_half_day_units;
-                    if ($posted['annual_half_day_units'] > PHP_INT_MAX - $confirmedUnits) {
-                        throw new OverflowException('The confirmed future-year entitlement exceeds the supported integer range.');
+                    $creditEntry = DB::table('leave_ledger_entries')->where('annual_account_id', $account->id)
+                        ->where('kind', 'annual_entitlement_credit')->first(['signed_half_day_units']);
+                    $postedForYear = $this->totals->forAccounts($account->id, $tabungAccountId)['annual_half_day_units'];
+                    if ($slotYear === $currentYear) {
+                        if ($creditEntry === null || (int) $creditEntry->signed_half_day_units !== (int) $confirmed->confirmed_half_day_units) {
+                            throw new DomainException('Current-year entitlement must be officially credited.');
+                        }
+                    } else {
+                        if ($creditEntry !== null || DB::table('leave_ledger_entries')->where('annual_account_id', $account->id)->exists()) {
+                            throw new DomainException('Next-year opening ledger must remain unposted until official credit.');
+                        }
+                        $postedForYear = (int) $confirmed->confirmed_half_day_units - (int) DB::table('leave_annual_commitments')
+                            ->where('annual_account_id', $account->id)->where('status', 'COMMITTED')->sum('units');
                     }
-                    $commitments = (int) DB::table('leave_annual_commitments')->where('annual_account_id', $annualAccountId)
-                        ->where('status', 'COMMITTED')->sum('units');
-                    $posted['annual_half_day_units'] += $confirmedUnits - $commitments;
-                } elseif ((int) $creditEntry->signed_half_day_units !== (int) $registeredEntitlement->confirmed_half_day_units) {
-                    throw new DomainException('The posted annual credit does not match its registered future-year entitlement.');
+                    $needed = count(array_filter($slots, fn (array $slot): bool => (int) substr($slot['date'], 0, 4) === $slotYear));
+                    if ($postedForYear - $this->sumFor('annual_units', 'annual_account_id', (int) $account->id) < $needed) {
+                        throw new DomainException('Cross-year AL requires sufficient annual balance in each year. Tabung and deficit transitions await HR reconciliation rules.');
+                    }
                 }
-            }
-            $pendingAnnual = $this->sumFor('annual_units', 'annual_account_id', $annualAccountId);
-            $pendingTabung = $this->sumFor('tabung_units', 'tabung_account_id', $tabungAccountId);
-            $before = $this->projection->project($posted['annual_half_day_units'], $posted['tabung_half_day_units'], $pendingAnnual, $pendingTabung, 0);
-            $after = $this->projection->project($posted['annual_half_day_units'], $posted['tabung_half_day_units'], $pendingAnnual, $pendingTabung, $requestedUnits);
-            $annualUnits = $before['projected_annual'] - $after['projected_annual'];
-            $tabungUnits = $before['projected_tabung'] - $after['projected_tabung'];
-            if ((int) $annual->leave_year > $currentYear && ($tabungUnits > 0 || $after['projected_annual'] < 0)) {
-                throw new DomainException('Pre-credit reservations requiring future Tabung or a negative balance await the year-transition transaction contract.');
-            }
-            $tabungSourceYear = $tabungUnits > 0 ? $this->singleAvailableTabungSourceYear($tabungAccountId, $tabungUnits) : null;
-            $annualPositiveUnits = min(max($before['annual_available'], 0), $requestedUnits);
-            $allocationRows = [];
-            foreach ($slots as $index => $slot) {
-                $isTabung = $index >= $annualPositiveUnits && $index < $annualPositiveUnits + $tabungUnits;
-                $allocationRows[] = [
-                    'leave_year' => (int) $annual->leave_year,
-                    'leave_date' => $slot['date'],
-                    'session_code' => $slot['session'],
-                    'allocation_bucket' => $isTabung ? 'TABUNG' : 'ANNUAL',
-                    'annual_account_id' => $isTabung ? null : $annualAccountId,
-                    'tabung_account_id' => $isTabung ? $tabungAccountId : null,
-                    'source_year' => $isTabung ? $tabungSourceYear : null,
-                    'units' => 1,
-                    'created_at' => now(),
-                ];
+                $allocationRows = [];
+                foreach ($slots as $slot) {
+                    $slotYear = (int) substr($slot['date'], 0, 4);
+                    $allocationRows[] = [
+                        'leave_year' => $slotYear, 'leave_date' => $slot['date'], 'session_code' => $slot['session'],
+                        'allocation_bucket' => 'ANNUAL', 'annual_account_id' => $annualAccounts->get($slotYear)->id,
+                        'tabung_account_id' => null, 'source_year' => null, 'units' => 1, 'created_at' => now(),
+                    ];
+                }
+            } else {
+                $posted = $this->totals->forAccounts($annualAccountId, $tabungAccountId);
+                if ($registeredEntitlement !== null && (int) $annual->leave_year >= $currentYear) {
+                    $creditEntry = DB::table('leave_ledger_entries')->where('annual_account_id', $annualAccountId)
+                        ->where('kind', 'annual_entitlement_credit')->first(['signed_half_day_units']);
+                    if ($creditEntry === null) {
+                        if ((int) $annual->leave_year === $currentYear) {
+                            throw new DomainException('The current-year confirmed entitlement must be officially credited before use.');
+                        }
+                        $confirmedUnits = (int) $registeredEntitlement->confirmed_half_day_units;
+                        if ($posted['annual_half_day_units'] > PHP_INT_MAX - $confirmedUnits) {
+                            throw new OverflowException('The confirmed future-year entitlement exceeds the supported integer range.');
+                        }
+                        $commitments = (int) DB::table('leave_annual_commitments')->where('annual_account_id', $annualAccountId)
+                            ->where('status', 'COMMITTED')->sum('units');
+                        $posted['annual_half_day_units'] += $confirmedUnits - $commitments;
+                    } elseif ((int) $creditEntry->signed_half_day_units !== (int) $registeredEntitlement->confirmed_half_day_units) {
+                        throw new DomainException('The posted annual credit does not match its registered future-year entitlement.');
+                    }
+                }
+                $pendingAnnual = $this->sumFor('annual_units', 'annual_account_id', $annualAccountId);
+                $pendingTabung = $this->sumFor('tabung_units', 'tabung_account_id', $tabungAccountId);
+                $before = $this->projection->project($posted['annual_half_day_units'], $posted['tabung_half_day_units'], $pendingAnnual, $pendingTabung, 0);
+                $after = $this->projection->project($posted['annual_half_day_units'], $posted['tabung_half_day_units'], $pendingAnnual, $pendingTabung, $requestedUnits);
+                $annualUnits = $before['projected_annual'] - $after['projected_annual'];
+                $tabungUnits = $before['projected_tabung'] - $after['projected_tabung'];
+                if ((int) $annual->leave_year > $currentYear && ($tabungUnits > 0 || $after['projected_annual'] < 0)) {
+                    throw new DomainException('Pre-credit reservations requiring future Tabung or a negative balance await the year-transition transaction contract.');
+                }
+                $tabungSourceYear = $tabungUnits > 0 ? $this->singleAvailableTabungSourceYear($tabungAccountId, $tabungUnits) : null;
+                $annualPositiveUnits = min(max($before['annual_available'], 0), $requestedUnits);
+                $allocationRows = [];
+                foreach ($slots as $index => $slot) {
+                    $isTabung = $index >= $annualPositiveUnits && $index < $annualPositiveUnits + $tabungUnits;
+                    $allocationRows[] = [
+                        'leave_year' => (int) $annual->leave_year,
+                        'leave_date' => $slot['date'],
+                        'session_code' => $slot['session'],
+                        'allocation_bucket' => $isTabung ? 'TABUNG' : 'ANNUAL',
+                        'annual_account_id' => $isTabung ? null : $annualAccountId,
+                        'tabung_account_id' => $isTabung ? $tabungAccountId : null,
+                        'source_year' => $isTabung ? $tabungSourceYear : null,
+                        'units' => 1,
+                        'created_at' => now(),
+                    ];
+                }
+
             }
 
             $reservationId = DB::table('leave_reservations')->insertGetId([
@@ -233,54 +282,42 @@ class LeaveBalanceTransactionService
             if ($reservation->status !== 'ACTIVE') {
                 throw new DomainException('Only an active pending reservation can be committed.');
             }
-            // CT-DEC-037: future-year approval is a commitment until the official credit.
             $currentYear = (int) now('Asia/Kuala_Lumpur')->format('Y');
-            $credited = DB::table('leave_ledger_entries')->where('annual_account_id', $reservation->annual_account_id)
-                ->where('kind', 'annual_entitlement_credit')->exists();
-            if ((int) $reservation->leave_year === $currentYear + 1 && ! $credited) {
-                $confirmation = DB::table('leave_annual_entitlement_confirmations')->where('annual_account_id', $annual->id)
-                    ->lockForUpdate()->first();
-                $committed = (int) DB::table('leave_annual_commitments')->where('annual_account_id', $annual->id)
-                    ->where('status', 'COMMITTED')->sum('units');
-                $pending = $this->sumFor('annual_units', 'annual_account_id', (int) $annual->id);
-                if ($confirmation === null || (int) $reservation->tabung_units !== 0
-                    || (int) $reservation->annual_units !== (int) $reservation->requested_units
-                    || count($annualUnitsByAccount) !== 1 || ! isset($annualUnitsByAccount[(int) $annual->id])
-                    || $committed + $pending > (int) $confirmation->confirmed_half_day_units
-                    || DB::table('leave_ledger_entries')->where('annual_account_id', $annual->id)->exists()) {
-                    throw new DomainException('A confirmed next-year annual-only reservation within the entitlement is required.');
+            $hasCommitment = false;
+            foreach ($annualUnitsByAccount as $accountId => $units) {
+                $account = $lockedAccounts['annual_accounts']->get((int) $accountId);
+                $accountYear = (int) $account->leave_year;
+                $confirmation = DB::table('leave_annual_entitlement_confirmations')->where('annual_account_id', $accountId)->lockForUpdate()->first();
+                $credit = DB::table('leave_ledger_entries')->where('annual_account_id', $accountId)->where('kind', 'annual_entitlement_credit')->first();
+                if ($accountYear === $currentYear + 1 && $credit === null) {
+                    $committed = (int) DB::table('leave_annual_commitments')->where('annual_account_id', $accountId)->where('status', 'COMMITTED')->sum('units');
+                    $pending = $this->sumFor('annual_units', 'annual_account_id', (int) $accountId);
+                    if ($confirmation === null || (int) $reservation->tabung_units !== 0 || $hasCommitment
+                        || $committed + $pending > (int) $confirmation->confirmed_half_day_units
+                        || DB::table('leave_ledger_entries')->where('annual_account_id', $accountId)->exists()) {
+                        throw new DomainException('A confirmed next-year annual-only reservation within entitlement is required.');
+                    }
+                    DB::table('leave_annual_commitments')->insert([
+                        'reservation_id' => $reservationId, 'annual_account_id' => $accountId,
+                        'approval_operation_id' => $operation['id'], 'approved_by' => $actorId,
+                        'units' => $units, 'status' => 'COMMITTED',
+                    ]);
+                    $hasCommitment = true;
+                    continue;
+                }
+                if ($accountYear > $currentYear || ($confirmation !== null && ($credit === null
+                    || (int) $credit->signed_half_day_units !== (int) $confirmation->confirmed_half_day_units))) {
+                    throw new DomainException('The annual entitlement has not been officially credited.');
                 }
 
-                DB::table('leave_annual_commitments')->insert([
-                    'reservation_id' => $reservationId, 'annual_account_id' => $annual->id,
-                    'approval_operation_id' => $operation['id'], 'approved_by' => $actorId,
-                    'units' => $reservation->annual_units, 'status' => 'COMMITTED',
-                ]);
-                $this->resolveReservation($reservationId, 'COMMITTED');
-                $this->recordEvent($reservationId, $operation['id'], 'COMMITTED', $actorId);
-                $this->audit('hr.leave.future_year_committed', $reservationId, $operationKey);
-
-                return $this->reservationResult($reservationId);
-            }
-            if ((int) $reservation->leave_year > $currentYear
-                || (DB::table('leave_annual_entitlement_confirmations')->where('annual_account_id', $reservation->annual_account_id)->exists() && ! $credited)) {
-                throw new DomainException('The annual entitlement has not been officially credited.');
-            }
-
-            if ($allocations->isEmpty()) {
-                $this->appendUsageEntry($reservation, $operation['id'], $actorId, $operationKey, 'annual_account_id', 'annual_units', null);
-            } else {
-                foreach ($annualUnitsByAccount as $accountId => $units) {
-                    $allocationAccount = $lockedAccounts['annual_accounts']->get((int) $accountId);
-                    $entryReservation = (object) ['annual_account_id' => $accountId, 'annual_units' => $units];
-                    $this->appendUsageEntry($entryReservation, $operation['id'], $actorId, $operationKey.':year-'.$allocationAccount->leave_year,
-                        'annual_account_id', 'annual_units', null);
-                }
+                $entryReservation = (object) ['annual_account_id' => $accountId, 'annual_units' => $units];
+                $entryKey = $allocations->isEmpty() ? $operationKey : $operationKey.':year-'.$accountYear;
+                $this->appendUsageEntry($entryReservation, $operation['id'], $actorId, $entryKey, 'annual_account_id', 'annual_units', null);
             }
             $this->appendUsageEntry($reservation, $operation['id'], $actorId, $operationKey, 'tabung_account_id', 'tabung_units', $reservation->tabung_source_year);
             $this->resolveReservation($reservationId, 'COMMITTED');
             $this->recordEvent($reservationId, $operation['id'], 'COMMITTED', $actorId);
-            $this->audit('hr.leave.balance_committed', $reservationId, $operationKey);
+            $this->audit($hasCommitment ? 'hr.leave.future_year_committed' : 'hr.leave.balance_committed', $reservationId, $operationKey);
 
             return $this->reservationResult($reservationId);
         }, 3);
@@ -494,45 +531,40 @@ class LeaveBalanceTransactionService
                 throw new RuntimeException('The approved reservation has no committed balance event.');
             }
             $commitment = DB::table('leave_annual_commitments')->where('reservation_id', $reservationId)->lockForUpdate()->first();
+            $postedUnitsByAccount = $annualUnitsByAccount;
             if ($commitment !== null && $commitment->status === 'COMMITTED') {
-                if ((int) $commitment->annual_account_id !== (int) $reservation->annual_account_id
+                $accountId = (int) $commitment->annual_account_id;
+                if (! isset($postedUnitsByAccount[$accountId]) || $postedUnitsByAccount[$accountId] !== (int) $commitment->units
                     || (int) $commitment->approval_operation_id !== (int) $committedEvent->balance_operation_id
-                    || (int) $commitment->units !== (int) $reservation->annual_units
-                    || DB::table('leave_ledger_entries')->where('annual_account_id', $commitment->annual_account_id)
-                        ->where('kind', 'annual_entitlement_credit')->exists()) {
+                    || DB::table('leave_ledger_entries')->where('annual_account_id', $accountId)->where('kind', 'annual_entitlement_credit')->exists()) {
                     throw new DomainException('The unposted commitment is inconsistent.');
                 }
                 DB::table('leave_annual_commitments')->where('id', $commitment->id)->update([
                     'status' => 'CANCELLED', 'cancel_operation_id' => $operation['id'], 'resolved_at' => now(),
                 ]);
-            } else {
-                $usageEntries = DB::table('leave_ledger_entries')->where('balance_operation_id', $committedEvent->balance_operation_id)
-                    ->where('kind', 'approved_leave_use')->lockForUpdate()->get();
-                $usageEntriesByAnnualAccount = $usageEntries->keyBy('annual_account_id');
-                if ($usageEntries->count() !== count($annualUnitsByAccount) || $usageEntriesByAnnualAccount->count() !== count($annualUnitsByAccount)) {
-                    throw new DomainException('The original annual usage entries do not match the per-date source allocation.');
+                unset($postedUnitsByAccount[$accountId]);
+            }
+            $usageEntries = DB::table('leave_ledger_entries')->where('balance_operation_id', $committedEvent->balance_operation_id)
+                ->where('kind', 'approved_leave_use')->lockForUpdate()->get();
+            $usageEntriesByAnnualAccount = $usageEntries->keyBy('annual_account_id');
+            if ($usageEntries->count() !== count($postedUnitsByAccount) || $usageEntriesByAnnualAccount->count() !== count($postedUnitsByAccount)) {
+                throw new DomainException('The original annual usage entries do not match the per-date source allocation.');
+            }
+            foreach ($postedUnitsByAccount as $accountId => $units) {
+                $usage = $usageEntriesByAnnualAccount->get($accountId);
+                if ($usage === null || (int) $usage->annual_account_id !== (int) $accountId
+                    || $usage->tabung_account_id !== null || (int) $usage->signed_half_day_units !== -$units
+                    || $usage->source_year !== null || $usage->reverses_entry_id !== null
+                    || DB::table('leave_ledger_entries')->where('reverses_entry_id', $usage->id)->exists()) {
+                    throw new DomainException('An original Annual Leave usage entry is inconsistent or already reversed.');
                 }
-                foreach ($annualUnitsByAccount as $accountId => $units) {
-                    $usage = $usageEntriesByAnnualAccount->get($accountId);
-                    if ($usage === null || (int) $usage->annual_account_id !== (int) $accountId
-                        || $usage->tabung_account_id !== null || (int) $usage->signed_half_day_units !== -$units
-                        || $usage->source_year !== null || $usage->reverses_entry_id !== null
-                        || DB::table('leave_ledger_entries')->where('reverses_entry_id', $usage->id)->exists()) {
-                        throw new DomainException('An original Annual Leave usage entry is inconsistent or already reversed.');
-                    }
-                    $accountYear = (int) $lockedAccounts['annual_accounts']->get($accountId)->leave_year;
-                    DB::table('leave_ledger_entries')->insert([
-                        'annual_account_id' => $accountId,
-                        'balance_operation_id' => $operation['id'],
-                        'signed_half_day_units' => $units,
-                        'kind' => 'approved_leave_cancellation',
-                        'source_year' => null,
-                        'operation_key' => $allocations->isEmpty() ? $operationKey.':annual' : $operationKey.':annual:'.$accountYear,
-                        'reverses_entry_id' => $usage->id,
-                        'actor_id' => $actorId,
-                    ]);
-                }
-
+                $accountYear = (int) $lockedAccounts['annual_accounts']->get($accountId)->leave_year;
+                DB::table('leave_ledger_entries')->insert([
+                    'annual_account_id' => $accountId, 'balance_operation_id' => $operation['id'],
+                    'signed_half_day_units' => $units, 'kind' => 'approved_leave_cancellation', 'source_year' => null,
+                    'operation_key' => $allocations->isEmpty() ? $operationKey.':annual' : $operationKey.':annual:'.$accountYear,
+                    'reverses_entry_id' => $usage->id, 'actor_id' => $actorId,
+                ]);
             }
 
             $updated = DB::table('leave_reservations')->where('id', $reservationId)->where('status', 'COMMITTED')

@@ -104,7 +104,7 @@ class AnnualLeaveWorkflowController extends Controller
         $balance = $accounts === null ? null : DB::transaction(function () use ($accounts, $totals, $projection): array {
             $posted = $totals->forAccounts($accounts->annual_id, $accounts->tabung_id);
             $holds = DB::table('leave_reservations')->where('status', 'ACTIVE');
-            $annual = (int) (clone $holds)->where('annual_account_id', $accounts->annual_id)->sum('annual_units');
+            $annual = $totals->pendingAnnualUnits((int) $accounts->annual_id);
             $tabung = (int) $holds->where('tabung_account_id', $accounts->tabung_id)->sum('tabung_units');
 
             return [...$posted, ...$projection->project($posted['annual_half_day_units'], $posted['tabung_half_day_units'], $annual, $tabung, 0), 'pending' => $annual + $tabung];
@@ -112,9 +112,9 @@ class AnnualLeaveWorkflowController extends Controller
 
         $nextYear = (int) substr($today, 0, 4) + 1;
         $future = $canSelf ? $this->accounts($userId, $nextYear, true) : null;
-        $futureBalance = $future === null ? null : DB::transaction(function () use ($future): array {
+        $futureBalance = $future === null ? null : DB::transaction(function () use ($future, $totals): array {
             DB::table('leave_annual_accounts')->where('id', $future->annual_id)->lockForUpdate()->first();
-            $pending = (int) DB::table('leave_reservations')->where('annual_account_id', $future->annual_id)->where('status', 'ACTIVE')->sum('annual_units');
+            $pending = $totals->pendingAnnualUnits((int) $future->annual_id);
             $commitments = (int) DB::table('leave_annual_commitments')->where('annual_account_id', $future->annual_id)->where('status', 'COMMITTED')->sum('units');
 
             return ['confirmed' => (int) $future->confirmed_half_day_units, 'pending' => $pending,
@@ -170,6 +170,7 @@ class AnnualLeaveWorkflowController extends Controller
             $page->through(static function ($row) use ($actions, $cancellationActions, $partialStates, $page, $history, $today): array {
                 $ownFutureAnnual = $page === $history && $row->leave_type === 'AL' && $row->starts_on > $today;
                 $partialStatus = $partialStates->get($row->id);
+                $sameYear = substr((string) $row->starts_on, 0, 4) === substr((string) $row->ends_on, 0, 4);
                 $requestActions = $actions->get($row->id, collect());
                 $returnedForCorrection = $requestActions->contains(fn ($action): bool => (int) $action->action_revision === (int) $row->current_revision
                     && $action->action_code === 'RETURN_FOR_CORRECTION');
@@ -179,7 +180,7 @@ class AnnualLeaveWorkflowController extends Controller
                         && $row->starts_on !== null && $row->starts_on > $today && $row->current_step_order !== null,
                     'can_resubmit' => $page === $history && $row->leave_type === 'AL' && $row->status === 'DRAFT'
                         && $returnedForCorrection && $row->session_mode !== 'UNSUPPORTED',
-                    'can_request_partial' => $page === $history && $row->leave_type === 'AL' && $row->status === 'APPROVED'
+                    'can_request_partial' => $sameYear && $page === $history && $row->leave_type === 'AL' && $row->status === 'APPROVED'
                         && $row->starts_on !== null && $row->starts_on <= $today && $row->ends_on > $today
                         && (int) $row->tabung_units === 0 && ! in_array($partialStatus, ['REQUESTED', 'HR_VERIFIED'], true),
                     'can_withdraw' => $ownFutureAnnual && $row->current_step_order !== null,
@@ -243,9 +244,11 @@ class AnnualLeaveWorkflowController extends Controller
         }
         $requestedYear = (int) substr($data['start'], 0, 4);
         $future = $type === 'AL' && $requestedYear === $year + 1;
-        if ((! $future && $requestedYear !== $year) || (int) substr($data['end'], 0, 4) !== $requestedYear
+        $lastYear = (int) substr($data['end'], 0, 4);
+        $crossYear = $type === 'AL' && $requestedYear === $year && $lastYear === $year + 1;
+        if ((! $future && $requestedYear !== $year) || (! $crossYear && $lastYear !== $requestedYear)
             || ($data['session'] !== 'FULL' && $data['start'] !== $data['end'])) {
-            throw ValidationException::withMessages(['start' => 'Gunakan satu tahun kalendar: tahun semasa atau AL tahun hadapan. Separuh hari terhad kepada satu tarikh.']);
+            throw ValidationException::withMessages(['start' => 'Gunakan tahun semasa atau AL sehingga tahun hadapan. Separuh hari terhad kepada satu tarikh.']);
         }
 
         $accounts = $this->accounts($userId, $requestedYear, $future);

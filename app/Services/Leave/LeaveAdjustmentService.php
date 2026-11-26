@@ -153,7 +153,7 @@ class LeaveAdjustmentService
         $posted = $this->totals->forAccounts($annual, $tabung);
         $holds = DB::table('leave_reservations')->where('status', 'ACTIVE');
         return $bucket === 'AL'
-            ? [$posted['annual_half_day_units'], (int) $holds->where('annual_account_id', $annual)->sum('annual_units')]
+            ? [$posted['annual_half_day_units'], $this->totals->pendingAnnualUnits($annual)]
             : [$posted['tabung_half_day_units'], (int) $holds->where('tabung_account_id', $tabung)->sum('tabung_units')];
     }
 

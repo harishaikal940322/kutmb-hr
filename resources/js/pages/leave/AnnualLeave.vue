@@ -111,7 +111,7 @@ function submitRequest() {
                                 <div><p class="text-xs text-muted-foreground">Komitmen diluluskan</p><p class="font-semibold">{{ workspace.future_balance.committed / 2 }} hari</p></div>
                                 <div><p class="text-xs text-muted-foreground">Tersedia</p><p class="font-semibold">{{ workspace.future_balance.available / 2 }} hari</p></div>
                             </div>
-                            <p class="text-xs text-muted-foreground">AL tahun hadapan sahaja; tidak menggunakan Tabung atau baki negatif sebelum kredit.</p>
+                            <p class="text-xs text-muted-foreground">AL tahun hadapan dan permohonan rentas tahun menggunakan baki AL tahun masing-masing. Tabung atau defisit rentas tahun belum disokong.</p>
                         </section>
                         <form class="max-w-3xl space-y-5 rounded-2xl border border-border bg-card p-5 shadow-sm @min-[560px]/leave-content:p-7" @submit.prevent="submitRequest">
                             <section class="space-y-4">

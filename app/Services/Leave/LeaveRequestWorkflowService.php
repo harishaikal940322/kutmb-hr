@@ -326,8 +326,9 @@ class LeaveRequestWorkflowService
         $firstDate = $slots[0]['date'];
         $lastDate = $slots[count($slots) - 1]['date'];
         $leaveYear = (int) substr($firstDate, 0, 4);
-        if ((int) substr($lastDate, 0, 4) !== $leaveYear) {
-            throw new DomainException('Cross-year requests must allocate each leave date to its calendar year (CT-DEC-034); the multi-account transaction is not yet integrated.');
+        $lastYear = (int) substr($lastDate, 0, 4);
+        if ($lastYear !== $leaveYear && ($leaveType !== 'AL' || $leaveYear !== (int) substr($today, 0, 4) || $lastYear !== $leaveYear + 1)) {
+            throw new DomainException('Cross-year AL is limited to the current and immediately following calendar year.');
         }
         if ($leaveType === 'AL' && $firstDate < $today) {
             throw new DomainException('Past-date leave must use the separate retrospective EL request type.');
@@ -978,6 +979,10 @@ class LeaveRequestWorkflowService
             }
             if ((int) $reservation->tabung_units !== 0) {
                 throw new DomainException('Partial cancellation of Tabung-funded leave is deferred until the current entitlement cap and source split can be verified.');
+            }
+            if (DB::table('leave_annual_commitments')->where('reservation_id', $reservation->id)->where('status', 'COMMITTED')->exists()
+                || collect($dates)->map(fn (string $date): string => substr($date, 0, 4))->unique()->count() > 1) {
+                throw new DomainException('Partial cancellation of a cross-year or unsettled commitment requires the year-transition reconciliation process.');
             }
 
             $cycle = (int) DB::table('leave_request_partial_cancellations')->where('request_id', $requestId)->max('cycle') + 1;

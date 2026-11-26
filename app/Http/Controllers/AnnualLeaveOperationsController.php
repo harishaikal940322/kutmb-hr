@@ -83,7 +83,7 @@ class AnnualLeaveOperationsController extends Controller
                     throw ValidationException::withMessages(['employee' => 'Akaun AL dan Tabung untuk pekerja ini diperlukan.']);
                 }
                 $posted = $totals->forAccounts($annual->id, $tabung->id);
-                $hold = (int) DB::table('leave_reservations')->where('annual_account_id', $annual->id)->where('status', 'ACTIVE')->sum('annual_units');
+                $hold = $totals->pendingAnnualUnits((int) $annual->id);
 
                 return $preview->previewCloseTransfer($employeeId, $year, $posted['annual_half_day_units'], $hold,
                     $posted['tabung_half_day_units'], (int) $data['cap']);
@@ -181,7 +181,7 @@ class AnnualLeaveOperationsController extends Controller
             ->select('employee.id', 'employee.employee_no', 'employee.display_name', 'entitlement.confirmed_half_day_units')
             ->selectSub(DB::table('leave_ledger_entries')->whereColumn('annual_account_id', 'annual.id')->selectRaw('COALESCE(SUM(signed_half_day_units), 0)'), 'annual_posted')
             ->selectSub(DB::table('leave_ledger_entries')->whereColumn('tabung_account_id', 'tabung.id')->selectRaw('COALESCE(SUM(signed_half_day_units), 0)'), 'tabung_posted')
-            ->selectSub(DB::table('leave_reservations')->whereColumn('annual_account_id', 'annual.id')->where('status', 'ACTIVE')->selectRaw('COALESCE(SUM(annual_units), 0)'), 'annual_pending')
+            ->selectRaw("(SELECT COALESCE(SUM(reservation.annual_units), 0) FROM leave_reservations AS reservation WHERE reservation.annual_account_id = annual.id AND reservation.status = 'ACTIVE' AND NOT EXISTS (SELECT 1 FROM leave_reservation_slot_allocations AS allocation WHERE allocation.reservation_id = reservation.id)) + (SELECT COALESCE(SUM(allocation.units), 0) FROM leave_reservation_slot_allocations AS allocation INNER JOIN leave_reservations AS reservation ON reservation.id = allocation.reservation_id WHERE allocation.annual_account_id = annual.id AND allocation.allocation_bucket = 'ANNUAL' AND reservation.status = 'ACTIVE') AS annual_pending" )
             ->selectSub(DB::table('leave_reservations')->whereColumn('tabung_account_id', 'tabung.id')->where('status', 'ACTIVE')->selectRaw('COALESCE(SUM(tabung_units), 0)'), 'tabung_pending');
     }
 

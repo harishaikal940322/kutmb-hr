@@ -217,10 +217,10 @@ class AnnualEntitlementCreditService
                 $reservation = DB::table('leave_reservations')->where('id', $commitment->reservation_id)->lockForUpdate()->first();
                 $approval = DB::table('leave_balance_operations')->where('id', $commitment->approval_operation_id)->first();
                 if ($reservation === null || $reservation->status !== 'COMMITTED' || $approval === null
-                    || (int) $reservation->annual_account_id !== (int) $annual->id
                     || (int) $reservation->employee_id !== (int) $employee->id
-                    || (int) $reservation->annual_units !== (int) $commitment->units
                     || (int) $reservation->tabung_units !== 0
+                    || (int) DB::table('leave_reservation_slot_allocations')->where('reservation_id', $reservation->id)
+                        ->where('allocation_bucket', 'ANNUAL')->where('annual_account_id', $annual->id)->sum('units') !== (int) $commitment->units
                     || $approval->operation_type !== 'COMMIT' || (int) $approval->actor_id !== (int) $commitment->approved_by
                     || (int) $approval->employee_id !== (int) $employee->id) {
                     throw new DomainException('Approved commitment history is inconsistent.');
