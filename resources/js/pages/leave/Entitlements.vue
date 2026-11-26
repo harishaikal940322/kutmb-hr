@@ -36,37 +36,74 @@ defineOptions({
 const search = ref(props.filters.search);
 const year = ref(props.filters.year);
 const expanded = ref<number | null>(null);
-const confirmation = useForm({ year: props.filters.year, units: '', reference: '', key: '' });
+const confirmation = useForm({ year: props.filters.year, units: '', annual_units: null as number | null, reference: '', key: '' });
 const confirmed = ref('');
 const credit = useForm({});
-const annualRate = ref('');
 const prorataLoading = ref(false);
-const prorataResult = ref('');
+type ProrataResult = {
+    calculation_type: 'FULL_YEAR' | 'NEW_HIRE' | 'TERMINATION' | 'NEW_HIRE_TERMINATION';
+    eligible_months: number; annual_half_day_units: number; prorated_half_day_units: number;
+    period_start: string; period_end: string; can_use_for_confirmation: boolean;
+};
+const prorataResult = ref<ProrataResult | null>(null);
+const prorataLabels = { FULL_YEAR: 'Tahun penuh', NEW_HIRE: 'Pekerja baharu', TERMINATION: 'Penamatan', NEW_HIRE_TERMINATION: 'Mula dan tamat dalam tahun yang sama' };
+const rateDays = ref('');
+let previewSequence = 0;
 const prorataError = ref('');
 
 async function previewProrata(row: Employee) {
+    const sequence = ++previewSequence;
     prorataLoading.value = true;
-    prorataResult.value = '';
+    prorataResult.value = null;
     prorataError.value = '';
     const year = props.filters.year;
-    const params = new URLSearchParams({ year: String(year), annual_units: annualRate.value });
+    const units = Number(rateDays.value) * 2;
+    if (!Number.isInteger(units) || units < 1 || units > 100000) {
+        prorataError.value = 'Masukkan kadar dalam gandaan 0.5 hari.';
+        prorataLoading.value = false;
+        return;
+    }
+    const params = new URLSearchParams({ year: String(year), annual_units: String(units) });
     try {
         const response = await fetch(`/leave/annual/entitlements/${row.id}/prorata?${params}`, {
             headers: { Accept: 'application/json' },
         });
         const result = await response.json();
-        if (expanded.value !== row.id || props.filters.year !== year) return;
+        if (sequence !== previewSequence || expanded.value !== row.id || props.filters.year !== year || Number(rateDays.value) * 2 !== units) return;
         if (response.ok) {
-            prorataResult.value = `${result.eligible_months} bulan · ${days(result.prorated_half_day_units)}`;
+            prorataResult.value = result as ProrataResult;
         } else {
             prorataError.value = response.status === 422 ? result.message : 'Pratonton tidak tersedia.';
         }
     } catch {
-        if (expanded.value === row.id && props.filters.year === year) prorataError.value = 'Pratonton tidak tersedia.';
+        if (sequence === previewSequence && expanded.value === row.id && props.filters.year === year) prorataError.value = 'Pratonton tidak tersedia.';
     } finally {
-        prorataLoading.value = false;
+        if (sequence === previewSequence) prorataLoading.value = false;
     }
 }
+
+function useProrata() {
+    if (!prorataResult.value?.can_use_for_confirmation) return;
+    confirmation.units = String(prorataResult.value.prorated_half_day_units);
+    confirmation.annual_units = prorataResult.value.annual_half_day_units;
+    confirmation.key = '';
+    confirmation.clearErrors();
+}
+
+function resetPreview() {
+    ++previewSequence;
+    rateDays.value = '';
+    prorataResult.value = null;
+    prorataError.value = '';
+    prorataLoading.value = false;
+}
+
+watch(rateDays, () => {
+    ++previewSequence;
+    prorataResult.value = null;
+    prorataError.value = '';
+    prorataLoading.value = false;
+});
 
 function expand(row: Employee) {
     expanded.value = expanded.value === row.id ? null : row.id;
@@ -74,9 +111,7 @@ function expand(row: Employee) {
     confirmation.clearErrors();
     credit.clearErrors();
     confirmed.value = '';
-    annualRate.value = '';
-    prorataResult.value = '';
-    prorataError.value = '';
+    resetPreview();
 }
 
 function postCredit(row: Employee) {
@@ -107,9 +142,7 @@ watch([() => props.filters.search, () => props.filters.year], ([nextSearch, next
     confirmation.clearErrors();
     credit.clearErrors();
     confirmed.value = '';
-    annualRate.value = '';
-    prorataResult.value = '';
-    prorataError.value = '';
+    resetPreview();
 });
 const statusLabels = {
     NO_ACCOUNT: 'Akaun belum tersedia',
@@ -200,18 +233,31 @@ function date(value: string | null) {
                                                 <div><dt class="text-xs text-muted-foreground">Tarikh pengesahan kelayakan</dt><dd class="mt-1 font-medium">{{ date(row.confirmed_at) }}</dd></div>
                                             </dl>
                                             <p v-if="expanded === row.id && confirmed" role="status" class="mt-4 text-sm">{{ confirmed }}</p>
-                                            <form v-if="expanded === row.id && canConfirmEntitlement && Number(row.service_start?.slice(0, 4)) === filters.year"
-                                                class="mt-4 space-y-3 border-t border-border pt-4" @submit.prevent="previewProrata(row)">
-                                                <p class="font-semibold">Pratonton prorata pekerja baharu</p>
-                                                <label class="block max-w-xs space-y-1 text-sm">
-                                                    <span>Kadar tahunan disahkan HR (unit separuh hari)</span>
-                                                    <input v-model="annualRate" type="number" required min="1" step="1" class="block h-10 w-full rounded-lg border border-input bg-background px-3" />
-                                                </label>
-                                                <p v-if="prorataResult" role="status" class="text-sm">{{ prorataResult }}</p>
+                                            <form v-if="expanded === row.id && canConfirmEntitlement"
+                                                class="mt-4 space-y-4 border-t border-border pt-4" @submit.prevent="previewProrata(row)">
+                                                <div>
+                                                    <p class="font-semibold">Pengiraan kelayakan &amp; prorata</p>
+                                                    <p class="mt-1 text-sm text-muted-foreground">Masukkan kadar tahunan yang telah disemak HR. Pengiraan menggunakan tarikh perkhidmatan, bukan penetapan kategori atau kadar automatik.</p>
+                                                </div>
+                                                <div class="grid gap-3 sm:grid-cols-2">
+                                                    <label class="block space-y-1 text-sm">
+                                                        <span>Kadar tahunan (hari)</span>
+                                                        <input v-model="rateDays" type="number" required min="0.5" max="50000" step="0.5" placeholder="Contoh: 20" class="block h-10 w-full rounded-lg border border-input bg-background px-3" />
+                                                    </label>
+                                                    <div class="self-end"><button type="submit" :disabled="prorataLoading" class="min-h-10 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">{{ prorataLoading ? 'Mengira…' : 'Kira kelayakan' }}</button></div>
+                                                </div>
+                                                <div v-if="prorataResult" role="status" class="space-y-3 rounded-lg border border-border bg-card p-4">
+                                                    <p class="text-sm font-medium">{{ prorataLabels[prorataResult.calculation_type] }} · {{ date(prorataResult.period_start) }} hingga {{ date(prorataResult.period_end) }}</p>
+                                                    <div class="grid gap-3 sm:grid-cols-3">
+                                                        <div><p class="text-xs text-muted-foreground">Kadar tahunan</p><p class="mt-1 text-lg font-semibold">{{ days(prorataResult.annual_half_day_units) }}</p></div>
+                                                        <div><p class="text-xs text-muted-foreground">Bulan layak</p><p class="mt-1 text-lg font-semibold">{{ prorataResult.eligible_months }} / 12</p></div>
+                                                        <div><p class="text-xs text-muted-foreground">Hasil pengiraan</p><p class="mt-1 text-xl font-semibold text-primary">{{ days(prorataResult.prorated_half_day_units) }}</p></div>
+                                                    </div>
+                                                    <p class="text-xs text-muted-foreground">Pratonton sahaja. Tiada perubahan kepada baki atau lejar. Kes penamatan memerlukan semakan penyelesaian HR.</p>
+                                                    <button v-if="prorataResult.can_use_for_confirmation && ['NO_ACCOUNT', 'UNCONFIRMED'].includes(row.entitlement_status)" type="button" class="min-h-10 rounded-lg border border-border px-3 text-sm font-semibold" @click="useProrata">Guna hasil untuk pengesahan</button>
+                                                </div>
                                                 <p v-if="prorataError" role="alert" class="text-sm text-destructive">{{ prorataError }}</p>
-                                                <button type="submit" :disabled="prorataLoading" class="min-h-10 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">
-                                                    {{ prorataLoading ? 'Mengira…' : 'Kira prorata' }}
-                                                </button>
+                                                <p class="text-xs leading-5 text-muted-foreground">Kadar probation 6 hari merupakan peraturan kredit berasingan, bukan kadar tahunan untuk diproratakan. Kenaikan pangkat, penamatan pertengahan bulan dan pembundaran tepat di tengah masih memerlukan keputusan HR.</p>
                                             </form>
                                             <form v-if="expanded === row.id && canCreditEntitlement && row.entitlement_status === 'CONFIRMED'"
                                                 class="mt-4 space-y-3 border-t border-border pt-4" @submit.prevent="postCredit(row)">
@@ -228,7 +274,8 @@ function date(value: string | null) {
                                                 <fieldset :disabled="confirmation.processing" class="grid gap-3 sm:grid-cols-2">
                                                     <legend class="mb-2 font-semibold">Sahkan kelayakan sintetik {{ filters.year }}</legend>
                                                     <label class="space-y-1 text-sm">Bilangan unit separuh hari
-                                                        <input v-model="confirmation.units" type="number" required min="1" step="1" class="block h-10 w-full rounded-lg border border-input bg-background px-3" />
+                                                        <input v-model="confirmation.units" type="number" required min="1" step="1" class="block h-10 w-full rounded-lg border border-input bg-background px-3" @input="confirmation.annual_units = null; confirmation.key = ''" />
+                                                        <span v-if="confirmation.annual_units !== null" class="text-xs text-muted-foreground">Daripada pengiraan server; akan disemak semula semasa pengesahan.</span>
                                                     </label>
                                                     <label class="space-y-1 text-sm">Rujukan pengesahan
                                                         <input v-model="confirmation.reference" type="text" required maxlength="120" class="block h-10 w-full rounded-lg border border-input bg-background px-3" />

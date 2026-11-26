@@ -1,3 +1,9 @@
+## 26 November 2026 — explicit-rate entitlement and prorata calculator
+
+- CT-DEC-003/036: extracted exact half-day integer calculation into AnnualEntitlementCalculator, supporting full-year, new hire (start month inclusive), month-end termination and combined start/exit in the same year. Exact rounding ties, mid-month termination and no service overlap fail closed. No automatic selection of category/rate, promotion splitting, appointment override, probation posting or exit settlement. HR supplies the applicable annual rate; the 6-day probation rule is separate.
+- Existing protected prorata endpoint and Profil & Kelayakan screen now expose eligible period, months, input rate and calculated days. Existing unconfirmed non-exit entitlement can use the calculated result for explicit confirmation; server rechecks the result under employee lock. Manual confirmation remains available; already confirmed/credited records are not modified. No automatic credit or balance changes from preview. Termination is preview only.
+- No migration or permission changes. Source only; no remote database/test/build execution. Owner to pull/build and review DEV-001 full year (20 days -> 20 days) and DEV-004 current-year new hire (explicit annual rate 20 -> 20 if start January; probation is not inferred). Actual rate bands, promotion and probation credit remain separate.
+ 
 ## 26 November 2026 — advanced annual leave: HR-assisted future and cross-year requests
 
 - Owner requested continued Annual Leave Backend development and deferred formal QA/UAT until production readiness; functional Owner satisfaction is the development acceptance criterion. Updated AGENTS.md accordingly.

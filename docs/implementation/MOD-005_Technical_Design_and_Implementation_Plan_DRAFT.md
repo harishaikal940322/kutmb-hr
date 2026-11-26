@@ -408,6 +408,10 @@ CT-DEC-052 uses the existing read service through `GET /leave/annual/team?month=
 
 CT-DEC-035/037 use explicit synthetic entitlement input until rates and mappings are confirmed. `POST /leave/annual/entitlements/{employee}/confirm` takes year, positive integer half-day units, source reference and UUID. The protected local/testing route requires both view and confirmation permissions. It records confirmation and initializes missing accounts atomically under the employee lock using the existing immutable confirmation service. Profil & Kelayakan exposes the action for current and next-year unconfirmed records. January 1 posting remains a separate permissioned service. Focused routes and service tests ran before the development database reset. See CURRENT_HANDOFF for the incident, exact CI failure and verification limits.
 
+## 8T. Explicit-rate entitlement and prorata calculation (26 November 2026)
+
+CT-DEC-003/036: full-year, new-hire starting-month-inclusive and month-end termination previews use exact half-day integer arithmetic with HR-supplied annual rate. The existing protected endpoint and entitlement page show period and eligible months, and may populate an unconfirmed non-exit entitlement for explicit HR confirmation with server recalculation under employee lock. Exit results are review-only. No automatic rates, promotion calculation, probation credit, mid-month exit or tie rounding is inferred. Existing January credit and immutable confirmation remain unchanged. Local source implementation, runtime verification pending.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Leave\AnnualEntitlementCalculator;
 use App\Services\Leave\AnnualEntitlementCreditService;
 use App\Services\Leave\BalanceProjection;
 use App\Services\Leave\LedgerPostedTotals;
@@ -112,32 +113,22 @@ class AnnualLeaveController extends Controller
         ]);
     }
 
-    public function previewNewHireProrata(Request $request, int $employee): JsonResponse
+    public function previewNewHireProrata(Request $request, int $employee, AnnualEntitlementCalculator $calculator): JsonResponse
     {
         $data = $request->validate([
             'year' => ['required', 'integer', 'min:1900', 'max:'.((int) now('Asia/Kuala_Lumpur')->format('Y') + 1)],
-            'annual_units' => ['required', 'integer', 'min:1'],
+            'annual_units' => ['required', 'integer', 'min:1', 'max:100000'],
         ]);
         $record = DB::table('employees')->where('id', $employee)->first(['service_start', 'service_end']);
         abort_if($record === null, 404);
 
-        $year = (int) $data['year'];
-        if ((int) substr((string) $record->service_start, 0, 4) !== $year
-            || ($record->service_end !== null && $record->service_end < sprintf('%04d-12-31', $year))) {
-            throw ValidationException::withMessages(['year' => 'Pratonton ini untuk tahun mula berkhidmat sehingga 31 Disember.']);
+        try {
+            $result = $calculator->calculate($record->service_start, $record->service_end, (int) $data['year'], (int) $data['annual_units']);
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages(['annual_units' => $exception->getMessage()]);
         }
 
-        $months = 13 - (int) substr($record->service_start, 5, 2);
-        $annualUnits = (int) $data['annual_units'];
-        $remainder = ($annualUnits % 12) * $months;
-        if ($remainder % 12 === 6) {
-            throw ValidationException::withMessages(['annual_units' => 'Hasil tepat di antara dua unit separuh hari memerlukan keputusan pembundaran HR.']);
-        }
-
-        return response()->json([
-            'eligible_months' => $months,
-            'prorated_half_day_units' => intdiv($annualUnits, 12) * $months + intdiv($remainder + 6, 12),
-        ], headers: ['Cache-Control' => 'private, no-store']);
+        return response()->json($result, headers: ['Cache-Control' => 'private, no-store']);
     }
 
     public function credit(Request $request, int $employee, AnnualEntitlementCreditService $entitlements): RedirectResponse
@@ -160,20 +151,28 @@ class AnnualLeaveController extends Controller
         return back();
     }
 
-    public function confirm(Request $request, int $employee, AnnualEntitlementCreditService $entitlements): RedirectResponse
+    public function confirm(Request $request, int $employee, AnnualEntitlementCreditService $entitlements, AnnualEntitlementCalculator $calculator): RedirectResponse
     {
         $currentYear = (int) now('Asia/Kuala_Lumpur')->format('Y');
         $data = $request->validate([
             'year' => ['required', 'integer', 'min:'.$currentYear, 'max:'.($currentYear + 1)],
             'units' => ['required', 'integer', 'min:1'],
+            'annual_units' => ['nullable', 'integer', 'min:1', 'max:100000'],
             'reference' => ['required', 'string', 'max:120'],
             'key' => ['required', 'uuid'],
         ]);
         $actor = $request->user()->id;
         $year = (int) $data['year'];
         try {
-            DB::transaction(function () use ($employee, $year, $data, $actor, $entitlements): void {
-                abort_unless(DB::table('employees')->where('id', $employee)->lockForUpdate()->first(['id']) !== null, 404);
+            DB::transaction(function () use ($employee, $year, $data, $actor, $entitlements, $calculator): void {
+                $record = DB::table('employees')->where('id', $employee)->lockForUpdate()->first(['id', 'service_start', 'service_end']);
+                abort_if($record === null, 404);
+                if (isset($data['annual_units'])) {
+                    $preview = $calculator->calculate($record->service_start, $record->service_end, $year, (int) $data['annual_units']);
+                    if (! $preview['can_use_for_confirmation'] || $preview['prorated_half_day_units'] !== (int) $data['units']) {
+                        throw new DomainException('Pratonton tidak lagi sepadan atau memerlukan semakan HR. Kira semula sebelum pengesahan.');
+                    }
+                }
                 $accounts = DB::table('leave_annual_accounts');
                 $annualId = (clone $accounts)->where('employee_id', $employee)->where('leave_year', $year)->value('id')
                     ?? $accounts->insertGetId(['employee_id' => $employee, 'leave_year' => $year]);
