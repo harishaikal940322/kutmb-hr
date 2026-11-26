@@ -13,7 +13,7 @@ class UserDirectoryQuery
     public function paginate(?string $search, int $page, ?string $status = null, ?int $role = null): LengthAwarePaginator
     {
         $query = User::query()->select(['id', 'name', 'username', 'status'])
-            ->whereNotNull('username')->with('roles:id,code,label,is_system');
+            ->whereNotNull('username')->with('roles:id,code,name,guard_name,label,is_system');
 
         if ($search !== null && trim($search) !== '') {
             $term = trim($search);

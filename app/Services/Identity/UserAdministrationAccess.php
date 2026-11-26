@@ -35,7 +35,7 @@ final class UserAdministrationAccess
     {
         if ($actor->is($target) || $target->username === null
             || $target->roles->contains(fn (Role $role): bool => (bool) $role->is_system)
-            || $target->can('iam.rbac.manage')) {
+            || $target->permissions()->where('permissions.code', 'iam.rbac.manage')->exists()) {
             return false;
         }
 
