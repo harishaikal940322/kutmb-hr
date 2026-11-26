@@ -4,7 +4,8 @@
 
 - Resume documented MOD-005 and required MOD-004 development with synthetic data. Implement backend and Vue functionality slice by slice, use focused Chromium review where practical, and continue independently when a policy-dependent operation is gated.
 - Defer automated tests and formal QA until Owner approval after functional review. Syntax checks, compilation and asset builds are permitted. Do not initiate CI troubleshooting or manually dispatch workflows during this phase. Formal testing remains required before release. This section supersedes conflicting testing and sequencing instructions below.
-- Recovery is deferred. Preserve the incident evidence. Use the existing development application and authorized setup flows. Destructive database operations remain prohibited. Verify the existing target and inspect each additive migration before applying it.
+- Recovery is deferred. Preserve the incident evidence. Use the existing development application and authorized setup flows. Destructive database operations remain prohibited except the Owner's explicitly approved, manually confirmed local synthetic reset below. Verify the existing target and inspect each additive migration before applying it.
+- Owner direction (26 November 2026): allow an intentionally requested reset of the existing synthetic `kutmb_hr_dev` database only via the interactive `dev:reset-database` command. The human Owner types the exact confirmation in their own terminal after preserving required backups/evidence; agents, tests and CI must not execute the reset or enter that confirmation on the Owner's behalf. Ordinary destructive commands remain prohibited on development, and production protection is unchanged. This is a narrow exception to all older blanket destructive-operation prohibitions, not authorization to create new infrastructure or change other databases.
 
 ## Scope and authority
 

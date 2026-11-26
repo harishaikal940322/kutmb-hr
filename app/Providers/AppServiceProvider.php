@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Console\Commands\ResetLocalDevelopmentDatabase;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Events\CommandStarting;
@@ -63,7 +64,11 @@ class AppServiceProvider extends ServiceProvider
             }
 
             $connection = $event->input->getParameterOption('--database', null);
-            if (! $this->isDisposableDatabase(is_string($connection) ? $connection : null)) {
+            $connectionName = is_string($connection) ? $connection : null;
+            if (ResetLocalDevelopmentDatabase::allowsDestructiveCommand($event->command, $connectionName)) {
+                return;
+            }
+            if (! $this->isDisposableDatabase($connectionName)) {
                 throw new RuntimeException('Destructive database commands require the configured disposable test database.');
             }
         });

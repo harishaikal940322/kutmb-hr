@@ -1,3 +1,10 @@
+## 26 November 2026 — Owner-confirmed local development reset
+
+- Owner reported direct fresh migration blocked by the destructive-command safety guard and explicitly approved a narrow, intentional reset mechanism for the existing synthetic development database. Added `dev:reset-database` (interactive terminal only, local uncached config, mysql:3306, configured and live database identity kutmb_hr_dev, no DB URL/socket/read-write overrides, no CI/test context, exact typed confirmation). Ordinary migrate:fresh, db:wipe, refresh/reset/rollback protections remain unchanged. The in-process exception is limited to migrate:fresh and its nested db:wipe on mysql, restored in finally before ordinary DatabaseSeeder runs. No backup is automatically generated; the Owner must preserve any required data/incident evidence outside the database and stop competing activity before confirming. MySQL DDL is not rollback-safe.
+- Existing DatabaseSeeder seeds roles only. The Owner registers the first protected System Admin through the existing explicitly enabled /register flow; then explicitly runs DevelopmentUserSeeder, DevelopmentLeaveAccessSeeder, DevelopmentEmployeeOrganizationSeeder, DevelopmentLeaveConfigurationSeeder. No default administrator credential introduced.
+- Previous owner execution after b65276f reported OK (7 tests, 263 assertions). Focused integration only, not formal full-SRS QA/UAT. QA-IAM-001 (protected System Admin cannot add ordinary role via current UI) remains open; not changed here.
+- Source implementation only. No reset, backup, database connection, migrations, seed execution, automated testing or CI operations performed remotely. Owner executes locally; actual fresh-migration compatibility and command behavior remain unverified.
+
 ## 26 November 2026 — owner review targeted fixes
 
 - Owner execution of 243a5e3 reported 5/7 passed, 219 assertions, two failures (CT-051 consent trigger and stale Vite manifest). Owner approved Asia/Kuala_Lumpur business timezone and the permission-driven UI test update.
