@@ -224,6 +224,43 @@ class AnnualLeaveReviewTest extends TestCase
         $this->assertSame(1, app(LedgerPostedTotals::class)->pendingAnnualUnits($f['annual']));
     }
 
+    public function test_ct_051_assisted_future_and_cross_year_requests_use_actual_year_accounts(): void
+    {
+        $f = $this->fixture();
+        $nextYear = $this->year + 1;
+        $futureDate = $this->workingDate($nextYear.'-01-15', $nextYear.'-01-31');
+        $dec = $this->workingDate($this->year.'-12-29', $this->year.'-12-31');
+        $jan = $this->workingDate($nextYear.'-01-01', $nextYear.'-01-10');
+        $databaseNow = CarbonImmutable::parse(DB::selectOne('SELECT UTC_TIMESTAMP() AS utc_now')->utc_now, 'UTC');
+        $applicationNow = CarbonImmutable::instance(now('Asia/Kuala_Lumpur'))->utc();
+        $confirmed = ($databaseNow->lessThan($applicationNow) ? $databaseNow : $applicationNow)->subMinutes(30)->startOfMinute();
+        $payload = ['employee' => $f['employee'], 'leave_type' => 'AL', 'start' => $futureDate, 'end' => $futureDate,
+            'session' => 'AM', 'reason' => 'Synthetic leave', 'recording_reason' => 'Synthetic assistance',
+            'consent_reference' => 'SYNTHETIC-FUTURE-CONSENT', 'confirmed_at' => $confirmed->setTimezone('Asia/Kuala_Lumpur')->format('Y-m-d\TH:i'),
+            'consent_acknowledged' => true, 'key' => $this->key()];
+        $this->actingAs($f['hr'])->from('/leave/annual/record')->post('/leave/annual/record', $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $id = (int) DB::table('leave_requests')->where('submission_key', $payload['key'])->value('id');
+        $this->assertGreaterThan(0, $id);
+        $this->assertDatabaseHas('leave_request_on_behalf_submissions', ['request_id' => $id, 'applicant_user_id' => $f['staff']->id, 'hr_actor_user_id' => $f['hr']->id]);
+        $this->assertSame(1, app(LedgerPostedTotals::class)->pendingAnnualUnits($f['next']));
+        $this->approve($f, $id);
+        $this->assertSame(0, $this->annual($f['next']));
+        $this->assertDatabaseHas('leave_annual_commitments', ['annual_account_id' => $f['next'], 'units' => 1, 'status' => 'COMMITTED']);
+
+        $cross = [...$payload, 'start' => $dec, 'end' => $jan, 'session' => 'FULL', 'key' => $this->key()];
+        $this->post('/leave/annual/record', $cross)->assertRedirect()->assertSessionHasNoErrors();
+        $crossId = (int) DB::table('leave_requests')->where('submission_key', $cross['key'])->value('id');
+        $this->assertGreaterThan(0, $crossId);
+        $reservation = DB::table('leave_request_revisions')->where('request_id', $crossId)->value('reservation_id');
+        $this->assertDatabaseHas('leave_reservation_slot_allocations', ['reservation_id' => $reservation, 'annual_account_id' => $f['annual'], 'leave_date' => $dec]);
+        $this->assertDatabaseHas('leave_reservation_slot_allocations', ['reservation_id' => $reservation, 'annual_account_id' => $f['next'], 'leave_date' => $jan]);
+        $this->assertGreaterThan(0, app(LedgerPostedTotals::class)->pendingAnnualUnits($f['annual']));
+        $this->assertGreaterThan(0, app(LedgerPostedTotals::class)->pendingAnnualUnits($f['next']));
+        $this->assertSame(40, $this->annual($f['annual']));
+        $this->assertSame(0, $this->annual($f['next']));
+        $this->post('/leave/annual/record', [...$payload, 'leave_type' => 'EL', 'key' => $this->key()])->assertSessionHasErrors('start');
+    }
+
     public function test_ct_029_hr_review_records_finding_without_second_debit(): void
     {
         $f = $this->fixture();

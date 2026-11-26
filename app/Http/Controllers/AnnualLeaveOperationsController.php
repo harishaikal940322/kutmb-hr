@@ -211,10 +211,15 @@ class AnnualLeaveOperationsController extends Controller
             'recording_reason' => ['required', 'string', 'max:1000'], 'consent_reference' => ['required', 'string', 'max:120'],
             'confirmed_at' => ['required', 'date_format:Y-m-d\TH:i'], 'consent_acknowledged' => ['accepted'], 'key' => ['required', 'uuid'],
         ]);
-        $year = $this->currentYear();
-        if ((int) substr($data['start'], 0, 4) !== $year || (int) substr($data['end'], 0, 4) !== $year
+        $today = now('Asia/Kuala_Lumpur')->toDateString();
+        $year = (int) substr($today, 0, 4);
+        $firstYear = (int) substr($data['start'], 0, 4);
+        $lastYear = (int) substr($data['end'], 0, 4);
+        $isAnnual = $data['leave_type'] === 'AL';
+        if (($isAnnual && ($data['start'] < $today || $firstYear < $year || $lastYear > $year + 1))
+            || (! $isAnnual && ($data['end'] > $today || $firstYear !== $year || $lastYear !== $year))
             || ($data['session'] !== 'FULL' && $data['start'] !== $data['end'])) {
-            throw ValidationException::withMessages(['start' => 'Gunakan tarikh tahun semasa; separuh hari terhad kepada satu tarikh.']);
+            throw ValidationException::withMessages(['start' => 'AL terhad kepada hari ini hingga akhir tahun hadapan; EL terhad kepada hari ini atau tarikh lampau tahun semasa. Separuh hari terhad kepada satu tarikh.']);
         }
         try {
             DB::transaction(function () use ($request, $data, $year, $workflow, $lookup): void {
@@ -227,28 +232,47 @@ class AnnualLeaveOperationsController extends Controller
                 if ($employee === null || $employee->user_id === null || (int) $employee->user_id === (int) $request->user()->id) {
                     throw new DomainException('Pilih pekerja lain yang mempunyai pautan akaun.');
                 }
-                $annual = DB::table('leave_annual_accounts as annual')
-                    ->join('leave_annual_entitlement_confirmations as entitlement', 'entitlement.annual_account_id', '=', 'annual.id')
-                    ->join('leave_ledger_entries as credit', 'credit.annual_account_id', '=', 'annual.id')
-                    ->where('annual.employee_id', $employee->id)->where('annual.leave_year', $year)
-                    ->where('credit.kind', 'annual_entitlement_credit')
-                    ->whereColumn('credit.signed_half_day_units', 'entitlement.confirmed_half_day_units')->value('annual.id');
-                $tabung = DB::table('leave_tabung_accounts')->where('employee_id', $employee->id)->value('id');
-                if ($annual === null || $tabung === null) {
-                    throw new DomainException('Kelayakan pekerja belum dikreditkan.');
-                }
                 $slots = [];
                 $last = \Carbon\CarbonImmutable::parse($data['end'], 'Asia/Kuala_Lumpur');
                 for ($day = \Carbon\CarbonImmutable::parse($data['start'], 'Asia/Kuala_Lumpur'); $day <= $last; $day = $day->addDay()) {
                     $date = $day->toDateString();
-                    $schedule = $lookup->workingScheduleFor($date);
-                    $calendar = $lookup->calendarFor($date);
+                    try {
+                        $schedule = $lookup->workingScheduleFor($date);
+                        $calendar = $lookup->calendarFor($date);
+                    } catch (\RuntimeException $exception) {
+                        if ($exception instanceof \Illuminate\Database\QueryException) {
+                            throw $exception;
+                        }
+                        throw new DomainException('Jadual kerja atau kalendar yang disahkan tidak tersedia untuk '.$date.'.', 0, $exception);
+                    }
                     if (! in_array((int) $day->format('N'), $schedule->working_weekdays, true) || in_array($date, $calendar['holidays'], true)) {
                         continue;
                     }
                     foreach ($data['session'] === 'FULL' ? ['AM', 'PM'] : [$data['session']] as $session) {
                         $slots[] = ['date' => $date, 'session' => $session];
                     }
+                }
+                if ($slots === []) {
+                    throw new DomainException('Tiada sesi bekerja dalam tempoh permohonan.');
+                }
+
+                // Use the first actual working session, not a holiday/weekend
+                // entered as the range start. The balance engine validates every year.
+                $anchorYear = (int) substr($slots[0]['date'], 0, 4);
+                $query = DB::table('leave_annual_accounts as annual')
+                    ->join('leave_annual_entitlement_confirmations as entitlement', 'entitlement.annual_account_id', '=', 'annual.id')
+                    ->where('annual.employee_id', $employee->id)->where('annual.leave_year', $anchorYear);
+                if ($anchorYear === $year) {
+                    $query->join('leave_ledger_entries as credit', 'credit.annual_account_id', '=', 'annual.id')
+                        ->where('credit.kind', 'annual_entitlement_credit')
+                        ->whereColumn('credit.signed_half_day_units', 'entitlement.confirmed_half_day_units');
+                }
+                $annual = $query->value('annual.id');
+                $tabung = DB::table('leave_tabung_accounts')->where('employee_id', $employee->id)->value('id');
+                if ($annual === null || $tabung === null) {
+                    throw new DomainException($anchorYear > $year
+                        ? 'Kelayakan tahun hadapan pekerja perlu didaftarkan dan disahkan oleh HR.'
+                        : 'Kelayakan tahun semasa pekerja perlu disahkan dan dikreditkan.');
                 }
                 $workflow->submitOnBehalf($request->user()->id, $employee->user_id, $annual, $tabung, $data['key'],
                     $data['leave_type'], $slots, $data['reason'] ?? null, $data['recording_reason'], $data['consent_reference'],
