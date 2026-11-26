@@ -137,8 +137,9 @@ function submitRequest() {
                     <TeamAvailabilityPanel v-else-if="workspace && section === 'team' && workspace.can_view_team" :today="workspace.today" />
                     <section v-else class="space-y-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
                         <ShieldCheck class="size-8 text-muted-foreground" aria-hidden="true" />
-                        <h2 class="font-semibold">{{ access.technical ? 'Akses pentadbiran teknikal' : 'Tiada submodul dalam skop semasa' }}</h2>
-                        <p class="text-sm leading-6 text-muted-foreground">Paparan ini tidak mengandungi data contoh atau simulasi peranan. Kebenaran modul, pautan pekerja dan penetapan pegawai ditentukan oleh rekod sebenar. Akses teknikal tidak memberikan kuasa membaca atau meluluskan cuti.</p>
+                        <h2 class="font-semibold">{{ access.can_manage_calendar || access.can_manage_policy ? 'Pengurusan cuti' : access.technical ? 'Akses pentadbiran teknikal' : 'Tiada submodul dalam skop semasa' }}</h2>
+                        <p v-if="access.can_manage_calendar || access.can_manage_policy" class="text-sm leading-6 text-muted-foreground">Gunakan sub-sidebar untuk mengurus kalendar atau dasar cuti yang dibenarkan.</p>
+                        <p v-else class="text-sm leading-6 text-muted-foreground">Kebenaran modul, pautan pekerja dan penetapan pegawai ditentukan oleh rekod sebenar. Akses teknikal tidak memberikan kuasa membaca atau meluluskan cuti.</p>
                     </section>
                 </div>
             </section>

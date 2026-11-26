@@ -16,6 +16,7 @@ type Entry = {
     is_final?: boolean;
     can_withdraw?: boolean;
     can_resubmit?: boolean;
+    can_return_for_correction?: boolean;
     can_request_cancellation?: boolean;
     can_request_partial?: boolean;
     partial_status?: string | null;
@@ -211,7 +212,7 @@ function resubmit(id: number) {
                                 >
                                     Tidak sokong
                                 </option>
-                                <option v-if="!cancellations" value="RETURN_FOR_CORRECTION">
+                                <option v-if="!cancellations && row.can_return_for_correction" value="RETURN_FOR_CORRECTION">
                                     Pulangkan untuk pembetulan
                                 </option>
                             </select>

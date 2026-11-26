@@ -33,6 +33,7 @@ class LeaveSessionSimulationController extends Controller
         }
 
         return Inertia::render('leave/SessionSimulation', [
+            'access' => AnnualLeaveWorkflowController::capabilities($request->user()),
             'date' => $data['date'] ?? '', 'sessions' => $data['sessions'] ?? [], 'units' => $units, 'unavailable' => $unavailable,
         ]);
     }

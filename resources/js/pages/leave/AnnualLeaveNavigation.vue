@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { CalendarDays, ChevronDown, ClipboardList, FileText, ListChecks, UsersRound, ShieldCheck } from '@lucide/vue';
+import { CalendarDays, ChevronDown, ClipboardList, FileText, ListChecks, UsersRound, ShieldCheck, SlidersHorizontal } from '@lucide/vue';
 import { computed, nextTick, ref, watch } from 'vue';
 
 export type AnnualSection = 'apply' | 'requests' | 'approvals' | 'team' | 'staff';
+type NavigationSection = AnnualSection | 'calendar' | 'policy';
 export type AnnualAccess = {
     sections: AnnualSection[];
     module: boolean;
@@ -13,19 +14,28 @@ export type AnnualAccess = {
     needs_unit: boolean;
     can_decide: boolean;
     can_review_partial: boolean;
+    can_manage_calendar: boolean;
+    can_manage_policy: boolean;
 };
-const props = defineProps<{ access: AnnualAccess; active: AnnualSection | null }>();
+const props = defineProps<{ access: AnnualAccess; active: NavigationSection | null }>();
 const catalog = {
     apply: { label: 'Mohon cuti', icon: ClipboardList, href: '/leave/annual?view=workflow&section=apply' },
     requests: { label: 'Permohonan saya', icon: FileText, href: '/leave/annual?view=workflow&section=requests' },
     approvals: { label: 'Sokongan & kelulusan', icon: ListChecks, href: '/leave/annual?view=workflow&section=approvals' },
     team: { label: 'Jadual unit', icon: UsersRound, href: '/leave/annual?view=workflow&section=team' },
     staff: { label: 'Profil & kelayakan', icon: UsersRound, href: '/leave/annual?section=staff' },
+    calendar: { label: 'Kalendar & cuti umum', icon: CalendarDays, href: '/leave/calendar-drafts' },
+    policy: { label: 'Dasar & kelayakan cuti', icon: SlidersHorizontal, href: '/leave/policy-drafts' },
 };
-const groups = computed(() => [
-    { label: 'Urusan cuti', items: props.access.sections.filter(item => item !== 'staff') },
-    { label: 'Pengurusan cuti', items: props.access.sections.filter(item => item === 'staff') },
-].filter(group => group.items.length));
+const groups = computed(() => {
+    const management: NavigationSection[] = props.access.sections.filter(item => item === 'staff');
+    if (props.access.can_manage_calendar) management.push('calendar');
+    if (props.access.can_manage_policy) management.push('policy');
+    return [
+        { label: 'Urusan cuti', items: props.access.sections.filter(item => item !== 'staff') as NavigationSection[] },
+        { label: 'Pengurusan cuti', items: management },
+    ].filter(group => group.items.length);
+});
 const open = ref(false);
 const toggle = ref<HTMLButtonElement | null>(null);
 watch(() => props.active, () => { open.value = false; });

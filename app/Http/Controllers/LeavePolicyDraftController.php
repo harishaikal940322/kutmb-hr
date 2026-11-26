@@ -17,7 +17,7 @@ use Inertia\Response;
 
 class LeavePolicyDraftController extends Controller
 {
-    public function index(VersionPeriodOverlap $overlap): Response
+    public function index(Request $request, VersionPeriodOverlap $overlap): Response
     {
         $versions = DB::table('leave_policy_versions')->orderByDesc('effective_from')->orderByDesc('id')->get();
         $versions->transform(function ($version) {
@@ -34,6 +34,7 @@ class LeavePolicyDraftController extends Controller
         });
 
         return Inertia::render('leave/PolicyDrafts', [
+            'access' => AnnualLeaveWorkflowController::capabilities($request->user()),
             'versions' => $overlap->annotate($versions), 'history' => $history,
             'categories' => DB::table('employment_categories')->where('active', true)->orderBy('name')->get(['id', 'code', 'name']),
             'entitlementDrafts' => DB::table('leave_entitlement_rule_drafts')->join('employment_categories', 'employment_categories.id', '=', 'leave_entitlement_rule_drafts.category_id')->orderBy('band_description')->get(['leave_entitlement_rule_drafts.id', 'policy_version_id', 'category_id', 'band_description', 'annual_half_day_units', 'leave_entitlement_rule_drafts.cancelled_at', 'leave_entitlement_rule_drafts.cancelled_by', 'employment_categories.name as category_name']),

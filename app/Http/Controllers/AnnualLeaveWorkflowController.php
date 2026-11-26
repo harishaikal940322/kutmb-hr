@@ -29,6 +29,8 @@ class AnnualLeaveWorkflowController extends Controller
         $review = $user->can('leave.partial-cancellation.review');
         $entitlements = $user->can('leave.entitlement.view');
         $technical = $user->can('iam.rbac.manage');
+        $calendar = $user->can('leave.calendar.manage');
+        $policy = $user->can('leave.policy.manage');
 
         $unitAvailable = false;
         if ($team && $linked) {
@@ -61,7 +63,9 @@ class AnnualLeaveWorkflowController extends Controller
 
         return [
             'sections' => $sections,
-            'module' => $self || $decision || $team || $review || $entitlements || $technical,
+            'module' => $self || $decision || $team || $review || $entitlements || $technical || $calendar || $policy,
+            'can_manage_calendar' => $calendar,
+            'can_manage_policy' => $policy,
             'technical' => $technical,
             'needs_employee' => ($self || $team) && ! $linked,
             'needs_unit' => $team && $linked && ! $unitAvailable,
@@ -85,7 +89,7 @@ class AnnualLeaveWorkflowController extends Controller
     {
         $today = now('Asia/Kuala_Lumpur')->toDateString();
         $canSelf = in_array('requests', $access['sections'], true);
-        $canDecide = $access['can_decide'];
+        $canDecide = $access['can_decide'] && self::isApprover($userId, $today);
         $canReviewPartial = $access['can_review_partial'];
         $accounts = $canSelf ? $this->accounts($userId, (int) substr($today, 0, 4)) : null;
         $balance = $accounts === null ? null : DB::transaction(function () use ($accounts, $totals, $projection): array {
@@ -151,6 +155,8 @@ class AnnualLeaveWorkflowController extends Controller
                     && $action->action_code === 'RETURN_FOR_CORRECTION');
                 $capabilities = [
                     'partial_status' => $partialStatus,
+                    'can_return_for_correction' => $page !== $history && $row->leave_type === 'AL'
+                        && $row->starts_on !== null && $row->starts_on > $today && $row->current_step_order !== null,
                     'can_resubmit' => $page === $history && $row->leave_type === 'AL' && $row->status === 'DRAFT'
                         && $returnedForCorrection && $row->session_mode !== 'UNSUPPORTED',
                     'can_request_partial' => $page === $history && $row->leave_type === 'AL' && $row->status === 'APPROVED'

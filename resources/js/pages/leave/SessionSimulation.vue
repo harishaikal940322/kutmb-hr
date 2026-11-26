@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import AnnualLeaveNavigation, { type AnnualAccess } from './AnnualLeaveNavigation.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 const props = defineProps<{
+    access: AnnualAccess;
     date: string;
     sessions: string[];
     units: number | null;
@@ -19,7 +21,10 @@ function simulate() {
 </script>
 <template>
     <Head title="Simulasi Sesi Cuti" />
-    <main class="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6">
+    <div class="@container/leave-module mx-auto w-full max-w-[100rem]">
+        <div class="grid min-w-0 items-start gap-4 px-3 py-4 sm:gap-5 sm:px-5 @min-[960px]/leave-module:grid-cols-[14rem_minmax(0,1fr)]">
+            <AnnualLeaveNavigation :access="access" active="calendar" />
+            <main class="min-w-0 mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6">
         <header>
             <h1 class="text-3xl font-semibold">Simulasi Sesi Cuti</h1>
             <p class="mt-2 text-sm text-muted-foreground">
@@ -79,5 +84,7 @@ function simulate() {
             Hasil simulasi: {{ units }} unit separuh hari ({{ units / 2 }}
             hari).
         </p>
-    </main>
+            </main>
+        </div>
+    </div>
 </template>

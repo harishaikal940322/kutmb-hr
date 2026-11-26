@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AnnualLeaveNavigation, { type AnnualAccess } from './AnnualLeaveNavigation.vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import VersionCancellationForm from './VersionCancellationForm.vue';
 import EntitlementCancellationForm from './EntitlementCancellationForm.vue';
@@ -51,6 +52,7 @@ type EntitlementDraft = {
     cancelled_by: number | null;
 };
 defineProps<{
+    access: AnnualAccess;
     versions: Version[];
     history: History[];
     categories: Category[];
@@ -96,7 +98,10 @@ function submit() {
 </script>
 <template>
     <Head title="Draf Dasar Cuti" />
-    <main class="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-6">
+    <div class="@container/leave-module mx-auto w-full max-w-[100rem]">
+        <div class="grid min-w-0 items-start gap-4 px-3 py-4 sm:gap-5 sm:px-5 @min-[960px]/leave-module:grid-cols-[14rem_minmax(0,1fr)]">
+            <AnnualLeaveNavigation :access="access" active="policy" />
+            <main class="min-w-0 mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-6">
         <header>
             <h1 class="text-3xl font-semibold">Draf Dasar Cuti</h1>
             <p class="mt-2 text-sm text-muted-foreground">
@@ -450,5 +455,7 @@ function submit() {
                 </li>
             </ul>
         </section>
-    </main>
+            </main>
+        </div>
+    </div>
 </template>

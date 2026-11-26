@@ -95,7 +95,7 @@ const menuCatalog: Record<string, NavItem> = {
     },
 };
 const page = usePage<{ visibleMenuKeys: string[] }>();
-const moduleKeys = new Set(['leave.annual.index', 'leave.annual.entitlements']);
+const moduleKeys = new Set(['leave.annual.index', 'leave.annual.entitlements', 'leave.calendar.drafts.index', 'leave.policy.drafts.index']);
 const moduleItems = computed(() =>
     page.props.visibleMenuKeys.some((key) => moduleKeys.has(key))
         ? [menuCatalog['leave.annual.index']]

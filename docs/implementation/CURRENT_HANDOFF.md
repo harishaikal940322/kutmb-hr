@@ -1,3 +1,8 @@
+## 26 November 2026 — permission navigation consistency
+
+- Follow-up to the permission-driven workspace: authorized calendar and policy draft pages now share the same responsive Cuti Tahunan content sub-sidebar and single main module entry. Calendar/policy-only permissions allow access to the module without requiring unrelated entitlement or approval grants. Existing draft routes retain their server permission checks.
+- The ordinary decision queue additionally requires an effective approval assignment before exposing its dataset. The correction-return option is limited to supported future AL rows; existing backend checks remain authoritative. No tests or build executed remotely; owner review remains pending.
+
 ## 26 November 2026 — permission-driven Annual Leave workspace
 
 - Requestor directed real permission-driven UI. The main module menu and shared responsive content sub-sidebar now use server-derived capabilities. Removed the design simulation from the reachable Annual Leave workspace; the frozen legacy Vue source is retained for design reference only. System Admin with IAM-only access sees a technical landing without HR data. Missing employee linkage or office appointment is explained without granting authority.
