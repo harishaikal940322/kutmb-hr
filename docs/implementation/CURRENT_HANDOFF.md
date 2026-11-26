@@ -1,3 +1,10 @@
+## 26 November 2026 — development role and permission seed
+
+- Requestor authorized direct remote source implementation and will review after pulling; formal automated tests remain deferred. Added `DevelopmentRoleSeeder` for the existing local `kutmb_hr_dev` MySQL target. Run `php artisan db:seed --class=DevelopmentRoleSeeder` after existing migrations. No account, user-role association, employee, office appointment, migration, or data reset is created by this seeder.
+- Seeds protected System Admin, Staf, Pengurus Unit, Pengurus Besar, Setiausaha ALK, Eksekutif HR, Pengurus HR and Pentadbir IT. Existing custom role definitions and their permission assignments are retained on reruns; protected System Admin retains original IAM management capability. No unrestricted HR access is inferred from System Admin or IT. Defaults for newly created development HR roles are synthetic least-privilege starting points for owner review, not formal HR grants.
+- Existing implemented calendar, entitlement confirmation/credit, partial-cancellation review and consent-recording permissions are now exposed in the IAM catalogue. The consent-recording permission is not automatically granted; its internal service is not a public route. Office-based approvals still require effective assignments, and the Secretary role alone confers no approval authority.
+- Next: permission-driven functional Annual Leave UI and explicit workflow permission boundaries; the existing design-only role simulation remains separate until functional pages replace it. Remote source changes only; no PHP execution, seed execution, build, database write or browser verification performed here.
+
 ## 26 November 2026 — correction resubmission and local bootstrap
 
 - Owner direction: local single-factor bootstrap/sign-in uses an 8-character minimum; `AGENTS.md` and `config/iam.php` now match.

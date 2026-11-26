@@ -33,6 +33,26 @@ return [
             'label' => 'Lihat profil dan kelayakan cuti',
             'description' => 'View minimum employee profile and confirmed annual entitlement in local development.',
             'group' => 'Annual leave', 'submodule' => 'Profil & kelayakan', 'action' => 'View', 'system_only' => false,
+        ], 'leave.calendar.team.view' => [
+            'label' => 'Lihat jadual cuti unit',
+            'description' => 'View approved absence names, dates and sessions for the linked employee’s current unit.',
+            'group' => 'Annual leave', 'submodule' => 'Jadual unit', 'action' => 'View', 'system_only' => false,
+        ], 'leave.entitlement.confirm' => [
+            'label' => 'Sahkan kelayakan cuti',
+            'description' => 'Confirm explicit synthetic annual entitlement input in local development.',
+            'group' => 'Annual leave', 'submodule' => 'Profil & kelayakan', 'action' => 'Confirm', 'system_only' => false,
+        ], 'leave.entitlement.credit' => [
+            'label' => 'Kredit kelayakan cuti',
+            'description' => 'Post confirmed annual entitlement using the existing once-only credit service.',
+            'group' => 'Annual leave', 'submodule' => 'Profil & kelayakan', 'action' => 'Credit', 'system_only' => false,
+        ], 'leave.partial-cancellation.review' => [
+            'label' => 'Semak pembatalan separa',
+            'description' => 'Verify actual return date for a supported partial leave cancellation.',
+            'group' => 'Annual leave', 'submodule' => 'Pindaan dan pembatalan', 'action' => 'Review', 'system_only' => false,
+        ], 'leave.request.record-on-behalf' => [
+            'label' => 'Rekod permohonan dengan pengesahan staf',
+            'description' => 'Internal consent-based recording authority; no public workflow is implied.',
+            'group' => 'Annual leave', 'submodule' => 'Permohonan', 'action' => 'Record', 'system_only' => false,
         ], 'leave.policy.manage' => [
             'label' => 'Manage draft leave policies', 'description' => 'Manage local development leave policy drafts.',
             'group' => 'Annual leave', 'submodule' => 'Policy drafts', 'action' => 'Manage', 'system_only' => false,
@@ -81,6 +101,43 @@ return [
             'system_only' => false,
         ],
     ],
+    // Defaults for new local development roles only; existing assignments are never synchronized by the seeder.
+    'development_role_defaults' => in_array($appEnvironment, ['local', 'testing'], true) ? [
+        'staff' => [
+            'label' => 'Staf',
+            'permissions' => ['hr.profile.self.view', 'leave.calendar.team.view'],
+        ],
+        'unit-manager' => [
+            'label' => 'Pengurus Unit',
+            'permissions' => ['hr.profile.self.view', 'leave.calendar.team.view'],
+        ],
+        'general-manager' => [
+            'label' => 'Pengurus Besar',
+            'permissions' => ['hr.profile.self.view', 'leave.calendar.team.view'],
+        ],
+        'alk-secretary' => [
+            'label' => 'Setiausaha ALK',
+            // Current approval authority requires an effective office assignment, not this role name.
+            'permissions' => [],
+        ],
+        'hr-executive' => [
+            'label' => 'Eksekutif HR',
+            'permissions' => ['hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage', 'leave.entitlement.view'],
+        ],
+        'hr-manager' => [
+            'label' => 'Pengurus HR',
+            'permissions' => [
+                'hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage',
+                'hr.organization.manage', 'hr.accounts.link', 'hr.offices.manage',
+                'leave.entitlement.view', 'leave.entitlement.confirm', 'leave.entitlement.credit',
+                'leave.calendar.manage', 'leave.policy.manage', 'leave.partial-cancellation.review',
+            ],
+        ],
+        'it-admin' => [
+            'label' => 'Pentadbir IT',
+            'permissions' => ['iam.users.view'],
+        ],
+    ] : [],
     'role_templates' => [
         'directory-viewer-v1' => [
             'label' => 'User directory viewer',

@@ -14,6 +14,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // No application accounts are seeded in the WP-020 foundation.
+        // Never seed application accounts or production HR role grants.
+        if (app()->environment(['local', 'testing']) && config('database.default') === 'mysql'
+            && config('database.connections.mysql.database') === 'kutmb_hr_dev') {
+            $this->call(DevelopmentRoleSeeder::class);
+        }
     }
 }
