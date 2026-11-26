@@ -1,0 +1,351 @@
+<?php
+
+namespace Tests\OwnerReview;
+
+use App\Models\User;
+use App\Services\Leave\AnnualEntitlementCreditService;
+use App\Services\Leave\AnnualLeaveYearCloseService;
+use App\Services\Leave\ConfirmedVersionLookup;
+use App\Services\Leave\LeaveAdjustmentService;
+use App\Services\Leave\LeaveRequestWorkflowService;
+use App\Services\Leave\LedgerPostedTotals;
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use DomainException;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
+use RuntimeException;
+use Tests\TestCase;
+
+/** Explicit opt-in only. Never include this in the general feature suite or run in parallel. */
+class AnnualLeaveReviewTest extends TestCase
+{
+    use DatabaseTransactions {
+        beginDatabaseTransaction as private beginRollbackTransaction;
+    }
+
+    private int $year;
+
+    public function beginDatabaseTransaction(): void
+    {
+        $config = config('database.connections.mysql');
+        if (getenv('KUTMB_OWNER_LEAVE_REVIEW') !== '1'
+            || ! app()->environment('testing') || app()->configurationIsCached()
+            || config('database.default') !== 'mysql'
+            || ($config['driver'] ?? null) !== 'mysql'
+            || ($config['host'] ?? null) !== 'mysql'
+            || ($config['database'] ?? null) !== 'kutmb_hr_dev'
+            || ! empty($config['url']) || ! empty($config['unix_socket'])
+            || isset($config['read']) || isset($config['write'])
+            || config('cache.default') !== 'array' || config('session.driver') !== 'array'
+            || config('queue.default') !== 'sync' || config('mail.default') !== 'array') {
+            throw new RuntimeException('Owner review refused: use the explicit local Docker command, uncached config and array session/cache/mail.');
+        }
+
+        $identity = DB::selectOne('SELECT DATABASE() AS db_name');
+        if ($identity?->db_name !== 'kutmb_hr_dev' || DB::transactionLevel() !== 0) {
+            throw new RuntimeException('Owner review refused: unexpected effective database or transaction state.');
+        }
+
+        $tables = DB::table('information_schema.tables')->whereRaw('table_schema = DATABASE()')
+            ->where('table_type', 'BASE TABLE')->get(['TABLE_NAME as name', 'ENGINE as engine']);
+        if ($tables->contains(fn ($row): bool => strtoupper((string) $row->engine) !== 'INNODB')) {
+            throw new RuntimeException('Owner review refused: nontransactional table found.');
+        }
+        foreach (['leave_balance_adjustments', 'leave_annual_commitments', 'leave_annual_year_closes', 'leave_attendance_review_outcomes',
+            'leave_reservation_slot_allocations', 'approval_assignments', 'leave_ledger_entries', 'users', 'audit_events'] as $table) {
+            if (! $tables->contains('name', $table)) {
+                throw new RuntimeException('Required migration missing: '.$table);
+            }
+        }
+        $this->beginRollbackTransaction();
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->assertGreaterThan(0, DB::transactionLevel());
+        $this->year = (int) now('Asia/Kuala_Lumpur')->format('Y');
+        Carbon::setTestNow(Carbon::parse($this->year.'-12-15 09:00:00', 'Asia/Kuala_Lumpur'));
+        // Read existing synthetic calendar/schedule and office configuration, never overwrite it.
+        $this->demoActor('unit-manager', 'leave.request.decide');
+        $this->demoActor('general-manager', 'leave.request.decide');
+        $this->demoActor('hr-manager', 'leave.year-end.post');
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
+
+    public function test_ct_040_adjustment_requires_independent_approval_and_posts_once(): void
+    {
+        $f = $this->fixture();
+        $maker = $this->actor('maker', ['leave.adjustment.prepare', 'leave.adjustment.decide']);
+        $checker = $this->actor('checker', ['leave.adjustment.decide']);
+        $outsider = $this->actor('outsider', []);
+        $service = app(LeaveAdjustmentService::class);
+        $payload = ['employee' => $f['employee'], 'bucket' => 'AL', 'units' => 3,
+            'reason' => 'Synthetic correction', 'evidence_reference' => 'SYNTHETIC-EVIDENCE', 'key' => $this->key()];
+
+        $this->denied(fn () => $service->prepare($outsider->id, $payload));
+        $id = $service->prepare($maker->id, $payload);
+        $this->assertSame($id, $service->prepare($maker->id, $payload));
+        $this->assertSame(40, $this->annual($f['annual']));
+        $this->assertDatabaseHas('leave_balance_adjustments', ['id' => $id, 'status' => 'PENDING', 'ledger_entry_id' => null]);
+        $decision = ['decision' => 'APPROVED', 'reason' => 'Synthetic verification', 'key' => $this->key()];
+        $this->denied(fn () => $service->decide($maker->id, $id, $decision));
+        $this->denied(fn () => $service->decide($outsider->id, $id, $decision));
+        $service->decide($checker->id, $id, $decision);
+        $service->decide($checker->id, $id, $decision);
+        $this->assertSame(43, $this->annual($f['annual']));
+        $this->assertDatabaseHas('leave_balance_adjustments', ['id' => $id, 'status' => 'APPROVED', 'before_units' => 40, 'after_units' => 43]);
+        $this->assertSame(1, DB::table('leave_ledger_entries')->where('annual_account_id', $f['annual'])->where('kind', 'hr_manual_adjustment')->count());
+
+        $rejected = $service->prepare($maker->id, [...$payload, 'key' => $this->key(), 'units' => -2]);
+        $service->decide($checker->id, $rejected, ['decision' => 'REJECTED', 'reason' => 'Synthetic rejection', 'key' => $this->key()]);
+        $this->assertSame(43, $this->annual($f['annual']));
+        $this->assertDatabaseHas('leave_balance_adjustments', ['id' => $rejected, 'status' => 'REJECTED', 'ledger_entry_id' => null]);
+    }
+
+    public function test_ct_037_future_approval_is_a_commitment_until_january_credit(): void
+    {
+        $f = $this->fixture();
+        $date = $this->workingDate(($this->year + 1).'-01-05', ($this->year + 1).'-01-20');
+        $payload = ['leave_type' => 'AL', 'start' => $date, 'end' => $date, 'session' => 'FULL', 'key' => $this->key()];
+        $this->actingAs($f['staff'])->from('/leave/annual')->post('/leave/annual/requests', $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $id = (int) DB::table('leave_requests')->where('submission_key', $payload['key'])->value('id');
+        $this->assertGreaterThan(0, $id);
+        $this->assertSame(2, app(LedgerPostedTotals::class)->pendingAnnualUnits($f['next']));
+        $this->assertSame(0, $this->annual($f['next']));
+        $this->approve($f, $id);
+        $this->assertDatabaseHas('leave_requests', ['id' => $id, 'status' => 'APPROVED']);
+        $this->assertDatabaseHas('leave_annual_commitments', ['annual_account_id' => $f['next'], 'units' => 2, 'status' => 'COMMITTED']);
+        $this->assertSame(0, $this->annual($f['next']));
+        $this->assertSame(0, app(LedgerPostedTotals::class)->pendingAnnualUnits($f['next']));
+        $this->actingAs($f['staff'])->get('/leave/annual?section=apply&view=workflow')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('leave/AnnualLeave')
+                ->where('workspace.future_balance.confirmed', 40)->where('workspace.future_balance.committed', 2)
+                ->where('workspace.future_balance.available', 38));
+
+        Carbon::setTestNow(Carbon::parse(($this->year + 1).'-01-01 09:00:00', 'Asia/Kuala_Lumpur'));
+        $credit = app(AnnualEntitlementCreditService::class);
+        $credit->creditConfirmedEntitlementOnJanuaryFirst($f['hr']->id, $f['next_confirmation']);
+        $again = $credit->creditConfirmedEntitlementOnJanuaryFirst($f['hr']->id, $f['next_confirmation']);
+        $this->assertTrue($again['replayed']);
+        $this->assertSame(38, $this->annual($f['next']));
+        $this->assertDatabaseHas('leave_annual_commitments', ['annual_account_id' => $f['next'], 'status' => 'SETTLED']);
+        $this->assertSame(1, DB::table('leave_ledger_entries')->where('annual_account_id', $f['next'])->where('kind', 'approved_leave_use')->count());
+    }
+
+    public function test_ct_034_cross_year_approval_and_cancellation_preserve_each_source(): void
+    {
+        $f = $this->fixture();
+        $dec = $this->workingDate($this->year.'-12-23', $this->year.'-12-31');
+        $jan = $this->workingDate(($this->year + 1).'-01-05', ($this->year + 1).'-01-20');
+        $workflow = app(LeaveRequestWorkflowService::class);
+        $result = $workflow->submit($f['staff']->id, $f['annual'], $f['tabung'], $this->key(), 'AL',
+            [['date' => $dec, 'session' => 'AM'], ['date' => $jan, 'session' => 'PM']]);
+        $this->assertSame(1, app(LedgerPostedTotals::class)->pendingAnnualUnits($f['annual']));
+        $this->assertSame(1, app(LedgerPostedTotals::class)->pendingAnnualUnits($f['next']));
+        $this->assertDatabaseHas('leave_reservation_slot_allocations', ['reservation_id' => $result['reservation_id'], 'annual_account_id' => $f['annual'], 'leave_year' => $this->year, 'leave_date' => $dec]);
+        $this->assertDatabaseHas('leave_reservation_slot_allocations', ['reservation_id' => $result['reservation_id'], 'annual_account_id' => $f['next'], 'leave_year' => $this->year + 1, 'leave_date' => $jan]);
+        $this->approve($f, $result['request_id']);
+        $this->assertSame(39, $this->annual($f['annual']));
+        $this->assertSame(0, $this->annual($f['next']));
+        $this->assertDatabaseHas('leave_annual_commitments', ['reservation_id' => $result['reservation_id'], 'annual_account_id' => $f['next'], 'units' => 1, 'status' => 'COMMITTED']);
+
+        $workflow->requestApprovedAnnualLeaveCancellation($f['staff']->id, $result['request_id'], $this->key(), 'Synthetic cancellation');
+        $workflow->decideApprovedAnnualLeaveCancellation($f['pb']->id, $result['request_id'], $this->key(), 'CONFIRM');
+        $this->assertSame(40, $this->annual($f['annual']));
+        $this->assertSame(0, $this->annual($f['next']));
+        $this->assertDatabaseHas('leave_annual_commitments', ['reservation_id' => $result['reservation_id'], 'status' => 'CANCELLED']);
+        $this->assertDatabaseHas('leave_requests', ['id' => $result['request_id'], 'status' => 'CANCELLED']);
+    }
+
+    public function test_ct_038_manual_close_retains_pending_and_carries_only_free_balance(): void
+    {
+        $f = $this->fixture();
+        $date = $this->workingDate($this->year.'-12-23', $this->year.'-12-31');
+        app(LeaveRequestWorkflowService::class)->submit($f['staff']->id, $f['annual'], $f['tabung'], $this->key(), 'AL',
+            [['date' => $date, 'session' => 'AM'], ['date' => $date, 'session' => 'PM']]);
+        $service = app(AnnualLeaveYearCloseService::class);
+        $this->assertFalse($service->eligibility($f['employee'], $this->year, 40)['can_post']);
+        Carbon::setTestNow(Carbon::parse(($this->year + 1).'-01-01 09:00:00', 'Asia/Kuala_Lumpur'));
+        app(AnnualEntitlementCreditService::class)->creditConfirmedEntitlementOnJanuaryFirst($f['hr']->id, $f['next_confirmation']);
+        $this->assertFalse($service->eligibility($f['employee'], $this->year, 39)['can_post']);
+        $preview = $service->eligibility($f['employee'], $this->year, 40);
+        $this->assertTrue($preview['can_post'], (string) $preview['reason']);
+        $this->assertSame(['annual' => 40, 'pending' => 2, 'tabung' => 0, 'transfer' => 38], $preview['snapshot']);
+        $this->denied(fn () => $service->close($f['hr']->id, $f['employee'], $this->year, 40, [...$preview['snapshot'], 'transfer' => 37], 'Synthetic close'));
+        $service->close($f['hr']->id, $f['employee'], $this->year, 40, $preview['snapshot'], 'Synthetic close');
+        $service->close($f['hr']->id, $f['employee'], $this->year, 40, $preview['snapshot'], 'Synthetic close');
+        $this->assertSame(2, $this->annual($f['annual']));
+        $this->assertSame(2, app(LedgerPostedTotals::class)->pendingAnnualUnits($f['annual']));
+        $this->assertSame(38, $this->tabung($f['tabung']));
+        $this->assertSame(40, $this->annual($f['next']));
+        $this->assertSame(1, DB::table('leave_annual_year_closes')->where('annual_account_id', $f['annual'])->count());
+    }
+
+    public function test_ct_051_assisted_submission_requires_consent_and_preserves_applicant(): void
+    {
+        $f = $this->fixture();
+        $date = $this->workingDate($this->year.'-12-23', $this->year.'-12-31');
+        $payload = ['employee' => $f['employee'], 'leave_type' => 'AL', 'start' => $date, 'end' => $date,
+            'session' => 'AM', 'reason' => 'Synthetic leave', 'recording_reason' => 'Synthetic assistance',
+            'consent_reference' => 'SYNTHETIC-CONSENT', 'confirmed_at' => $this->year.'-12-15T08:30',
+            'consent_acknowledged' => true, 'key' => $this->key()];
+        $this->actingAs($f['staff'])->post('/leave/annual/record', $payload)->assertForbidden();
+        $this->actingAs($f['hr'])->from('/leave/annual/record')->post('/leave/annual/record', [...$payload, 'consent_acknowledged' => false])
+            ->assertSessionHasErrors('consent_acknowledged');
+        $this->post('/leave/annual/record', $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $id = (int) DB::table('leave_requests')->where('submission_key', $payload['key'])->value('id');
+        $this->assertGreaterThan(0, $id);
+        $this->assertDatabaseHas('leave_requests', ['id' => $id, 'employee_id' => $f['employee'], 'requester_user_id' => $f['staff']->id]);
+        $this->assertDatabaseHas('leave_request_on_behalf_submissions', ['request_id' => $id, 'hr_actor_user_id' => $f['hr']->id,
+            'applicant_user_id' => $f['staff']->id, 'consent_evidence_reference' => 'SYNTHETIC-CONSENT']);
+        $this->assertSame(40, $this->annual($f['annual']));
+        $this->assertSame(1, app(LedgerPostedTotals::class)->pendingAnnualUnits($f['annual']));
+    }
+
+    public function test_ct_029_hr_review_records_finding_without_second_debit(): void
+    {
+        $f = $this->fixture();
+        $date = $this->workingDate($this->year.'-12-01', $this->year.'-12-10');
+        $workflow = app(LeaveRequestWorkflowService::class);
+        $result = $workflow->submit($f['staff']->id, $f['annual'], $f['tabung'], $this->key(), 'EL',
+            [['date' => $date, 'session' => 'PM']], 'Synthetic emergency');
+        $workflow->decide($f['pu']->id, $result['request_id'], $this->key(), 'SUPPORT');
+        $workflow->decide($f['pb']->id, $result['request_id'], $this->key(), 'REJECT', 'Synthetic rejection');
+        $review = DB::table('leave_attendance_reviews as review')->join('leave_request_revisions as revision', 'revision.id', '=', 'review.revision_id')
+            ->where('revision.request_id', $result['request_id'])->first(['review.id', 'review.review_code']);
+        $this->assertNotNull($review);
+        $this->assertSame('RETROSPECTIVE_EL_REJECTION', $review->review_code);
+        $this->assertSame(39, $this->annual($f['annual']));
+        $url = '/leave/annual/reports/reviews/'.$review->id.'/outcome';
+        $payload = ['finding' => 'ABSENCE_CONFIRMED', 'note' => 'Synthetic verified absence', 'evidence_reference' => 'SYNTHETIC-ATTENDANCE', 'operation_key' => $this->key()];
+        $this->actingAs($f['staff'])->post($url, $payload)->assertForbidden();
+        $this->actingAs($f['hr'])->from('/leave/annual/reports')->post($url, $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->post($url, $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(1, DB::table('leave_attendance_review_outcomes')->where('review_id', $review->id)->count());
+        $this->assertDatabaseHas('leave_attendance_review_outcomes', ['review_id' => $review->id, 'finding' => 'ABSENCE_CONFIRMED', 'reviewer_id' => $f['hr']->id]);
+        $this->assertSame(39, $this->annual($f['annual']));
+        $this->assertDatabaseHas('leave_requests', ['id' => $result['request_id'], 'status' => 'REJECTED']);
+    }
+
+    public function test_permission_driven_pages_do_not_expose_hr_data_to_staff(): void
+    {
+        $f = $this->fixture();
+        $this->actingAs($f['staff'])->get('/leave/annual/ledger?year='.$this->year)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('leave/Operations')->where('mode', 'ledger')
+                ->where('balance.annual_half_day_units', 40)->has('entries.data', 1)->missing('accounts')->missing('reviews'));
+        foreach (['reports', 'adjustments', 'year-end', 'record'] as $page) {
+            $this->get('/leave/annual/'.$page)->assertForbidden();
+        }
+        $this->actingAs($f['hr'])->get('/leave/annual/reports?year='.$this->year)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('leave/Operations')->where('mode', 'reports')->has('accounts.data'));
+        $this->get('/leave/annual/year-end')->assertOk();
+        $this->get('/leave/annual/record')->assertOk();
+        $this->get('/leave/annual/adjustments')->assertOk();
+    }
+
+    private function fixture(): array
+    {
+        $suffix = Str::lower(Str::random(10));
+        $staff = $this->actor('staff', ['leave.request.self']);
+        $hr = $this->actor('hr', ['leave.entitlement.confirm', 'leave.entitlement.credit', 'leave.entitlement.view',
+            'leave.reports.view', 'leave.attendance.review', 'leave.request.record-on-behalf', 'leave.year-end.preview',
+            'leave.year-end.post', 'leave.adjustment.decide']);
+        $pu = $this->demoActor('unit-manager', 'leave.request.decide');
+        $pb = $this->demoActor('general-manager', 'leave.request.decide');
+        $unit = DB::table('organization_units')->where('code', 'DEV-OPERASI')->where('active', true)->value('id');
+        $category = DB::table('employment_categories')->where('code', 'DEV-PEKERJA')->where('active', true)->value('id');
+        $this->assertNotNull($unit, 'Run DevelopmentEmployeeOrganizationSeeder first.');
+        $this->assertNotNull($category);
+        $employee = DB::table('employees')->insertGetId(['employee_no' => 'QA-'.$suffix, 'display_name' => 'Synthetic QA '.$suffix,
+            'user_id' => $staff->id, 'service_start' => ($this->year - 3).'-01-01']);
+        DB::table('employee_assignments')->insert(['employee_id' => $employee, 'unit_id' => $unit, 'category_id' => $category,
+            'effective_from' => ($this->year - 3).'-01-01']);
+        $annual = DB::table('leave_annual_accounts')->insertGetId(['employee_id' => $employee, 'leave_year' => $this->year]);
+        $next = DB::table('leave_annual_accounts')->insertGetId(['employee_id' => $employee, 'leave_year' => $this->year + 1]);
+        $tabung = DB::table('leave_tabung_accounts')->insertGetId(['employee_id' => $employee]);
+        $service = app(AnnualEntitlementCreditService::class);
+        Carbon::setTestNow(Carbon::parse($this->year.'-01-01 09:00:00', 'Asia/Kuala_Lumpur'));
+        $confirmation = $service->confirmAnnualEntitlement($hr->id, $annual, 40, 'Synthetic QA current', $this->key());
+        $service->creditConfirmedEntitlementOnJanuaryFirst($hr->id, $confirmation['confirmation_id']);
+        Carbon::setTestNow(Carbon::parse($this->year.'-12-15 09:00:00', 'Asia/Kuala_Lumpur'));
+        $future = $service->confirmAnnualEntitlement($hr->id, $next, 40, 'Synthetic QA future', $this->key());
+
+        return ['employee' => $employee, 'staff' => $staff, 'hr' => $hr, 'pu' => $pu, 'pb' => $pb,
+            'annual' => $annual, 'next' => $next, 'tabung' => $tabung, 'next_confirmation' => $future['confirmation_id']];
+    }
+
+    private function actor(string $label, array $permissions): User
+    {
+        $this->assertGreaterThan(0, DB::transactionLevel());
+        $user = User::factory()->create(['username' => 'qa-'.$label.'-'.Str::lower(Str::random(10)), 'email' => null, 'status' => 'ACTIVE']);
+        if ($permissions !== []) {
+            $user->givePermissionTo($permissions);
+        }
+        return $user;
+    }
+
+    private function demoActor(string $role, string $permission): User
+    {
+        $user = User::query()->where('username_canonical', 'dev-'.$role)->where('status', 'ACTIVE')->first();
+        $this->assertNotNull($user, 'Missing synthetic development account: '.$role);
+        $this->assertTrue(DB::table('audit_events')->where('action_code', 'iam.development_user.seeded')->where('target_ref', 'user:'.$user->id)->exists());
+        $this->assertTrue($user->can($permission), 'Run DevelopmentLeaveAccessSeeder first: '.$permission);
+        return $user;
+    }
+
+    private function approve(array $fixture, int $id): void
+    {
+        $workflow = app(LeaveRequestWorkflowService::class);
+        $workflow->decide($fixture['pu']->id, $id, $this->key(), 'SUPPORT');
+        $workflow->decide($fixture['pb']->id, $id, $this->key(), 'APPROVE');
+    }
+
+    private function workingDate(string $from, string $to): string
+    {
+        $lookup = app(ConfirmedVersionLookup::class);
+        for ($date = CarbonImmutable::parse($from, 'Asia/Kuala_Lumpur'); $date->toDateString() <= $to; $date = $date->addDay()) {
+            $day = $date->toDateString();
+            $schedule = $lookup->workingScheduleFor($day);
+            $calendar = $lookup->calendarFor($day);
+            if (in_array((int) $date->format('N'), $schedule->working_weekdays, true) && ! in_array($day, $calendar['holidays'], true)) {
+                return $day;
+            }
+        }
+        throw new RuntimeException('No configured working day in the synthetic review range.');
+    }
+
+    private function annual(int $id): int
+    {
+        return (int) DB::table('leave_ledger_entries')->where('annual_account_id', $id)->sum('signed_half_day_units');
+    }
+
+    private function tabung(int $id): int
+    {
+        return (int) DB::table('leave_ledger_entries')->where('tabung_account_id', $id)->sum('signed_half_day_units');
+    }
+
+    private function key(): string
+    {
+        return (string) Str::uuid();
+    }
+
+    private function denied(callable $operation): void
+    {
+        try {
+            $operation();
+        } catch (DomainException) {
+            $this->addToAssertionCount(1);
+            return;
+        }
+        $this->fail('Expected operation to fail closed.');
+    }
+}
