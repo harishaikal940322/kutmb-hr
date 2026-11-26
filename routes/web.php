@@ -19,6 +19,7 @@ use App\Http\Controllers\MfaController;
 use App\Http\Controllers\OrganizationReferenceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserDirectoryController;
+use App\Http\Controllers\UserAdministrationController;
 use App\Http\Middleware\EnsureLocalHrDevelopment;
 use Illuminate\Support\Facades\Route;
 
@@ -70,8 +71,14 @@ Route::middleware('protected')->group(function () {
     Route::get('profile', [ProfileController::class, 'show'])->name('profile');
     Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::get('users', UserDirectoryController::class)
-        ->middleware(['user-directory-preview', 'permission:iam.users.view'])
+        ->middleware('user-directory-preview')
         ->name('users.index');
+    Route::middleware(['user-directory-preview', 'can:iam.rbac.manage'])->group(function (): void {
+        Route::post('users', [UserAdministrationController::class, 'store'])->name('users.store');
+        Route::patch('users/{user}/profile', [UserAdministrationController::class, 'updateProfile'])->whereNumber('user')->name('users.profile.update');
+        Route::put('users/{user}/roles', [UserAdministrationController::class, 'updateRoles'])->whereNumber('user')->name('users.roles.update');
+        Route::patch('users/{user}/status', [UserAdministrationController::class, 'updateStatus'])->whereNumber('user')->name('users.status.update');
+    });
 });
 
 Route::get('/leave/annual', AnnualLeaveController::class)

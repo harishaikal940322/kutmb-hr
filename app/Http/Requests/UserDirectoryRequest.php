@@ -17,6 +17,8 @@ class UserDirectoryRequest extends FormRequest
         return [
             'search' => ['sometimes', 'nullable', 'string', 'max:100'],
             'page' => ['sometimes', 'integer', 'min:1', 'max:10000'],
+            'status' => ['sometimes', 'nullable', 'in:ACTIVE,INACTIVE'],
+            'role' => ['sometimes', 'nullable', 'integer', 'min:1', 'exists:roles,id'],
         ];
     }
 }

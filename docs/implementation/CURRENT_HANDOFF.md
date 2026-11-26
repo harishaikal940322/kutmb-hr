@@ -1,3 +1,9 @@
+## 26 November 2026 — local user administration
+
+- Requestor authorized implementation of the missing Pengguna module based on DOC-005 IAM-FR-001/002/005/006/009/010/012 and IAM-AUD-001, DOC-011 and TD-001/002/007–011. The existing /users page now appears under Administration for the protected System Admin in local development without the optional read-only preview toggle. Other authorized preview readers remain read-only and production remains gated.
+- Local protected administrators can list/search/filter actual account data, create active username/password accounts with non-system roles, edit display names, change assignable roles, and activate/deactivate ordinary accounts. Protected roles, privileged targets and the actor's own account cannot be mutated here. Role/status writes are serialized by iam_guard; affected sessions are revoked on role changes/deactivation; audit metadata excludes credentials. No reset, account deletion, production provisioning, delegated administration or employee linkage is introduced.
+- Remote source only; no tests, build, seed execution or database access. Existing DevelopmentUserSeeder remains the explicit way to populate synthetic user accounts. Owner to pull and build assets for browser review.
+
 ## 26 November 2026 — synthetic development user seed
 
 - Requestor explicitly authorized a development account for every non-System Admin seed role with the shared synthetic password `password`. Added `DevelopmentUserSeeder`, invoked explicitly with `php artisan db:seed --class=DevelopmentUserSeeder`; not invoked by ordinary DatabaseSeeder. Restricted to APP_ENV=local and the existing MySQL database kutmb_hr_dev.

@@ -21,8 +21,12 @@ class NavigationMenuService
                 continue;
             }
 
-            if ($key === 'users.index' && (! app()->environment(['local', 'testing'])
-                || ! config('iam.local_user_directory_preview_enabled'))) {
+            if ($key === 'users.index') {
+                $permission = $menu['editable'] ? ($permissionMap[$key] ?? $menu['permission']) : $menu['permission'];
+                $access = app(UserAdministrationAccess::class);
+                if ($access->canManage($user) || ($access->canView($user) && $user->can($permission))) {
+                    $visible[] = $key;
+                }
                 continue;
             }
 

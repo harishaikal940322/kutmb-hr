@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\Identity\NavigationMenuService;
+use App\Services\Identity\UserAdministrationAccess;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -42,10 +43,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user()?->only(['name', 'email']),
             ],
-            'userDirectoryPreview' => app()->environment(['local', 'testing'])
-                && (bool) config('iam.local_user_directory_preview_enabled')
-                && $request->user() !== null
-                && $request->user()->can('iam.users.view'),
+            'userDirectoryPreview' => app(UserAdministrationAccess::class)->canView($request->user()),
             'visibleMenuKeys' => $request->user() === null
                 ? []
                 : app(NavigationMenuService::class)->visibleKeys($request->user()),

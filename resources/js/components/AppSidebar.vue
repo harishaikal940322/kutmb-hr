@@ -74,7 +74,7 @@ const menuCatalog: Record<string, NavItem> = {
         icon: UsersRound,
     },
     'users.index': {
-        title: 'Direktori Pengguna',
+        title: 'Pengguna',
         href: '/users',
         icon: UsersRound,
     },
@@ -102,6 +102,7 @@ const moduleItems = computed(() =>
         : [],
 );
 const systemAdministrationKeys = new Set([
+    'users.index',
     'iam.roles.index',
     'iam.permissions.index',
     'iam.menus.index',
