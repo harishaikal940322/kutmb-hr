@@ -55,7 +55,7 @@ class AnnualLeaveReviewTest extends TestCase
             throw new RuntimeException('Owner review refused: nontransactional table found.');
         }
         foreach (['leave_balance_adjustments', 'leave_annual_commitments', 'leave_annual_year_closes', 'leave_attendance_review_outcomes',
-            'leave_reservation_slot_allocations', 'leave_tabung_cap_confirmations', 'leave_late_release_claims', 'leave_late_reconciliations', 'leave_attendance_non_use_slots', 'approval_assignments', 'leave_ledger_entries', 'users', 'audit_events'] as $table) {
+            'leave_reservation_slot_allocations', 'leave_tabung_cap_confirmations', 'leave_late_release_claims', 'leave_late_reconciliations', 'leave_attendance_non_use_slots', 'leave_exit_settlements', 'leave_exit_settlement_events', 'approval_assignments', 'leave_ledger_entries', 'users', 'audit_events'] as $table) {
             if (! $tables->contains('name', $table)) {
                 throw new RuntimeException('Required migration missing: '.$table);
             }
@@ -565,6 +565,62 @@ class AnnualLeaveReviewTest extends TestCase
         $this->assertDatabaseHas('leave_late_reconciliations', ['source_kind' => 'HR_ADJUSTMENT', 'source_id' => $id,
             'eligible_units' => 2, 'transfer_units' => 0, 'burn_units' => 2]);
         $this->denied(fn () => $service->prepare($maker->id, [...$payload, 'historical_eligible' => true, 'key' => $this->key()]));
+    }
+
+    public function test_tb_06_exit_settlement_prorata_fifo_and_external_confirmation(): void
+    {
+        $f = $this->fixture();
+        $maker = $this->actor('settlement-maker', ['leave.settlement.prepare', 'leave.settlement.confirm', 'leave.adjustment.prepare']);
+        $checker = $this->actor('settlement-checker', ['leave.settlement.confirm', 'leave.adjustment.decide']);
+        $service = app(\App\Services\Leave\LeaveExitSettlementService::class);
+        $adjustments = app(LeaveAdjustmentService::class);
+        // Synthetic Tabung fixture: one half-day of current-year source.
+        $adjustment = $adjustments->prepare($maker->id, ['employee' => $f['employee'], 'bucket' => 'TABUNG',
+            'source_year' => $this->year, 'units' => 1, 'reason' => 'Synthetic Tabung fixture',
+            'evidence_reference' => 'SYNTHETIC-TABUNG', 'key' => $this->key()]);
+        $adjustments->decide($checker->id, $adjustment, ['decision' => 'APPROVED', 'reason' => 'Verified', 'key' => $this->key()]);
+        Carbon::setTestNow(Carbon::parse($this->year.'-10-01 08:00:00', 'Asia/Kuala_Lumpur'));
+        $workflow = app(LeaveRequestWorkflowService::class);
+        // 39 half-days of approved AL, through the ordinary short-request workflow.
+        $cursor = $this->year.'-10-05';
+        for ($i = 0; $i < 20; $i++) {
+            $date = $this->workingDate($cursor, $this->year.'-11-30');
+            $slots = [['date' => $date, 'session' => 'AM']];
+            if ($i < 19) {
+                $slots[] = ['date' => $date, 'session' => 'PM'];
+            }
+            $request = $workflow->submit($f['staff']->id, $f['annual'], $f['tabung'], $this->key(), 'AL', $slots, 'Synthetic leave');
+            $this->approve($f, $request['request_id']);
+            $cursor = CarbonImmutable::parse($date, 'Asia/Kuala_Lumpur')->addDay()->toDateString();
+        }
+        $this->assertSame(1, $this->annual($f['annual']));
+        $this->assertSame(1, $this->tabung($f['tabung']));
+        DB::table('employees')->where('id', $f['employee'])->update(['service_end' => $this->year.'-11-30']);
+        Carbon::setTestNow(Carbon::parse($this->year.'-12-15 09:00:00', 'Asia/Kuala_Lumpur'));
+        $key = $this->key();
+        $this->denied(fn () => $service->prepare($f['staff']->id, $f['employee'], $key, 'SYNTHETIC-EXIT', 'Synthetic exit'));
+        $id = $service->prepare($maker->id, $f['employee'], $key, 'SYNTHETIC-EXIT', 'Synthetic exit');
+        $this->assertSame($id, $service->prepare($maker->id, $f['employee'], $key, 'SYNTHETIC-EXIT', 'Synthetic exit'));
+        $this->assertDatabaseHas('leave_exit_settlements', ['id' => $id, 'credited_units' => 40,
+            'final_entitlement_units' => 37, 'deficit_units' => 2, 'offset_units' => 1, 'residual_units' => 1]);
+        $this->assertSame(1, $this->annual($f['annual']));
+        $start = $this->key();
+        $this->denied(fn () => $service->transition($maker->id, $id, 'STARTED', $start, 'Self confirmation denied'));
+        $service->transition($checker->id, $id, 'STARTED', $start, 'Verified prorata and FIFO');
+        $service->transition($checker->id, $id, 'STARTED', $start, 'Verified prorata and FIFO');
+        $this->assertSame(-1, $this->annual($f['annual']));
+        $this->assertSame(0, $this->tabung($f['tabung']));
+        $this->denied(fn () => $service->transition($checker->id, $id, 'SETTLED', $this->key(), 'Missing evidence'));
+        $service->transition($maker->id, $id, 'EVIDENCE', $this->key(), 'External evidence recorded', 'SYNTHETIC-EXTERNAL', $this->year.'-12-15');
+        $final = $this->key();
+        $service->transition($checker->id, $id, 'SETTLED', $final, 'Verified external settlement');
+        $service->transition($checker->id, $id, 'SETTLED', $final, 'Verified external settlement');
+        $this->assertSame(3, DB::table('leave_exit_settlement_events')->where('settlement_id', $id)->count());
+        $this->assertSame(-1, $this->annual($f['annual']));
+        $this->assertSame(0, $this->annual($f['next']));
+        $this->actingAs($f['staff'])->get('/leave/annual/settlements')->assertForbidden();
+        $this->actingAs($checker)->get('/leave/annual/settlements?status=SETTLED')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('leave/Settlements')->where('status', 'SETTLED')->has('rows.data'));
     }
 
     private function fixture(): array

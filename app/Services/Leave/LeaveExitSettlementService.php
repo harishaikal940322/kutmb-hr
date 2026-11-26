@@ -107,6 +107,13 @@ class LeaveExitSettlementService
                 if ($employee->service_end !== $case->exit_date) {
                     throw new DomainException('Tarikh tamat perkhidmatan berubah; rujuk HR.');
                 }
+                if (DB::table('leave_reservations')->where('employee_id', $employee->id)->where('status', 'ACTIVE')->exists()
+                    || DB::table('leave_requests')->where('employee_id', $employee->id)->whereNotIn('status', ['APPROVED','REJECTED','CANCELLED','WITHDRAWN'])->exists()
+                    || DB::table('leave_balance_adjustments')->where('employee_id', $employee->id)->where('status', 'PENDING')->exists()
+                    || DB::table('leave_request_partial_cancellations as p')->join('leave_requests as q', 'q.id', '=', 'p.request_id')
+                        ->where('q.employee_id', $employee->id)->whereIn('p.status', ['REQUESTED','HR_VERIFIED'])->exists()) {
+                    throw new DomainException('Terdapat permohonan atau pelarasan belum selesai; rujuk HR.');
+                }
                 $posted = $this->totals->forAccounts((int) $case->annual_account_id, (int) $case->tabung_account_id);
                 $snapshot = json_decode($case->snapshot, true, 512, JSON_THROW_ON_ERROR);
                 $start = $events->get('STARTED');
@@ -139,6 +146,7 @@ class LeaveExitSettlementService
         $tabung = DB::table('leave_tabung_accounts')->where('employee_id', $employee->id)->lockForUpdate()->first();
         if ($annual === null || $tabung === null || DB::table('leave_annual_year_closes')->where('annual_account_id', $annual->id)->exists()
             || DB::table('leave_reservations')->where('employee_id', $employee->id)->where('status', 'ACTIVE')->exists()
+            || DB::table('leave_requests')->where('employee_id', $employee->id)->whereNotIn('status', ['APPROVED','REJECTED','CANCELLED','WITHDRAWN'])->exists()
             || DB::table('leave_annual_commitments')->whereIn('annual_account_id', DB::table('leave_annual_accounts')->where('employee_id', $employee->id)->select('id'))->where('status', 'COMMITTED')->exists()
             || DB::table('leave_balance_adjustments')->where('employee_id', $employee->id)->where('status', 'PENDING')->exists()
             || DB::table('leave_request_partial_cancellations as p')->join('leave_requests as q', 'q.id', '=', 'p.request_id')->where('q.employee_id', $employee->id)->whereIn('p.status', ['REQUESTED','HR_VERIFIED'])->exists()
