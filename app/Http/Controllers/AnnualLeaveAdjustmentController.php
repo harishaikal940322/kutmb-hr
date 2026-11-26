@@ -51,16 +51,18 @@ class AnnualLeaveAdjustmentController extends Controller
                 ->where('p.case_kind', 'AFTER_END')->when(! $decide, fn ($query) => $query->where('p.requested_by', $actor->id))
                 ->where(fn ($query) => $query->whereNull('e.user_id')->orWhere('e.user_id', '<>', $actor->id))
                 ->orderByDesc('p.id')->simplePaginate(20, ['p.id', 'q.request_key', 'e.employee_no', 'e.display_name', 'p.status',
-                    'p.request_reason', 'p.evidence_reference', 'p.actual_return_date', 'p.actual_return_session', 'p.unused_half_day_units'], 'special_page'),
+                    'p.request_reason', 'p.evidence_reference', 'p.actual_return_date', 'p.actual_return_session', 'p.unused_half_day_units',
+                    DB::raw('(SELECT SUM(recon.transfer_units) FROM leave_partial_refund_reconciliations AS recon WHERE recon.partial_cancellation_id = p.id) AS reconciliation_transfer'),
+                    DB::raw('(SELECT SUM(recon.burn_units) FROM leave_partial_refund_reconciliations AS recon WHERE recon.partial_cancellation_id = p.id) AS reconciliation_burn')], 'special_page'),
             'specialCandidates' => $prepare ? DB::table('leave_requests as q')
                 ->join('leave_request_revisions as r', fn ($join) => $join->on('r.request_id', '=', 'q.id')->on('r.revision', '=', 'q.current_revision'))
                 ->join('leave_reservations as b', 'b.id', '=', 'r.reservation_id')->join('employees as e', 'e.id', '=', 'q.employee_id')
                 ->where('q.status', 'APPROVED')->where('q.leave_type', 'AL')->where('b.status', 'COMMITTED')
-                ->where('b.leave_year', (int) now('Asia/Kuala_Lumpur')->format('Y'))->whereColumn('e.user_id', 'q.requester_user_id')
+                ->where('b.leave_year', '<=', (int) now('Asia/Kuala_Lumpur')->format('Y'))->whereColumn('e.user_id', 'q.requester_user_id')
                 ->where('e.user_id', '<>', $actor->id)
                 ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('leave_request_days as d')->whereColumn('d.revision_id', 'r.id')->where('d.leave_date', '>', now('Asia/Kuala_Lumpur')->toDateString()))
                 ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('leave_request_partial_cancellations as p')->whereColumn('p.request_id', 'q.id')->whereIn('p.status', ['REQUESTED', 'HR_VERIFIED', 'CONFIRMED']))
-                ->orderByDesc('q.id')->limit(50)->get(['q.request_key', 'e.employee_no', 'e.display_name']) : [],
+                ->orderByDesc('q.id')->limit(50)->get(['q.request_key', 'e.employee_no', 'e.display_name', 'b.leave_year']) : [],
             'employees' => $prepare ? DB::table('employees')->where(fn ($q) => $q->whereNull('user_id')->orWhere('user_id', '<>', $actor->id))
                 ->orderBy('display_name')->get(['id', 'employee_no', 'display_name']) : [],
         ]);

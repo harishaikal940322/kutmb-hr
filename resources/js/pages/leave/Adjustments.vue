@@ -4,8 +4,8 @@ import { ref } from 'vue';
 import AnnualLeaveNavigation, { type AnnualAccess } from './AnnualLeaveNavigation.vue';
 
 type Adjustment = { historical_eligible: number | boolean; reconciliation_transfer: number | null; reconciliation_burn: number | null; id: number; display_name: string; employee_no: string; leave_year: number; bucket: string; source_year: number | null; signed_units: number; reason: string; evidence_reference: string; prepared_balance: number; prepared_pending: number; status: 'PENDING' | 'APPROVED' | 'REJECTED'; before_units: number | null; after_units: number | null; decision_reason: string | null; prepared_by_name: string; decided_by_name: string | null; can_decide: boolean; created_at: string };
-type SpecialCase = { id: number; request_key: string; display_name: string; employee_no: string; status: string; request_reason: string; evidence_reference: string; actual_return_date: string | null; actual_return_session: string | null; unused_half_day_units: number | null };
-const props = defineProps<{ specialCases: { data: SpecialCase[]; prev_page_url: string | null; next_page_url: string | null }; specialCandidates: { request_key: string; display_name: string; employee_no: string }[]; access: AnnualAccess; canPrepare: boolean; year: number; employees: { id: number; employee_no: string; display_name: string }[]; adjustments: { data: Adjustment[]; prev_page_url: string | null; next_page_url: string | null } }>();
+type SpecialCase = { id: number; request_key: string; display_name: string; employee_no: string; status: string; request_reason: string; evidence_reference: string; actual_return_date: string | null; actual_return_session: string | null; unused_half_day_units: number | null; reconciliation_transfer: number | null; reconciliation_burn: number | null };
+const props = defineProps<{ specialCases: { data: SpecialCase[]; prev_page_url: string | null; next_page_url: string | null }; specialCandidates: { request_key: string; display_name: string; employee_no: string; leave_year: number }[]; access: AnnualAccess; canPrepare: boolean; year: number; employees: { id: number; employee_no: string; display_name: string }[]; adjustments: { data: Adjustment[]; prev_page_url: string | null; next_page_url: string | null } }>();
 defineOptions({ layout: { breadcrumbs: [{ title: 'Cuti Tahunan', href: '/leave/annual' }] } });
 const prepare = useForm({ employee: '', bucket: 'AL', leave_year: props.year, historical_eligible: false, source_year: props.year, units: '', reason: '', evidence_reference: '', key: '' });
 const decide = useForm({ decision: 'APPROVED', reason: '', key: '', historical_verified: false });
@@ -54,9 +54,9 @@ function days(value: number | null) { return value === null ? '—' : (Number(va
                 </form>
                 <section class="space-y-4 rounded-xl border border-border bg-card p-5">
                     <h2 class="font-semibold">Pelarasan khas selepas cuti tamat</h2>
-                    <p class="text-sm text-muted-foreground">CR-Q03 · Rujuk permohonan asal dan bukti kehadiran. HR menyemak tarikh/sesi sebenar, Pengurus Besar mengesahkan. Baki hanya dipulangkan selepas keputusan akhir. Tahun lama masih memerlukan rekonsiliasi.</p>
+                    <p class="text-sm text-muted-foreground">CR-Q03 · Rujuk permohonan asal dan bukti kehadiran. HR menyemak tarikh/sesi sebenar, Pengurus Besar mengesahkan. Baki hanya dipulangkan selepas keputusan akhir. AL tahun tertutup yang layak dipindah ke Tabung mengikut kapasiti semasa; lebihan burn. Sumber asal dan debit yang lengkap diperlukan.</p>
                     <form v-if="canPrepare" class="space-y-3" @submit.prevent="sendSpecial">
-                        <label class="block space-y-1 text-sm font-medium">Permohonan asal<input v-model="special.request_key" list="special-requests" required maxlength="80" :class="input" placeholder="Masukkan rujukan permohonan cuti" /><datalist id="special-requests"><option v-for="row in specialCandidates" :key="row.request_key" :value="row.request_key">{{ row.employee_no }} · {{ row.display_name }}</option></datalist></label>
+                        <label class="block space-y-1 text-sm font-medium">Permohonan asal<input v-model="special.request_key" list="special-requests" required maxlength="80" :class="input" placeholder="Masukkan rujukan permohonan cuti" /><datalist id="special-requests"><option v-for="row in specialCandidates" :key="row.request_key" :value="row.request_key">{{ row.employee_no }} · {{ row.display_name }} · {{ row.leave_year }}</option></datalist></label>
                         <label class="block space-y-1 text-sm font-medium">Sebab pelarasan<textarea v-model="special.reason" required maxlength="1000" :class="input" /></label>
                         <label class="block space-y-1 text-sm font-medium">Rujukan bukti kehadiran<input v-model="special.evidence_reference" required maxlength="120" :class="input" /></label>
                         <p v-for="error in special.errors" :key="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
@@ -69,6 +69,7 @@ function days(value: number | null) { return value === null ? '—' : (Number(va
                         <p class="whitespace-pre-wrap">{{ row.request_reason }}</p>
                         <p class="text-xs text-muted-foreground">Bukti: {{ row.evidence_reference }}</p>
                         <p v-if="row.actual_return_date">{{ row.actual_return_date }} {{ row.actual_return_session }} · {{ days(row.unused_half_day_units) }}</p>
+                        <p v-if="row.reconciliation_transfer !== null">Rekonsiliasi tahun tertutup: pindah {{ days(row.reconciliation_transfer) }} · burn {{ days(row.reconciliation_burn) }}</p>
                     </div>
                     <p v-if="!specialCases.data.length" class="text-sm text-muted-foreground">Tiada rekod pelarasan khas.</p>
                     <nav class="flex gap-4 text-sm text-primary"><Link v-if="specialCases.prev_page_url" :href="specialCases.prev_page_url">Sebelum</Link><Link v-if="specialCases.next_page_url" :href="specialCases.next_page_url">Seterusnya</Link></nav>

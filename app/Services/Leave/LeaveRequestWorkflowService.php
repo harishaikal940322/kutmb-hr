@@ -1009,9 +1009,6 @@ class LeaveRequestWorkflowService
             if (($special && $now < $ends) || (! $special && ($now < $starts || $now >= $ends))) {
                 throw new DomainException($special ? 'Pelarasan khas hanya selepas sesi cuti terakhir tamat.' : 'Pembatalan separa hanya dalam tempoh cuti; selepas tamat rujuk HR.');
             }
-            if ($special && (int) substr($last->leave_date, 0, 4) !== (int) now('Asia/Kuala_Lumpur')->format('Y')) {
-                throw new DomainException('Pelarasan tahun lama memerlukan rekonsiliasi TB-05.');
-            }
             $reservation = DB::table('leave_reservations')->where('id', $revision->reservation_id)->lockForUpdate()->first();
             if ($reservation === null || $reservation->status !== 'COMMITTED' || (int) $reservation->requested_units < 1) {
                 throw new DomainException('A committed approved Annual Leave reservation is required.');
@@ -1026,6 +1023,10 @@ class LeaveRequestWorkflowService
             if (collect($dates)->map(fn (string $date): string => substr($date, 0, 4))->unique()->count() > 1
                 && (int) DB::table('leave_reservation_slot_allocations')->where('reservation_id', $reservation->id)->count() !== (int) $reservation->requested_units) {
                 throw new DomainException('Pembatalan merentas tahun memerlukan pemetaan lengkap setiap sesi.');
+            }
+
+            if ($special && (int) substr($first->leave_date, 0, 4) < (int) now('Asia/Kuala_Lumpur')->format('Y')) {
+                $this->assertHistoricalSpecialSource($employee, $reservation, $slots);
             }
 
             $cycle = (int) DB::table('leave_request_partial_cancellations')->where('request_id', $requestId)->max('cycle') + 1;
@@ -1057,6 +1058,75 @@ class LeaveRequestWorkflowService
                 'replayed' => false,
             ];
         }, 3);
+    }
+
+    /**
+     * Historical special preparation is evidence only. Require a complete original source map,
+     * posted approval and closed historical accounts; the final refund revalidates all balances.
+     */
+    private function assertHistoricalSpecialSource(object $employee, object $reservation, \Illuminate\Support\Collection $slots): void
+    {
+        $current = (int) now('Asia/Kuala_Lumpur')->format('Y');
+        $allocations = DB::table('leave_reservation_slot_allocations')->where('reservation_id', $reservation->id)
+            ->orderBy('id')->lockForUpdate()->get();
+        $accounts = DB::table('leave_annual_accounts')->whereIn('id', $allocations->whereNotNull('annual_account_id')->pluck('annual_account_id')->unique())
+            ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        $tabung = DB::table('leave_tabung_accounts')->where('id', $reservation->tabung_account_id)->lockForUpdate()->first();
+        $commitment = DB::table('leave_annual_commitments')->where('reservation_id', $reservation->id)->lockForUpdate()->first();
+        $event = DB::table('leave_reservation_events')->where('reservation_id', $reservation->id)
+            ->where('event_code', 'COMMITTED')->lockForUpdate()->first();
+        if ($allocations->count() !== (int) $reservation->requested_units || $slots->count() !== $allocations->count()
+            || $tabung === null || (int) $tabung->employee_id !== (int) $employee->id || $event === null
+            || ($commitment !== null && $commitment->status !== 'SETTLED')
+            || (new TabungCapacity)->confirmedCapFor((int) $employee->id, $current) === null) {
+            throw new DomainException('Pelarasan khas sejarah memerlukan pemetaan sesi asal, debit diluluskan yang telah dipos dan kadar Tabung semasa.');
+        }
+        $sessionKeys = $slots->map(fn ($slot): string => $slot->leave_date.':'.$slot->session_code)->all();
+        $annualUnits = [];
+        $tabungUnits = [];
+        foreach ($allocations as $allocation) {
+            $year = (int) $allocation->leave_year;
+            if ((int) $allocation->units !== 1 || $year > $current
+                || $year !== (int) substr($allocation->leave_date, 0, 4)
+                || ! in_array($allocation->leave_date.':'.$allocation->session_code, $sessionKeys, true)) {
+                throw new DomainException('Sesi pelarasan khas tidak sepadan dengan permohonan asal.');
+            }
+            if ($allocation->allocation_bucket === 'ANNUAL') {
+                $id = (int) $allocation->annual_account_id;
+                $account = $accounts->get($id);
+                if ($account === null || (int) $account->employee_id !== (int) $employee->id
+                    || (int) $account->leave_year !== $year || $allocation->tabung_account_id !== null || $allocation->source_year !== null
+                    || ($year < $current && ! DB::table('leave_annual_year_closes')->where('annual_account_id', $id)
+                        ->where('employee_id', $employee->id)->where('tabung_account_id', $tabung->id)->exists())) {
+                    throw new DomainException('Akaun AL tahun asal mesti sepadan dan tahun lama mesti sudah ditutup.');
+                }
+                $annualUnits[$id] = ($annualUnits[$id] ?? 0) + 1;
+            } elseif ($allocation->allocation_bucket === 'TABUNG' && $allocation->annual_account_id === null
+                && (int) $allocation->tabung_account_id === (int) $tabung->id && $allocation->source_year !== null) {
+                $source = (int) $allocation->source_year;
+                $tabungUnits[$source] = ($tabungUnits[$source] ?? 0) + 1;
+            } else {
+                throw new DomainException('Sumber asal pelarasan khas tidak sah.');
+            }
+        }
+        $usage = DB::table('leave_ledger_entries')->where('balance_operation_id', $event->balance_operation_id)
+            ->where('kind', 'approved_leave_use')->lockForUpdate()->get();
+        if (array_sum($annualUnits) !== (int) $reservation->annual_units || array_sum($tabungUnits) !== (int) $reservation->tabung_units
+            || $usage->count() !== count($annualUnits) + count($tabungUnits)) {
+            throw new DomainException('Debit kelulusan asal tidak lengkap.');
+        }
+        foreach ($annualUnits as $id => $units) {
+            if ($usage->filter(fn ($entry): bool => (int) $entry->annual_account_id === $id && $entry->tabung_account_id === null
+                && $entry->source_year === null && $entry->reverses_entry_id === null && (int) $entry->signed_half_day_units === -$units)->count() !== 1) {
+                throw new DomainException('Debit AL asal tidak sepadan dengan sesi.');
+            }
+        }
+        foreach ($tabungUnits as $year => $units) {
+            if ($usage->filter(fn ($entry): bool => (int) $entry->tabung_account_id === (int) $tabung->id && $entry->annual_account_id === null
+                && (int) $entry->source_year === $year && $entry->reverses_entry_id === null && (int) $entry->signed_half_day_units === -$units)->count() !== 1) {
+                throw new DomainException('Debit Tabung asal tidak sepadan dengan sesi.');
+            }
+        }
     }
 
     /** @return array{request_id:int,status:string,current_step_order:null,reservation_id:int,partial_cancellation_id:int,actual_return_date:string,unused_half_day_units:int,replayed:bool} */

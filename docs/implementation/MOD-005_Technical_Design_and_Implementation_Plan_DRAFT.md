@@ -471,3 +471,7 @@ Existing HR all-session non-use transaction may reconstruct a missing original-s
 ## 8AG. TB-05 partial confirmed non-use
 
 000059 immutable per-allocation non-use records bind the HR partial finding to an original historical AL claim. Strict subset only, complete annual-only historical source map, distinct exact AM/PM sessions, outcome replay includes selection. Unselected sessions remain protected without absence/payroll classification. Closed-year confirmed unused units alone reconcile at current capacity; open year ordinary close includes them. Legacy/mixed/current-year and subsequent outcomes remain gated. Runtime unverified.
+
+## 8AH. TB-05 historical after-end special adjustment
+
+CR-Q03/04 now reuses existing approved-source refund and 000056 reconciliation for historical after-end preparation, including supported posted historical/current cross-year sources. Exact session allocation and original debit, closed historical AL accounts, confirmed current cap and settled commitments where applicable required. Distinct maker/reviewer/GM unchanged; no balance movement until GM confirms. Existing final transaction validates current capacity, original cohort and replay. No new schema; runtime unverified.

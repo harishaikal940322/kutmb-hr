@@ -475,6 +475,40 @@ class AnnualLeaveReviewTest extends TestCase
         $this->assertSame(1, DB::table('leave_late_reconciliations')->where('annual_account_id', $f['annual'])->count());
     }
 
+    public function test_tb_05_historical_special_adjustment_reconciles_only_original_unused_session(): void
+    {
+        $f = $this->fixture();
+        $maker = $this->actor('historic-special-maker', ['leave.adjustment.prepare']);
+        $reviewer = $this->actor('historic-special-reviewer', ['leave.adjustment.decide', 'leave.partial-cancellation.review']);
+        $date = $this->workingDate($this->year.'-12-23', $this->year.'-12-31');
+        $workflow = app(LeaveRequestWorkflowService::class);
+        $result = $workflow->submit($f['staff']->id, $f['annual'], $f['tabung'], $this->key(), 'AL',
+            [['date' => $date, 'session' => 'AM'], ['date' => $date, 'session' => 'PM']]);
+        $id = $result['request_id'];
+        $this->approve($f, $id);
+        Carbon::setTestNow(Carbon::parse(($this->year + 1).'-01-01 09:00:00', 'Asia/Kuala_Lumpur'));
+        $this->denied(fn () => $workflow->prepareAfterEndCancellation($maker->id, $id, $this->key(), 'Synthetic return', 'SYNTHETIC-HISTORIC'));
+        app(AnnualEntitlementCreditService::class)->creditConfirmedEntitlementOnJanuaryFirst($f['hr']->id, $f['next_confirmation']);
+        $close = app(AnnualLeaveYearCloseService::class);
+        $preview = $close->eligibility($f['employee'], $this->year, 40);
+        $this->assertTrue($preview['can_post'], (string) $preview['reason']);
+        $close->close($f['hr']->id, $f['employee'], $this->year, 40, $preview['snapshot'], 'Synthetic close');
+        $case = $workflow->prepareAfterEndCancellation($maker->id, $id, $this->key(), 'Synthetic return', 'SYNTHETIC-HISTORIC')['partial_cancellation_id'];
+        $workflow->verifyApprovedAnnualLeavePartialCancellation($reviewer->id, $id, $case, $this->key(), $date, 'Verified', 'PM');
+        $this->assertSame(0, $this->annual($f['annual']));
+        $this->assertSame(38, $this->tabung($f['tabung']));
+        $key = $this->key();
+        $workflow->decideApprovedAnnualLeavePartialCancellation($f['pb']->id, $id, $case, $key, 'CONFIRM');
+        $workflow->decideApprovedAnnualLeavePartialCancellation($f['pb']->id, $id, $case, $key, 'CONFIRM');
+        $this->assertSame(0, $this->annual($f['annual']));
+        $this->assertSame(39, $this->tabung($f['tabung']));
+        $this->assertSame(40, $this->annual($f['next']));
+        $this->assertDatabaseHas('leave_partial_refund_reconciliations', ['partial_cancellation_id' => $case,
+            'annual_account_id' => $f['annual'], 'eligible_units' => 1, 'transfer_units' => 1, 'burn_units' => 0]);
+        $this->assertSame(1, DB::table('leave_partial_refund_reconciliations')->where('partial_cancellation_id', $case)->count());
+        $this->denied(fn () => $workflow->prepareAfterEndCancellation($maker->id, $id, $this->key(), 'Duplicate', 'SYNTHETIC-HISTORIC'));
+    }
+
     public function test_tb_05_historical_positive_adjustment_requires_attestation_and_burns_excess_once(): void
     {
         $f = $this->fixture();
