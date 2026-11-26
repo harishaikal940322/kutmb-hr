@@ -90,12 +90,28 @@ class AnnualEntitlementCreditService
     /** @return array{annual_account_id:int,leave_year:int,credited_half_day_units:int,ledger_entry_id:int,replayed:bool} */
     public function creditConfirmedEntitlementOnJanuaryFirst(int $actorId, int $confirmationId): array
     {
+        return $this->postConfirmedEntitlement($actorId, $confirmationId, false);
+    }
+
+    /** CLI-only opening balance for the explicitly seeded synthetic development fixtures. */
+    public function creditDevelopmentFixture(int $actorId, int $confirmationId): array
+    {
+        if (! app()->environment('local') || ! app()->runningInConsole()
+            || config('database.default') !== 'mysql' || DB::connection()->getDatabaseName() !== 'kutmb_hr_dev') {
+            throw new DomainException('Development opening balances require the local fixture seeder.');
+        }
+
+        return $this->postConfirmedEntitlement($actorId, $confirmationId, true);
+    }
+
+    private function postConfirmedEntitlement(int $actorId, int $confirmationId, bool $fixture): array
+    {
         $this->assertLocal();
         if ($actorId < 1 || $confirmationId < 1) {
             throw new DomainException('An authorized actor and confirmed annual entitlement are required.');
         }
 
-        return DB::transaction(function () use ($actorId, $confirmationId): array {
+        return DB::transaction(function () use ($actorId, $confirmationId, $fixture): array {
             $candidate = DB::table('leave_annual_entitlement_confirmations')->where('id', $confirmationId)
                 ->first(['annual_account_id', 'employee_id', 'leave_year']);
             if ($candidate === null) {
@@ -112,6 +128,28 @@ class AnnualEntitlementCreditService
                 throw new DomainException('The confirmed entitlement and annual account scope are inconsistent.');
             }
             $this->assertAuthorizedActor($actorId, 'leave.entitlement.credit');
+
+            if ($fixture) {
+                $target = DB::table('employees as employee')->join('users as user', 'user.id', '=', 'employee.user_id')
+                    ->where('employee.id', $employee->id)->first(['employee.employee_no', 'user.id as user_id', 'user.username_canonical']);
+                $fixtureAccounts = [
+                    'DEV-001' => 'dev-staff', 'DEV-002' => 'dev-unit-manager', 'DEV-003' => 'dev-general-manager',
+                    'DEV-004' => 'dev-hr-executive', 'DEV-005' => 'dev-hr-manager', 'DEV-006' => 'dev-it-admin',
+                ];
+                $actor = User::query()->findOrFail($actorId);
+                $recordedUser = static fn (int $id): bool => AuditEvent::query()->where('action_code', 'iam.development_user.seeded')
+                    ->where('target_ref', 'user:'.$id)->exists();
+                if ($target === null || ($fixtureAccounts[$target->employee_no] ?? null) !== $target->username_canonical
+                    || $actor->username_canonical !== 'dev-hr-manager' || ! $actor->hasRole('hr-manager')
+                    || ! $recordedUser($actorId) || ! $recordedUser((int) $target->user_id)
+                    || ! AuditEvent::query()->where('action_code', 'hr.employee.development_seeded')->where('target_ref', 'employee:'.$employee->id)->exists()
+                    || (int) $annual->leave_year !== (int) now('Asia/Kuala_Lumpur')->format('Y')
+                    || $confirmation->confirmation_reference !== 'DEV-FIXTURE-OPENING-'.$annual->leave_year
+                    || $confirmation->confirmation_key !== 'dev-fixture-entitlement:'.$annual->id.':'.$annual->leave_year
+                    || (int) $confirmation->confirmed_by !== $actorId) {
+                    throw new DomainException('Only explicitly seeded current-year synthetic employee confirmations can receive development opening credit.');
+                }
+            }
 
             $operationKey = 'annual-credit:'.$annual->id.':'.$annual->leave_year;
             $payloadHash = $this->hash([
@@ -148,7 +186,7 @@ class AnnualEntitlementCreditService
             }
 
             $today = now('Asia/Kuala_Lumpur')->toDateString();
-            if ($today !== sprintf('%04d-01-01', (int) $annual->leave_year)) {
+            if (! $fixture && $today !== sprintf('%04d-01-01', (int) $annual->leave_year)) {
                 throw new DomainException('An annual entitlement can be credited only on January 1; missed-job recovery is not configured.');
             }
 
@@ -169,7 +207,16 @@ class AnnualEntitlementCreditService
                 'operation_key' => $operationKey,
                 'actor_id' => $actorId,
             ]);
-            $this->audit('hr.leave.annual_entitlement_credited', (int) $annual->id, $actorId, $operationKey);
+            if ($fixture) {
+                AuditEvent::query()->create([
+                    'occurred_at' => now(), 'actor_id' => null,
+                    'action_code' => 'hr.leave.development_opening_credited',
+                    'target_ref' => 'leave_annual_account:'.$annual->id, 'outcome' => 'SUCCESS',
+                    'metadata' => ['source' => 'development_seeder', 'correlation_id' => $operationKey],
+                ]);
+            } else {
+                $this->audit('hr.leave.annual_entitlement_credited', (int) $annual->id, $actorId, $operationKey);
+            }
 
             return [
                 'annual_account_id' => (int) $annual->id,
