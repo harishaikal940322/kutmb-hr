@@ -3,6 +3,7 @@
 use App\Http\Controllers\AnnualLeaveController;
 use App\Http\Controllers\AnnualLeaveOperationsController;
 use App\Http\Controllers\AnnualLeaveAdjustmentController;
+use App\Http\Controllers\LeaveSettlementController;
 use App\Http\Controllers\AnnualLeaveWorkflowController;
 use App\Http\Controllers\ApprovalOfficeController;
 use App\Http\Controllers\EmployeeAccountLinkController;
@@ -84,6 +85,11 @@ Route::middleware('protected')->group(function () {
 });
 
 Route::middleware(['protected', EnsureLocalHrDevelopment::class])->prefix('leave/annual')->group(function (): void {
+    Route::get('/settlements', [LeaveSettlementController::class, 'index'])->name('leave.annual.settlements');
+    Route::post('/settlements', [LeaveSettlementController::class, 'store'])->middleware('permission:leave.settlement.prepare')->name('leave.annual.settlements.store');
+    Route::post('/settlements/{settlement}/start', [LeaveSettlementController::class, 'start'])->whereNumber('settlement')->middleware('permission:leave.settlement.confirm')->name('leave.annual.settlements.start');
+    Route::post('/settlements/{settlement}/evidence', [LeaveSettlementController::class, 'evidence'])->whereNumber('settlement')->middleware('permission:leave.settlement.prepare')->name('leave.annual.settlements.evidence');
+    Route::post('/settlements/{settlement}/confirm', [LeaveSettlementController::class, 'confirm'])->whereNumber('settlement')->middleware('permission:leave.settlement.confirm')->name('leave.annual.settlements.confirm');
     Route::get('/adjustments', [AnnualLeaveAdjustmentController::class, 'index'])->name('leave.annual.adjustments');
     Route::post('/adjustments/special', [AnnualLeaveAdjustmentController::class, 'prepareSpecial'])->middleware('permission:leave.adjustment.prepare')->name('leave.annual.adjustments.special');
     Route::post('/adjustments', [AnnualLeaveAdjustmentController::class, 'store'])->middleware('permission:leave.adjustment.prepare')->name('leave.annual.adjustments.store');

@@ -4,7 +4,7 @@ import { CalendarDays, ChevronDown, ClipboardList, FileText, ListChecks, UsersRo
 import { computed, nextTick, ref, watch } from 'vue';
 
 export type AnnualSection = 'apply' | 'requests' | 'approvals' | 'team' | 'staff';
-type NavigationSection = AnnualSection | 'calendar' | 'policy' | 'ledger' | 'reports' | 'year-end' | 'record' | 'adjustments';
+type NavigationSection = AnnualSection | 'calendar' | 'policy' | 'ledger' | 'reports' | 'year-end' | 'record' | 'adjustments' | 'settlements';
 export type AnnualAccess = {
     sections: AnnualSection[];
     module: boolean;
@@ -20,10 +20,12 @@ export type AnnualAccess = {
     can_preview_year_end: boolean;
     can_record_on_behalf: boolean;
     can_manage_adjustments: boolean;
+    can_manage_settlements?: boolean;
     can_view_own_ledger: boolean;
 };
 const props = defineProps<{ access: AnnualAccess; active: NavigationSection | null }>();
 const catalog = {
+    settlements: { label: 'Penyelesaian baki', icon: ShieldCheck, href: '/leave/annual/settlements' },
     adjustments: { label: 'Pelarasan baki', icon: SlidersHorizontal, href: '/leave/annual/adjustments' },
     ledger: { label: 'Baki & transaksi saya', icon: FileText, href: '/leave/annual/ledger' },
     reports: { label: 'Laporan & semakan HR', icon: ListChecks, href: '/leave/annual/reports' },
@@ -45,6 +47,7 @@ const groups = computed(() => {
     if (props.access.can_preview_year_end) management.push('year-end');
     if (props.access.can_record_on_behalf) management.push('record');
     if (props.access.can_manage_adjustments) management.push('adjustments');
+    if (props.access.can_manage_settlements) management.push('settlements');
     const personal: NavigationSection[] = props.access.sections.filter(item => item !== 'staff');
     if (props.access.can_view_own_ledger) personal.push('ledger');
     return [

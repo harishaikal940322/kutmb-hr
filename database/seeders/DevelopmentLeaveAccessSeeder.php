@@ -26,7 +26,7 @@ class DevelopmentLeaveAccessSeeder extends Seeder
                 throw new RuntimeException('IAM baseline is missing.');
             }
 
-            $codes = ['leave.request.self', 'leave.request.decide', 'leave.reports.view', 'leave.attendance.review', 'leave.year-end.preview', 'leave.year-end.post', 'leave.request.record-on-behalf', 'leave.adjustment.prepare', 'leave.adjustment.decide'];
+            $codes = ['leave.request.self', 'leave.request.decide', 'leave.reports.view', 'leave.attendance.review', 'leave.year-end.preview', 'leave.year-end.post', 'leave.request.record-on-behalf', 'leave.adjustment.prepare', 'leave.adjustment.decide', 'leave.settlement.prepare', 'leave.settlement.confirm'];
             $permissions = Permission::query()->whereIn('code', $codes)->where('guard_name', 'web')->get()->keyBy('code');
 
             foreach (config('iam.development_role_defaults', []) as $code => $definition) {

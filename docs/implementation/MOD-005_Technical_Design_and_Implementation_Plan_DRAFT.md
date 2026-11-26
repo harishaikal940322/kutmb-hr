@@ -479,3 +479,7 @@ CR-Q03/04 now reuses existing approved-source refund and 000056 reconciliation f
 ## 8AI. TB-05D historical deficit visibility; negative posting gated
 
 Existing HR reports expose actual posted AL deficits separately from projected shortfall (including protected holds), filtered by historical year, with posted-deficit-only filter and close status. Read only; no entitlement or Tabung changes. TB-Q04/05 do not specify historical over-credit recovery once funds are transferred, burned or consumed. Negative historical adjustment posting and inter-year offset remain gated pending explicit source/disposition decision. TB-Q06 is a separate post-exit residual settlement scope. Runtime unverified.
+
+## 8AJ. TB-06 exit settlement (bounded)
+
+000060 append-only exit case and events; status derived from STARTED/EVIDENCE/SETTLED. Separate local permission prepare/confirm, employee/account locks, operation UUID and immutable source snapshot. Current-year elapsed month-end exit only, uncomplicated original credited entitlement with single confirmed full rate, existing calculator, no unresolved source/attendance/holds/other-year balances; unsupported cases fail closed. Independent HR checker starts with atomic prorata reduction and original-cohort FIFO offset; maker records external reference/date, independent checker confirms. External settlement status does not erase residual AL history or post a payroll credit. No RM, payroll integration or automatic deduction. Stale cases gated, no reopening. Runtime unverified.

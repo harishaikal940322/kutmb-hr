@@ -65,6 +65,14 @@ return [
             'label' => 'Putuskan pelarasan baki',
             'description' => 'Independently approve or reject a prepared local balance adjustment.',
             'group' => 'Annual leave', 'submodule' => 'Pelarasan baki', 'action' => 'Decide', 'system_only' => false,
+        ], 'leave.settlement.prepare' => [
+            'label' => 'Sediakan penyelesaian baki',
+            'description' => 'Prepare exit settlement and record external settlement evidence in local development.',
+            'group' => 'Annual leave', 'submodule' => 'Penyelesaian baki', 'action' => 'Prepare', 'system_only' => false,
+        ], 'leave.settlement.confirm' => [
+            'label' => 'Sahkan penyelesaian baki',
+            'description' => 'Independently verify exit balance and external settlement evidence in local development.',
+            'group' => 'Annual leave', 'submodule' => 'Penyelesaian baki', 'action' => 'Confirm', 'system_only' => false,
         ], 'leave.attendance.review' => [
             'label' => 'Rekod hasil semakan HR',
             'description' => 'Record an evidence-referenced finding for a rejected leave review; no payroll or balance mutation.',
@@ -154,7 +162,7 @@ return [
         ],
         'hr-executive' => [
             'label' => 'Eksekutif HR',
-            'permissions' => ['hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage', 'leave.entitlement.view', 'leave.reports.view', 'leave.request.record-on-behalf', 'leave.adjustment.prepare'],
+            'permissions' => ['hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage', 'leave.entitlement.view', 'leave.reports.view', 'leave.request.record-on-behalf', 'leave.adjustment.prepare', 'leave.settlement.prepare'],
         ],
         'hr-manager' => [
             'label' => 'Pengurus HR',
@@ -163,7 +171,7 @@ return [
                 'hr.organization.manage', 'hr.accounts.link', 'hr.offices.manage',
                 'leave.entitlement.view', 'leave.entitlement.confirm', 'leave.entitlement.credit',
                 'leave.calendar.manage', 'leave.policy.manage', 'leave.partial-cancellation.review',
-                'leave.reports.view', 'leave.year-end.preview', 'leave.year-end.post', 'leave.request.record-on-behalf', 'leave.adjustment.decide', 'leave.attendance.review',
+                'leave.reports.view', 'leave.year-end.preview', 'leave.year-end.post', 'leave.request.record-on-behalf', 'leave.adjustment.decide', 'leave.attendance.review', 'leave.settlement.confirm',
             ],
         ],
         'it-admin' => [
@@ -184,7 +192,7 @@ return [
             ],
             'hr-executive-v1' => [
                 'label' => 'Eksekutif HR', 'description' => 'Profil pekerja, penempatan dan semakan kelayakan pembangunan.',
-                'permissions' => ['hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage', 'leave.entitlement.view', 'leave.reports.view', 'leave.request.record-on-behalf', 'leave.adjustment.prepare'],
+                'permissions' => ['hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage', 'leave.entitlement.view', 'leave.reports.view', 'leave.request.record-on-behalf', 'leave.adjustment.prepare', 'leave.settlement.prepare'],
             ],
             'hr-manager-v1' => [
                 'label' => 'Pengurus HR', 'description' => 'Pengurusan pekerja, organisasi dan operasi kelayakan cuti pembangunan.',
@@ -193,7 +201,7 @@ return [
                     'hr.organization.manage', 'hr.accounts.link', 'hr.offices.manage',
                     'leave.entitlement.view', 'leave.entitlement.confirm', 'leave.entitlement.credit',
                     'leave.calendar.manage', 'leave.policy.manage', 'leave.partial-cancellation.review',
-                'leave.reports.view', 'leave.year-end.preview', 'leave.year-end.post', 'leave.request.record-on-behalf', 'leave.adjustment.decide', 'leave.attendance.review',
+                'leave.reports.view', 'leave.year-end.preview', 'leave.year-end.post', 'leave.request.record-on-behalf', 'leave.adjustment.decide', 'leave.attendance.review', 'leave.settlement.confirm',
                 ],
             ],
             'unit-manager-v1' => [
