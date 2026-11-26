@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditEvent;
 use App\Models\User;
+use App\Services\Leave\AnnualLateReconciliationService;
 use App\Services\Leave\AnnualLeaveYearEndPreview;
 use App\Services\Leave\AnnualLeaveYearCloseService;
 use App\Services\Leave\ConfirmedVersionLookup;
@@ -81,15 +82,16 @@ class AnnualLeaveOperationsController extends Controller
         ]);
     }
 
-    public function recordReviewOutcome(Request $request, int $review): RedirectResponse
+    public function recordReviewOutcome(Request $request, int $review, AnnualLateReconciliationService $reconciliation): RedirectResponse
     {
         $data = $request->validate([
-            'finding' => ['required', 'in:ABSENCE_CONFIRMED,ABSENCE_NOT_CONFIRMED,REFERRED'],
+            'finding' => ['required', 'in:ABSENCE_CONFIRMED,ABSENCE_NOT_CONFIRMED,REFERRED,NO_ABSENCE_CONFIRMED'],
             'note' => ['required', 'string', 'max:1000'],
             'evidence_reference' => ['required', 'string', 'max:255'],
             'operation_key' => ['required', 'uuid'],
         ]);
-        DB::transaction(function () use ($request, $review, $data): void {
+        try {
+        DB::transaction(function () use ($request, $review, $data, $reconciliation): void {
             $actor = User::query()->lockForUpdate()->findOrFail($request->user()->id);
             abort_unless($actor->status === 'ACTIVE' && $actor->can('leave.attendance.review') && $actor->can('leave.reports.view'), 403);
             $case = DB::table('leave_attendance_reviews as review')
@@ -97,11 +99,14 @@ class AnnualLeaveOperationsController extends Controller
                 ->join('leave_requests as request', 'request.id', '=', 'revision.request_id')
                 ->join('employees as employee', 'employee.id', '=', 'request.employee_id')
                 ->where('review.id', $review)->lockForUpdate()
-                ->first(['review.id', 'request.status', 'request.current_revision', 'revision.revision', 'employee.user_id']);
+                ->first(['review.id', 'review.review_code', 'request.status', 'request.current_revision', 'revision.revision', 'employee.user_id']);
             abort_if($case === null, 404);
             abort_if((int) $case->user_id === (int) $actor->id, 403);
             if ($case->status !== 'REJECTED' || (int) $case->current_revision !== (int) $case->revision) {
                 throw ValidationException::withMessages(['finding' => 'Kes bukan semakan penolakan revision semasa.']);
+            }
+            if ($data['finding'] === 'NO_ABSENCE_CONFIRMED' && $case->review_code !== 'LATE_AL_REJECTION') {
+                throw ValidationException::withMessages(['finding' => 'Pengesahan semua sesi tidak digunakan hanya untuk AL lewat ditolak.']);
             }
             $payload = ['finding' => $data['finding'], 'note' => trim($data['note']), 'evidence_reference' => trim($data['evidence_reference'])];
             if ($payload['note'] === '' || $payload['evidence_reference'] === '') {
@@ -123,6 +128,9 @@ class AnnualLeaveOperationsController extends Controller
                 'review_id' => $review, 'reviewer_id' => $actor->id, ...$payload,
                 'operation_key' => $data['operation_key'], 'created_at' => now(),
             ]);
+            if ($payload['finding'] === 'NO_ABSENCE_CONFIRMED') {
+                $reconciliation->reconcileAttendance($review, (int) $actor->id, $data['operation_key']);
+            }
             AuditEvent::query()->create([
                 'occurred_at' => now(), 'actor_id' => $actor->id,
                 'action_code' => 'hr.leave.attendance_review_recorded', 'target_ref' => 'leave_attendance_review:'.$review,
@@ -130,7 +138,10 @@ class AnnualLeaveOperationsController extends Controller
                 'metadata' => ['source' => 'annual_leave_review', 'reason_code' => $payload['finding'], 'correlation_id' => $data['operation_key']],
             ]);
         }, 3);
-        return back()->with('success', 'Hasil semakan HR direkodkan tanpa perubahan baki atau gaji.');
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages(['finding' => $exception->getMessage()]);
+        }
+        return back()->with('success', 'Hasil semakan HR direkodkan. Jika semua sesi AL lama disahkan tidak digunakan, rekonsiliasi yang layak turut dipos. Tiada perubahan gaji.');
     }
 
     public function yearEnd(Request $request, AnnualLeaveYearEndPreview $preview, LedgerPostedTotals $totals, AnnualLeaveYearCloseService $close, TabungCapacity $capacity): Response

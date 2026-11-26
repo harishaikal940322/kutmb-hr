@@ -448,6 +448,10 @@ Owner CR-Q03, CT-DEC-016/017 and CT-DEC-040: source implemented with distinct HR
 
 Ordinary partial cancellation can span supported year accounts using exact per-session allocations. Whole unused unposted commitment cancelled with no credit; settled commitment checked against original debit; current-year AL reversed; closed-year newly returned AL reconciled immediately with TB-Q04/05 actual current capacity and distinct transfer/burn entries. 000056 immutable reconciliation amount snapshot linked to case/operation/source. Historical deficit/unclosed year, absent rate, partially unused unposted commitment, special historical preparation and cross-year shortage allocation remain fail-closed. Generic late release and HR adjustment reconciliation remain separate TB-05 work. Runtime unverified.
 
+## 8AD. TB-05 late-rejection source reconciliation
+
+CT-DEC-039/046 and TB-Q04/05: 000057 adds original-source release claims and immutable late reconciliation history. Final late AL rejection does not itself authorize transfer; historical claims protect eligible units while evidence is unresolved. HR finding NO_ABSENCE_CONFIRMED explicitly attests every requested session was not used; outcome and closed-year transfer/burn post atomically. Unclosed year ordinary close accounts for protected claims and includes free units after non-use confirmation. Ambiguous/actual absence stays protected for HR; no payroll or automatic attendance posting. No prior-case backfill or generic historical adjustment yet. Runtime unverified.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.

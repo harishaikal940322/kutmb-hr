@@ -386,7 +386,7 @@ class LeaveBalanceTransactionService
     }
 
     /** @return array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int} */
-    public function release(int $actorId, int $reservationId, string $reason, string $operationKey, ?int $finalAssignmentId = null): array
+    public function release(int $actorId, int $reservationId, string $reason, string $operationKey, ?int $finalAssignmentId = null, bool $deferAttendance = false): array
     {
         $this->assertLocal();
         $this->validateKeys((string) $reservationId, $operationKey);
@@ -395,7 +395,7 @@ class LeaveBalanceTransactionService
         }
 
         /** @var array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int} $result */
-        $result = DB::transaction(function () use ($actorId, $reservationId, $reason, $operationKey, $finalAssignmentId): array {
+        $result = DB::transaction(function () use ($actorId, $reservationId, $reason, $operationKey, $finalAssignmentId, $deferAttendance): array {
             $candidate = DB::table('leave_reservations')->where('id', $reservationId)->first();
             if ($candidate === null) {
                 throw new DomainException('The reservation does not exist.');
@@ -415,7 +415,7 @@ class LeaveBalanceTransactionService
             $allocations = Schema::hasTable('leave_reservation_slot_allocations')
                 ? DB::table('leave_reservation_slot_allocations')->where('reservation_id', $reservationId)->orderBy('leave_year')->orderBy('leave_date')->orderBy('session_code')->lockForUpdate()->get()
                 : collect();
-            $this->assertSlotAllocationConsistency($reservation, $employee, $tabung, $lockedAccounts['annual_accounts'], $allocations);
+            $annualUnitsByAccount = $this->assertSlotAllocationConsistency($reservation, $employee, $tabung, $lockedAccounts['annual_accounts'], $allocations);
             $this->assertActiveActor($actorId);
             if ($reason === 'WITHDRAWAL') {
                 if ((int) $employee->user_id !== $actorId) {
@@ -440,8 +440,34 @@ class LeaveBalanceTransactionService
                 throw new DomainException('Only an active pending reservation can be released.');
             }
 
+            $started = DB::table('leave_active_slots')->where('reservation_id', $reservationId)
+                ->where('leave_date', '<=', now('Asia/Kuala_Lumpur')->toDateString())->exists();
+            if ($deferAttendance && ($reason !== 'FINAL_REJECTION' || ! $started)) {
+                throw new DomainException('Attendance reconciliation requires a started, finally rejected AL reservation.');
+            }
+            if ($reason === 'FINAL_REJECTION' && $started && ! $deferAttendance) {
+                $deferAttendance = DB::table('leave_request_revisions as revision')
+                    ->join('leave_requests as request', 'request.id', '=', 'revision.request_id')
+                    ->where('revision.reservation_id', $reservationId)->where('request.leave_type', 'AL')->exists();
+            }
             $this->resolveReservation($reservationId, 'RELEASED');
             $this->recordEvent($reservationId, $operation['id'], 'RELEASED', $actorId);
+            // A rejected late AL is not evidence of non-use. Keep its exact source claims
+            // for HR; historical claims remain protected until evidence confirms non-use.
+            foreach ($annualUnitsByAccount as $accountId => $units) {
+                $account = $lockedAccounts['annual_accounts']->get((int) $accountId);
+                if ($deferAttendance) {
+                    DB::table('leave_late_release_claims')->insert([
+                        'reservation_id' => $reservationId, 'release_operation_id' => $operation['id'],
+                        'annual_account_id' => $accountId, 'tabung_account_id' => $tabung->id,
+                        'source_year' => $account->leave_year, 'units' => $units, 'created_at' => now(),
+                    ]);
+                } elseif ((int) $account->leave_year < (int) now('Asia/Kuala_Lumpur')->format('Y')
+                    && DB::table('leave_annual_year_closes')->where('annual_account_id', $accountId)->exists()) {
+                    app(AnnualLateReconciliationService::class)->reconcile($actorId, (int) $employee->id, (int) $accountId,
+                        (int) $tabung->id, $units, $operation['id'], $operationKey, 'RELEASE', $reservationId);
+                }
+            }
             $this->audit('hr.leave.balance_released', $reservationId, $operationKey);
 
             return $this->reservationResult($reservationId);

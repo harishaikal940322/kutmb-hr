@@ -43,7 +43,21 @@ class LedgerPostedTotals
             ->where('allocation.annual_account_id', $annualAccountId)->where('allocation.allocation_bucket', 'ANNUAL')
             ->where('reservation.status', 'ACTIVE')->sum('allocation.units');
 
-        return $legacy + $allocated;
+        return $legacy + $allocated + $this->pendingHistoricalReviewUnits($annualAccountId);
+    }
+
+    /** Late rejected AL from a historical year stays protected until HR confirms actual non-use. */
+    public function pendingHistoricalReviewUnits(int $annualAccountId): int
+    {
+        return (int) DB::table('leave_late_release_claims as claim')
+            ->where('claim.annual_account_id', $annualAccountId)
+            ->where('claim.source_year', '<', (int) now('Asia/Kuala_Lumpur')->format('Y'))
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('leave_request_revisions as revision')
+                ->join('leave_attendance_reviews as review', 'review.revision_id', '=', 'revision.id')
+                ->join('leave_attendance_review_outcomes as outcome', 'outcome.review_id', '=', 'review.id')
+                ->whereColumn('revision.reservation_id', 'claim.reservation_id')
+                ->where('review.review_code', 'LATE_AL_REJECTION')->where('outcome.finding', 'NO_ABSENCE_CONFIRMED'))
+            ->sum('claim.units');
     }
 
     /** Pending amounts by actual source; legacy header used only without per-slot allocations. */

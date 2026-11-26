@@ -568,7 +568,7 @@ class LeaveRequestWorkflowService
                     $this->balances->debitRetrospectiveElRejection($actorId, (int) $revision->reservation_id, (int) $currentStep->assignment_id, $operationKey.':e');
                     $reviewCode = 'RETROSPECTIVE_EL_REJECTION';
                 } else {
-                    $this->balances->release($actorId, (int) $revision->reservation_id, 'FINAL_REJECTION', $operationKey.':r', (int) $currentStep->assignment_id);
+                    $this->balances->release($actorId, (int) $revision->reservation_id, 'FINAL_REJECTION', $operationKey.':r', (int) $currentStep->assignment_id, $hasStarted);
                     if ($hasStarted) {
                         $reviewCode = 'LATE_AL_REJECTION';
                     }
