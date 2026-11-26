@@ -74,18 +74,18 @@ class AnnualLateReconciliationService
         ]);
     }
 
-    /** Called only after an immutable HR finding explicitly confirms every original session was not used. */
-    public function reconcileAttendance(int $reviewId, int $actor, string $key): void
+    /** Called within the immutable HR outcome transaction for confirmed all/partial non-use. */
+    public function reconcileAttendance(int $reviewId, int $actor, string $key, array $unusedSlotIds = []): void
     {
         $review = DB::table('leave_attendance_reviews as review')
             ->join('leave_request_revisions as revision', 'revision.id', '=', 'review.revision_id')
             ->join('leave_requests as request', 'request.id', '=', 'revision.request_id')
             ->join('leave_attendance_review_outcomes as outcome', 'outcome.review_id', '=', 'review.id')
             ->where('review.id', $reviewId)->where('review.review_code', 'LATE_AL_REJECTION')
-            ->where('outcome.finding', 'NO_ABSENCE_CONFIRMED')->where('outcome.reviewer_id', $actor)
+            ->whereIn('outcome.finding', ['NO_ABSENCE_CONFIRMED', 'PARTIAL_NON_USE_CONFIRMED'])->where('outcome.reviewer_id', $actor)
             ->where('outcome.operation_key', $key)->where('request.status', 'REJECTED')
             ->whereColumn('request.current_revision', 'revision.revision')
-            ->first(['revision.reservation_id', 'request.employee_id']);
+            ->first(['revision.reservation_id', 'request.employee_id', 'outcome.id as outcome_id', 'outcome.finding']);
         if ($review === null) {
             throw new DomainException('Pengesahan HR tentang semua sesi tidak digunakan diperlukan.');
         }
@@ -95,11 +95,21 @@ class AnnualLateReconciliationService
         if ($employee === null) {
             throw new DomainException('Rekod pekerja tidak ditemui.');
         }
-        if ($claims->isEmpty()) {
-            $claims = $this->recoverLegacyAttendanceClaim((int) $review->reservation_id, (int) $employee->id);
+        if ($review->finding === 'PARTIAL_NON_USE_CONFIRMED') {
+            $eligible = $this->recordPartialNonUse((int) $review->reservation_id, (int) $employee->id,
+                (int) $review->outcome_id, $claims, $unusedSlotIds);
+        } else {
+            if ($unusedSlotIds !== []) {
+                throw new DomainException('Pilihan sesi hanya untuk dapatan separa.');
+            }
+            if ($claims->isEmpty()) {
+                $claims = $this->recoverLegacyAttendanceClaim((int) $review->reservation_id, (int) $employee->id);
+            }
+            $eligible = $claims->mapWithKeys(fn ($claim): array => [(int) $claim->id => (int) $claim->units])->all();
         }
-        // If not yet closed, the ordinary close will include these newly free units.
-        $closed = $claims->filter(fn ($claim): bool => DB::table('leave_annual_year_closes')->where('annual_account_id', $claim->annual_account_id)->exists());
+        // If not yet closed, the ordinary close includes only newly free units.
+        $closed = $claims->filter(fn ($claim): bool => ($eligible[(int) $claim->id] ?? 0) > 0
+            && DB::table('leave_annual_year_closes')->where('annual_account_id', $claim->annual_account_id)->exists());
         if ($closed->isEmpty()) {
             return;
         }
@@ -117,8 +127,65 @@ class AnnualLateReconciliationService
         ]);
         foreach ($closed as $claim) {
             $this->reconcile($actor, (int) $employee->id, (int) $claim->annual_account_id, $tabungId,
-                (int) $claim->units, $operation, $operationKey, 'ATTENDANCE', (int) $claim->id);
+                $eligible[(int) $claim->id], $operation, $operationKey, 'ATTENDANCE', (int) $claim->id);
         }
+    }
+
+    /** Persist exact confirmed non-use; remaining sessions stay protected, without an absence debit. */
+    private function recordPartialNonUse(int $reservationId, int $employeeId, int $outcomeId,
+        \Illuminate\Support\Collection $claims, array $unusedSlotIds): array
+    {
+        if (! app()->environment(['local', 'testing']) || DB::transactionLevel() < 1 || $claims->isEmpty()) {
+            throw new DomainException('Semakan separa memerlukan tuntutan sumber asal yang lengkap.');
+        }
+        $reservation = DB::table('leave_reservations')->where('id', $reservationId)->lockForUpdate()->first();
+        $slots = DB::table('leave_reservation_slot_allocations')->where('reservation_id', $reservationId)->orderBy('id')->lockForUpdate()->get();
+        $current = (int) now('Asia/Kuala_Lumpur')->format('Y');
+        $accounts = DB::table('leave_annual_accounts')->whereIn('id', $claims->pluck('annual_account_id'))->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        $byAccount = $claims->keyBy('annual_account_id');
+        if ($reservation === null || $reservation->status !== 'RELEASED' || (int) $reservation->employee_id !== $employeeId
+            || (int) $reservation->tabung_units !== 0 || (int) $reservation->annual_units !== (int) $reservation->requested_units
+            || $slots->count() !== (int) $reservation->requested_units || (int) $claims->sum('units') !== $slots->count()
+            || $accounts->count() !== $claims->count() || count($unusedSlotIds) < 1 || count($unusedSlotIds) >= $slots->count()
+            || count(array_unique($unusedSlotIds)) !== count($unusedSlotIds)) {
+            throw new DomainException('Semakan separa terhad kepada sesi AL tahun lama dengan tuntutan lengkap; pilih sebahagian sesi sahaja.');
+        }
+        $sourceCounts = [];
+        $selected = [];
+        foreach ($slots as $slot) {
+            $account = $accounts->get((int) $slot->annual_account_id);
+            $claim = $byAccount->get((int) $slot->annual_account_id);
+            if ($slot->allocation_bucket !== 'ANNUAL' || (int) $slot->units !== 1 || $account === null || $claim === null
+                || (int) $account->employee_id !== $employeeId || (int) $slot->leave_year >= $current
+                || (int) $account->leave_year !== (int) $slot->leave_year || (int) $claim->source_year !== (int) $slot->leave_year
+                || (int) $claim->tabung_account_id !== (int) $reservation->tabung_account_id
+                || (int) substr($slot->leave_date, 0, 4) !== (int) $slot->leave_year
+                || ! in_array($slot->session_code, ['AM', 'PM'], true) || $slot->tabung_account_id !== null || $slot->source_year !== null) {
+                throw new DomainException('Pemetaan sesi AL lama tidak sepadan dengan tuntutan sumber.');
+            }
+            $id = (int) $claim->id;
+            $sourceCounts[$id] = ($sourceCounts[$id] ?? 0) + 1;
+            if (in_array((int) $slot->id, $unusedSlotIds, true)) {
+                $selected[] = [$slot, $id];
+            }
+        }
+        foreach ($claims as $claim) {
+            if (($sourceCounts[(int) $claim->id] ?? 0) !== (int) $claim->units
+                || DB::table('leave_late_reconciliations')->where('source_kind', 'ATTENDANCE')->where('source_id', $claim->id)->exists()) {
+                throw new DomainException('Tuntutan sumber tidak sepadan atau sudah direkonsiliasi.');
+            }
+        }
+        if (count($selected) !== count($unusedSlotIds)) {
+            throw new DomainException('Pilihan sesi bukan daripada permohonan asal.');
+        }
+        $eligible = [];
+        foreach ($selected as [$slot, $claimId]) {
+            DB::table('leave_attendance_non_use_slots')->insert([
+                'outcome_id' => $outcomeId, 'allocation_id' => $slot->id, 'claim_id' => $claimId, 'created_at' => now(),
+            ]);
+            $eligible[$claimId] = ($eligible[$claimId] ?? 0) + 1;
+        }
+        return $eligible;
     }
 
     /** Recover only a provable historical annual-only release, within the HR outcome transaction. */

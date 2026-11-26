@@ -23,3 +23,5 @@ Do not treat these as approval of unstated exact entitlement-band boundaries, pa
 - No runtime/database/build execution by remote editor. Owner review required.
 
 - TB-05 legacy follow-up: protected unresolved historical legacy late-rejection holds and bounded source recovery on explicit HR all-session non-use, limited to provable single-year annual-only sources. Closed-year history must reconcile exactly; ambiguous or already recorded cases remain flagged, not automatically reopened. No migration or runtime verification.
+
+- TB-05 partial non-use: 000059 records exact original historical AL sessions independently of protected residual claims. Confirmed unused subset alone is eligible; unselected sessions remain protected. No absence debit, payroll or reopening. Complete historical annual-only sources with existing claims only. Runtime unverified.

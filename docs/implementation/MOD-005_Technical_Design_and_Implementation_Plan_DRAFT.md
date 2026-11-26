@@ -467,3 +467,7 @@ CT-DEC-039/046 and TB-Q04/05: 000057 adds original-source release claims and imm
 ## 8AF. TB-05 legacy late-release recovery (bounded)
 
 Existing HR all-session non-use transaction may reconstruct a missing original-source claim only from a complete single-year annual-only reservation map and immutable reserve/release evidence. Closed-year recovery additionally proves held at close, released after close, balanced close arithmetic, no later annual ledger movements and exact newly free units. Existing late reconciliation applies current confirmed cap and posted Tabung. No migration backfill; unresolved legacy holds protected and exposed in reports. Mixed, ambiguous or previously recorded outcomes not automatically reopened. Runtime unverified.
+
+## 8AG. TB-05 partial confirmed non-use
+
+000059 immutable per-allocation non-use records bind the HR partial finding to an original historical AL claim. Strict subset only, complete annual-only historical source map, distinct exact AM/PM sessions, outcome replay includes selection. Unselected sessions remain protected without absence/payroll classification. Closed-year confirmed unused units alone reconcile at current capacity; open year ordinary close includes them. Legacy/mixed/current-year and subsequent outcomes remain gated. Runtime unverified.

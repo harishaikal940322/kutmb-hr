@@ -55,7 +55,7 @@ class AnnualLeaveReviewTest extends TestCase
             throw new RuntimeException('Owner review refused: nontransactional table found.');
         }
         foreach (['leave_balance_adjustments', 'leave_annual_commitments', 'leave_annual_year_closes', 'leave_attendance_review_outcomes',
-            'leave_reservation_slot_allocations', 'leave_tabung_cap_confirmations', 'leave_late_release_claims', 'leave_late_reconciliations', 'approval_assignments', 'leave_ledger_entries', 'users', 'audit_events'] as $table) {
+            'leave_reservation_slot_allocations', 'leave_tabung_cap_confirmations', 'leave_late_release_claims', 'leave_late_reconciliations', 'leave_attendance_non_use_slots', 'approval_assignments', 'leave_ledger_entries', 'users', 'audit_events'] as $table) {
             if (! $tables->contains('name', $table)) {
                 throw new RuntimeException('Required migration missing: '.$table);
             }
@@ -436,6 +436,42 @@ class AnnualLeaveReviewTest extends TestCase
         $this->assertSame(40, $this->tabung($f['tabung']));
         $this->assertSame(0, app(LedgerPostedTotals::class)->pendingHistoricalReviewUnits($f['annual']));
         $this->assertDatabaseHas('leave_late_reconciliations', ['annual_account_id' => $f['annual'], 'eligible_units' => 2, 'transfer_units' => 2, 'burn_units' => 0]);
+        $this->assertSame(1, DB::table('leave_late_reconciliations')->where('annual_account_id', $f['annual'])->count());
+    }
+
+    public function test_tb_05_partial_non_use_reconciles_only_selected_session(): void
+    {
+        $f = $this->fixture();
+        $date = $this->workingDate($this->year.'-12-23', $this->year.'-12-31');
+        $workflow = app(LeaveRequestWorkflowService::class);
+        $result = $workflow->submit($f['staff']->id, $f['annual'], $f['tabung'], $this->key(), 'AL',
+            [['date' => $date, 'session' => 'AM'], ['date' => $date, 'session' => 'PM']]);
+        $workflow->decide($f['pu']->id, $result['request_id'], $this->key(), 'SUPPORT');
+        Carbon::setTestNow(Carbon::parse(($this->year + 1).'-01-01 09:00:00', 'Asia/Kuala_Lumpur'));
+        app(AnnualEntitlementCreditService::class)->creditConfirmedEntitlementOnJanuaryFirst($f['hr']->id, $f['next_confirmation']);
+        $close = app(AnnualLeaveYearCloseService::class);
+        $preview = $close->eligibility($f['employee'], $this->year, 40);
+        $this->assertTrue($preview['can_post'], (string) $preview['reason']);
+        $close->close($f['hr']->id, $f['employee'], $this->year, 40, $preview['snapshot'], 'Synthetic close');
+        $workflow->decide($f['pb']->id, $result['request_id'], $this->key(), 'REJECT', 'Synthetic late rejection');
+        $this->assertSame(2, $this->annual($f['annual']));
+        $this->assertSame(38, $this->tabung($f['tabung']));
+        $this->assertSame(2, app(LedgerPostedTotals::class)->pendingHistoricalReviewUnits($f['annual']));
+        $review = DB::table('leave_attendance_reviews as review')->join('leave_request_revisions as revision', 'revision.id', '=', 'review.revision_id')
+            ->where('revision.request_id', $result['request_id'])->value('review.id');
+        $url = '/leave/annual/reports/reviews/'.$review.'/outcome';
+        $slots = DB::table('leave_reservation_slot_allocations')->where('reservation_id', $result['reservation_id'])->orderBy('id')->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $payload = ['finding' => 'PARTIAL_NON_USE_CONFIRMED', 'note' => 'Synthetic one session not used', 'evidence_reference' => 'SYNTHETIC-PARTIAL', 'operation_key' => $this->key(), 'unused_slots' => [$slots[0]]];
+        $this->actingAs($f['hr'])->from('/leave/annual/reports')->post($url, [...$payload, 'unused_slots' => $slots])->assertRedirect()->assertSessionHasErrors('finding');
+        $this->assertSame(2, $this->annual($f['annual']));
+        $this->post($url, $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->post($url, $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->post($url, [...$payload, 'unused_slots' => [$slots[1]]])->assertRedirect()->assertSessionHasErrors('finding');
+        $this->assertSame(1, $this->annual($f['annual']));
+        $this->assertSame(39, $this->tabung($f['tabung']));
+        $this->assertSame(1, app(LedgerPostedTotals::class)->pendingHistoricalReviewUnits($f['annual']));
+        $this->assertDatabaseHas('leave_attendance_non_use_slots', ['allocation_id' => $slots[0]]);
+        $this->assertDatabaseHas('leave_late_reconciliations', ['annual_account_id' => $f['annual'], 'eligible_units' => 1, 'transfer_units' => 1, 'burn_units' => 0]);
         $this->assertSame(1, DB::table('leave_late_reconciliations')->where('annual_account_id', $f['annual'])->count());
     }
 

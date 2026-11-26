@@ -1,3 +1,8 @@
+## 26 November 2026 — TB-05 partial confirmed non-use
+
+- 000059 adds immutable original allocation/session references to a new partial HR outcome. Only a strictly partial selection of complete historical annual-only reservations with matching 000057 claims is supported. HR records evidence and exact AM/PM sessions; other sessions remain protected for HR follow-up, not approved leave or an automatic absence/payroll debit. Closed-year selected units alone transfer/burn using existing current cap; unclosed year includes only confirmed non-use on normal close. Outcome, source references and ledger post atomically; replay must match selected IDs. Reports show confirmed count and session selection. Legacy missing claims, mixed Tabung/current-year sources and previously recorded outcomes remain gated.
+- Added opt-in synthetic review case; not executed. No local migration, PHP lint, database, build or runtime. Owner must apply 000059 before using this code. No normative requirements change.
+
 ## 26 November 2026 — TB-05 legacy late release, bounded source recovery
 
 - Owner authorized remote implementation via ChatGPT; local checkout/runtime unavailable. Existing 000057/000058 schema reused, no new migration. Unresolved legacy historical late-rejected AL now counts as protected holds (per-slot or legacy header); HR reports include historical holds and missing-claim indication.

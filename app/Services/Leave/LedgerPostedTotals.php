@@ -59,6 +59,18 @@ class LedgerPostedTotals
                 ->where('review.review_code', 'LATE_AL_REJECTION')->where('outcome.finding', 'NO_ABSENCE_CONFIRMED'))
             ->sum('claim.units');
 
+        // Partial outcomes release only individually verified original sessions.
+        $partial = (int) DB::table('leave_attendance_non_use_slots as slot')
+            ->join('leave_late_release_claims as claim', 'claim.id', '=', 'slot.claim_id')
+            ->join('leave_attendance_review_outcomes as outcome', 'outcome.id', '=', 'slot.outcome_id')
+            ->where('claim.annual_account_id', $annualAccountId)
+            ->where('claim.source_year', '<', (int) now('Asia/Kuala_Lumpur')->format('Y'))
+            ->where('outcome.finding', 'PARTIAL_NON_USE_CONFIRMED')->count();
+        $recorded -= $partial;
+        if ($recorded < 0) {
+            throw new \DomainException('Invalid historical attendance hold.');
+        }
+
         // Protect unresolved legacy historical releases even without a 000057 claim.
         $account = DB::table('leave_annual_accounts')->where('id', $annualAccountId)->first(['leave_year']);
         if ($account === null || (int) $account->leave_year >= (int) now('Asia/Kuala_Lumpur')->format('Y')) {

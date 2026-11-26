@@ -65,6 +65,7 @@ class AnnualLeaveOperationsController extends Controller
             ->orderByDesc('review.id')->paginate(25, ['review.id', 'review.review_code', 'review.opened_at',
                 'employee.display_name', 'employee.employee_no', 'request.request_key', 'request.status',
                 'employee.user_id as target_user_id', 'outcome.finding', 'outcome.created_at as recorded_at',
+                'reservation.id as reservation_id', 'reservation.requested_units', 'reservation.annual_units', 'reservation.tabung_units', 'outcome.id as outcome_id',
                 DB::raw("CASE WHEN review.review_code = 'LATE_AL_REJECTION' AND reservation.annual_units > 0 AND NOT EXISTS (SELECT 1 FROM leave_late_release_claims AS claim WHERE claim.reservation_id = reservation.id) THEN 1 ELSE 0 END AS legacy_missing_claim")], 'review_page')->withQueryString()
             ->through(function ($row) use ($request) {
                 $row->can_record = (int) ($request->user()->can('leave.attendance.review')
@@ -73,6 +74,23 @@ class AnnualLeaveOperationsController extends Controller
                 unset($row->target_user_id);
                 return $row;
             });
+
+        $reviewSlots = [];
+        foreach ($reviews->items() as $row) {
+            $row->partial_non_use_count = $row->outcome_id === null ? 0 : DB::table('leave_attendance_non_use_slots')
+                ->where('outcome_id', $row->outcome_id)->count();
+            if ($row->can_record && $row->review_code === 'LATE_AL_REJECTION' && ! $row->legacy_missing_claim
+                && (int) $row->tabung_units === 0 && (int) $row->annual_units === (int) $row->requested_units
+                && (int) $row->requested_units > 1) {
+                $slots = DB::table('leave_reservation_slot_allocations')->where('reservation_id', $row->reservation_id)
+                    ->where('allocation_bucket', 'ANNUAL')->where('leave_year', '<', $this->currentYear())
+                    ->orderBy('leave_date')->orderBy('session_code')->get(['id', 'leave_date', 'session_code']);
+                if ($slots->count() === (int) $row->requested_units) {
+                    $reviewSlots[(string) $row->id] = $slots;
+                }
+            }
+            unset($row->reservation_id, $row->requested_units, $row->annual_units, $row->tabung_units, $row->outcome_id);
+        }
 
         $accounts = $this->accountRows($year)->orderBy('employee.display_name')->orderBy('employee.id')
             ->paginate(25, pageName: 'balance_page')->withQueryString()
@@ -87,14 +105,16 @@ class AnnualLeaveOperationsController extends Controller
         return Inertia::render('leave/Operations', [
             'access' => AnnualLeaveWorkflowController::capabilities($request->user()),
             'mode' => 'reports', 'year' => $year, 'currentYear' => $this->currentYear(),
-            'summary' => $summary, 'reviews' => $reviews, 'accounts' => $accounts,
+            'summary' => $summary, 'reviews' => $reviews, 'accounts' => $accounts, 'reviewSlots' => $reviewSlots,
         ]);
     }
 
     public function recordReviewOutcome(Request $request, int $review, AnnualLateReconciliationService $reconciliation): RedirectResponse
     {
         $data = $request->validate([
-            'finding' => ['required', 'in:ABSENCE_CONFIRMED,ABSENCE_NOT_CONFIRMED,REFERRED,NO_ABSENCE_CONFIRMED'],
+            'finding' => ['required', 'in:ABSENCE_CONFIRMED,ABSENCE_NOT_CONFIRMED,REFERRED,NO_ABSENCE_CONFIRMED,PARTIAL_NON_USE_CONFIRMED'],
+            'unused_slots' => ['nullable', 'array'],
+            'unused_slots.*' => ['required', 'integer', 'min:1', 'distinct'],
             'note' => ['required', 'string', 'max:1000'],
             'evidence_reference' => ['required', 'string', 'max:255'],
             'operation_key' => ['required', 'uuid'],
@@ -114,8 +134,14 @@ class AnnualLeaveOperationsController extends Controller
             if ($case->status !== 'REJECTED' || (int) $case->current_revision !== (int) $case->revision) {
                 throw ValidationException::withMessages(['finding' => 'Kes bukan semakan penolakan revision semasa.']);
             }
-            if ($data['finding'] === 'NO_ABSENCE_CONFIRMED' && $case->review_code !== 'LATE_AL_REJECTION') {
-                throw ValidationException::withMessages(['finding' => 'Pengesahan semua sesi tidak digunakan hanya untuk AL lewat ditolak.']);
+            $unused = array_map('intval', $data['unused_slots'] ?? []);
+            sort($unused, SORT_NUMERIC);
+            $partial = $data['finding'] === 'PARTIAL_NON_USE_CONFIRMED';
+            if (in_array($data['finding'], ['NO_ABSENCE_CONFIRMED', 'PARTIAL_NON_USE_CONFIRMED'], true) && $case->review_code !== 'LATE_AL_REJECTION') {
+                throw ValidationException::withMessages(['finding' => 'Pengesahan sesi tidak digunakan hanya untuk AL lewat ditolak.']);
+            }
+            if (($partial && $unused === []) || (! $partial && $unused !== [])) {
+                throw ValidationException::withMessages(['unused_slots' => 'Pilih sesi hanya bagi dapatan separa.']);
             }
             $payload = ['finding' => $data['finding'], 'note' => trim($data['note']), 'evidence_reference' => trim($data['evidence_reference'])];
             if ($payload['note'] === '' || $payload['evidence_reference'] === '') {
@@ -125,7 +151,9 @@ class AnnualLeaveOperationsController extends Controller
             if ($existing !== null) {
                 if ($existing->operation_key === $data['operation_key'] && (int) $existing->reviewer_id === (int) $actor->id
                     && $existing->finding === $payload['finding'] && $existing->note === $payload['note']
-                    && $existing->evidence_reference === $payload['evidence_reference']) {
+                    && $existing->evidence_reference === $payload['evidence_reference']
+                    && DB::table('leave_attendance_non_use_slots')->where('outcome_id', $existing->id)
+                        ->orderBy('allocation_id')->pluck('allocation_id')->map(fn ($id) => (int) $id)->all() === $unused) {
                     return;
                 }
                 throw ValidationException::withMessages(['finding' => 'Hasil semakan sudah direkodkan.']);
@@ -137,8 +165,8 @@ class AnnualLeaveOperationsController extends Controller
                 'review_id' => $review, 'reviewer_id' => $actor->id, ...$payload,
                 'operation_key' => $data['operation_key'], 'created_at' => now(),
             ]);
-            if ($payload['finding'] === 'NO_ABSENCE_CONFIRMED') {
-                $reconciliation->reconcileAttendance($review, (int) $actor->id, $data['operation_key']);
+            if (in_array($payload['finding'], ['NO_ABSENCE_CONFIRMED', 'PARTIAL_NON_USE_CONFIRMED'], true)) {
+                $reconciliation->reconcileAttendance($review, (int) $actor->id, $data['operation_key'], $unused);
             }
             AuditEvent::query()->create([
                 'occurred_at' => now(), 'actor_id' => $actor->id,
@@ -150,7 +178,7 @@ class AnnualLeaveOperationsController extends Controller
         } catch (DomainException $exception) {
             throw ValidationException::withMessages(['finding' => $exception->getMessage()]);
         }
-        return back()->with('success', 'Hasil semakan HR direkodkan. Jika semua sesi AL lama disahkan tidak digunakan, rekonsiliasi yang layak turut dipos. Tiada perubahan gaji.');
+        return back()->with('success', 'Hasil semakan HR direkodkan. Sesi AL lama yang disahkan tidak digunakan direkonsiliasi jika layak. Tiada perubahan gaji.');
     }
 
     public function yearEnd(Request $request, AnnualLeaveYearEndPreview $preview, LedgerPostedTotals $totals, AnnualLeaveYearCloseService $close, TabungCapacity $capacity): Response
