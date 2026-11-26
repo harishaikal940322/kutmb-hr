@@ -79,6 +79,166 @@ class LeaveRequestWorkflowService
         });
     }
 
+    /** @return array{request_id:int,request_key:string,status:string,current_step_order:?int,reservation_id:int,replayed:bool} */
+    public function resubmitCurrentYearAnnualRange(
+        int $userId, int $requestId, int $annualId, int $tabungId, string $key, string $start, string $end, string $session, ?string $reason,
+    ): array {
+        $this->assertLocal();
+        $this->assertSubmissionKey($key);
+        if ($userId < 1 || $requestId < 1 || $annualId < 1 || $tabungId < 1 || $start > $end
+            || ! in_array($session, ['FULL', 'AM', 'PM'], true)
+            || ($session !== 'FULL' && $start !== $end)) {
+            throw new DomainException('A valid same-year Annual Leave correction is required.');
+        }
+
+        $today = now('Asia/Kuala_Lumpur')->toDateString();
+        $year = (int) substr($today, 0, 4);
+        if ($start < $today || (int) substr($start, 0, 4) !== $year || (int) substr($end, 0, 4) !== $year) {
+            throw new DomainException('Annual Leave corrections must use future dates within the current year.');
+        }
+        $slots = [];
+        $last = $this->parseDate($end);
+        for ($date = $this->parseDate($start); $date <= $last; $date = $date->add(new DateInterval('P1D'))) {
+            $value = $date->format('Y-m-d');
+            if (! $this->isWorkingDate($value, (int) $date->format('N'))) {
+                continue;
+            }
+            foreach ($session === 'FULL' ? ['AM', 'PM'] : [$session] as $code) {
+                $slots[] = ['date' => $value, 'session' => $code];
+            }
+        }
+        if ($slots === []) {
+            throw new DomainException('The corrected dates contain no confirmed working sessions.');
+        }
+        $reason = $this->normalizeReason($reason);
+
+        $reservationOperationKey = 'resubmit:'.$key;
+
+        return DB::transaction(function () use ($userId, $requestId, $annualId, $tabungId, $key, $start, $end, $slots, $reason, $reservationOperationKey): array {
+            $this->lockSubmissionGuards();
+            $candidate = DB::table('leave_requests')->where('id', $requestId)->first(['employee_id']);
+            if ($candidate === null) {
+                throw new DomainException('The leave request does not exist.');
+            }
+            $employee = DB::table('employees')->where('id', $candidate->employee_id)->lockForUpdate()->first();
+            $request = DB::table('leave_requests')->where('id', $requestId)->lockForUpdate()->first();
+            $actor = DB::table('users')->where('id', $userId)->lockForUpdate()->first(['status', 'username']);
+            if ($employee === null || $request === null || (int) $employee->user_id !== $userId
+                || (int) $request->requester_user_id !== $userId || $actor === null
+                || $actor->status !== 'ACTIVE' || $actor->username === null || $request->leave_type !== 'AL') {
+                throw new DomainException('Only the linked active employee can resubmit their own Annual Leave request.');
+            }
+
+            $existingOperation = DB::table('leave_balance_operations as operation')
+                ->join('leave_reservation_events as event', 'event.balance_operation_id', '=', 'operation.id')
+                ->join('leave_reservations as reservation', 'reservation.id', '=', 'event.reservation_id')
+                ->where('operation.operation_key', $reservationOperationKey)
+                ->first(['reservation.revision', 'reservation.id as reservation_id']);
+            if ($existingOperation !== null) {
+                $reservation = $this->balances->reserve($userId, $request->request_key, (int) $existingOperation->revision,
+                    $annualId, $tabungId, $slots, $reservationOperationKey);
+                $revision = DB::table('leave_request_revisions')->where('request_id', $requestId)
+                    ->where('revision', $existingOperation->revision)->where('reservation_id', $reservation['reservation_id'])->first();
+                $storedSlots = $revision === null ? [] : DB::table('leave_request_days')->where('revision_id', $revision->id)
+                    ->orderBy('leave_date')->orderBy('session_code')->get(['leave_date', 'session_code'])
+                    ->map(fn ($slot): array => ['date' => (string) $slot->leave_date, 'session' => (string) $slot->session_code])->all();
+                if ($revision === null || (int) $request->current_revision < (int) $existingOperation->revision) {
+                    throw new DomainException('The resubmission operation does not match this leave request.');
+                }
+                if ((int) $revision->requested_units !== count($slots) || $revision->reason !== $reason || $storedSlots !== $slots) {
+                    throw new DomainException('The resubmission key was already used for a different correction.');
+                }
+
+                return [
+                    'request_id' => $requestId,
+                    'request_key' => $request->request_key,
+                    'status' => $request->status,
+                    'current_step_order' => $request->current_step_order === null ? null : (int) $request->current_step_order,
+                    'reservation_id' => (int) $reservation['reservation_id'],
+                    'replayed' => true,
+                ];
+            }
+
+            if ($request->status !== 'DRAFT' || $request->current_step_order !== null) {
+                throw new DomainException('Only a request returned for correction can be resubmitted.');
+            }
+            $previousRevision = DB::table('leave_request_revisions')->where('request_id', $requestId)
+                ->where('revision', $request->current_revision)->lockForUpdate()->first();
+            $returned = $previousRevision === null ? null : DB::table('leave_workflow_actions as action')
+                ->join('leave_approval_steps as step', 'step.id', '=', 'action.approval_step_id')
+                ->where('action.revision_id', $previousRevision->id)->where('action.action_code', 'RETURN_FOR_CORRECTION')
+                ->where('action.reason', '<>', '')->where('step.revision_id', $previousRevision->id)->first(['action.id']);
+            if ($previousRevision === null || $returned === null
+                || DB::table('leave_reservations')->where('id', $previousRevision->reservation_id)->where('status', 'RELEASED')->doesntExist()) {
+                throw new DomainException('The current revision has no released correction return to resubmit.');
+            }
+
+            $annual = DB::table('leave_annual_accounts')->where('id', $annualId)->where('employee_id', $employee->id)
+                ->where('leave_year', (int) substr($start, 0, 4))->exists();
+            $tabung = DB::table('leave_tabung_accounts')->where('id', $tabungId)->where('employee_id', $employee->id)->exists();
+            if (! $annual || ! $tabung) {
+                throw new DomainException('The corrected request must use the linked employee current-year Annual and Tabung accounts.');
+            }
+
+            $notice = $this->assessShortNotice($start, now('Asia/Kuala_Lumpur')->toDateString());
+            if (($notice['short_notice'] ?? false) && $reason === null) {
+                throw new DomainException('An emergency reason is required when the corrected AL request is under three working days.');
+            }
+            $route = $this->assignments->resolveForEmployee($userId, (int) $employee->id, count($slots), $slots);
+            $firstStep = $route[0];
+            $newRevision = (int) $request->current_revision + 1;
+            $reservation = $this->balances->reserve($userId, $request->request_key, $newRevision,
+                $annualId, $tabungId, $slots, $reservationOperationKey);
+            $revisionId = DB::table('leave_request_revisions')->insertGetId([
+                'request_id' => $requestId,
+                'revision' => $newRevision,
+                'leave_year' => (int) substr($start, 0, 4),
+                'requested_units' => count($slots),
+                'reason' => $this->normalizeReason($reason),
+                'reservation_id' => $reservation['reservation_id'],
+                'created_by' => $userId,
+                'created_at' => now(),
+                'is_short_notice_emergency' => $notice['short_notice'] ?? false,
+                'notice_working_days_min' => $notice['min_days'] ?? null,
+                'notice_working_days_max' => $notice['max_days'] ?? null,
+            ]);
+            DB::table('leave_request_days')->insert(array_map(fn (array $slot): array => [
+                'revision_id' => $revisionId,
+                'leave_date' => $slot['date'],
+                'session_code' => $slot['session'],
+                'created_at' => now(),
+            ], $slots));
+            DB::table('leave_approval_steps')->insert(array_map(fn (array $step): array => [
+                'revision_id' => $revisionId,
+                'step_order' => $step['step_order'],
+                'stage_code' => $step['stage_code'],
+                'office_code' => $step['office_code'],
+                'assignment_id' => $step['assignment_id'],
+                'assignee_user_id' => $step['assignee_user_id'],
+                'unit_id' => $step['unit_id'],
+                'is_final' => $step['is_final'],
+                'created_at' => now(),
+            ], $route));
+            $status = $this->transitions->statusForStage($firstStep['stage_code']);
+            DB::table('leave_requests')->where('id', $requestId)->update([
+                'status' => $status,
+                'current_revision' => $newRevision,
+                'current_step_order' => $firstStep['step_order'],
+                'updated_at' => now(),
+            ]);
+            $this->audit('hr.leave.request_resubmitted', $requestId, $userId, $reservationOperationKey);
+
+            return [
+                'request_id' => $requestId,
+                'request_key' => $request->request_key,
+                'status' => $status,
+                'current_step_order' => $firstStep['step_order'],
+                'reservation_id' => $reservation['reservation_id'],
+                'replayed' => false,
+            ];
+        }, 3);
+    }
+
     private function isWorkingDate(string $date, int $weekday): bool
     {
         try {

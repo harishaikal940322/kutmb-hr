@@ -19,7 +19,7 @@
 
 - Backend authorization is authoritative; Vue permission hints are presentation only. Preserve active-account checks, per-target authorization, last-admin safety, fresh authorization after privilege changes, validation and relevant audit behavior.
 - Username is the current login principal. Public self-registration, delegated User Admin, production bootstrap, account recovery and privileged mutation flows remain disabled or gated unless their requirements and security decisions are accepted.
-- MFA is planned, not implemented. The 8-character password minimum is conditional on fully enforced MFA and required approvals. Preserve the 15-character minimum on every permitted single-factor path; do not weaken password policy or add an incomplete MFA path.
+- MFA is planned, not implemented. Local development uses an 8-character password minimum for single-factor bootstrap and sign-in.
 - Never commit secrets, credentials, real personal HR data, database exports or confidential infrastructure details. Use synthetic data only.
 - Never run destructive database operations without explicit authorization. Use the existing development environment/database; do not create pretend staging, UAT or production databases in the development server.
 

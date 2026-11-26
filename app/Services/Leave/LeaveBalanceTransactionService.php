@@ -110,8 +110,8 @@ class LeaveBalanceTransactionService
             if ($operation['replay']) {
                 return $this->reservationResult((int) $operation['event']->reservation_id);
             }
-            if (DB::table('leave_reservations')->where('request_key', $requestKey)->exists()) {
-                throw new DomainException('This request already has a balance reservation.');
+            if (DB::table('leave_reservations')->where('request_key', $requestKey)->where('revision', $revision)->exists()) {
+                throw new DomainException('This request revision already has a balance reservation.');
             }
             $this->assertNoActiveSlotConflicts((int) $employee->id, $slots);
 

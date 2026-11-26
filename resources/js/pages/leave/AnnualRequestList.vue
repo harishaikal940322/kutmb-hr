@@ -12,8 +12,10 @@ type Entry = {
     reason: string | null;
     starts_on: string;
     ends_on: string;
+    session_mode: 'FULL' | 'AM' | 'PM' | 'UNSUPPORTED';
     is_final?: boolean;
     can_withdraw?: boolean;
+    can_resubmit?: boolean;
     can_request_cancellation?: boolean;
     can_request_partial?: boolean;
     partial_status?: string | null;
@@ -34,7 +36,9 @@ defineProps<{
 const selected = ref<number>();
 const message = ref('');
 const form = useForm({ decision: '', reason: '', key: '' });
+const correction = useForm({ start: '', end: '', session: 'FULL', reason: '', key: '' });
 const labels: Record<string, string> = {
+    DRAFT: 'Perlu Pembetulan',
     WAITING_UNIT_MANAGER_SUPPORT: 'Menunggu sokongan Pengurus Unit',
     WAITING_GENERAL_MANAGER_SUPPORT: 'Menunggu sokongan Pengurus Besar',
     WAITING_GENERAL_MANAGER_FINAL: 'Menunggu kelulusan Pengurus Besar',
@@ -53,12 +57,18 @@ const labels: Record<string, string> = {
     NOT_SUPPORT: 'Tidak disokong',
     APPROVE: 'Lulus',
     REJECT: 'Tolak',
+    RETURN_FOR_CORRECTION: 'Dipulangkan untuk pembetulan',
 };
 
-function open(id: number) {
-    selected.value = selected.value === id ? undefined : id;
+function open(row: Entry) {
+    selected.value = selected.value === row.id ? undefined : row.id;
     form.reset();
     form.clearErrors();
+    correction.reset();
+    correction.clearErrors();
+    correction.start = row.starts_on;
+    correction.end = row.ends_on;
+    correction.session = row.session_mode === 'UNSUPPORTED' ? 'FULL' : row.session_mode;
 }
 
 function submit(
@@ -73,6 +83,18 @@ function submit(
             selected.value = undefined;
             form.reset();
             message.value = 'Tindakan direkodkan.';
+        },
+    });
+}
+
+function resubmit(id: number) {
+    correction.key ||= crypto.randomUUID();
+    correction.post(`/leave/annual/requests/${id}/resubmit`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            selected.value = undefined;
+            correction.reset();
+            message.value = 'Permohonan yang dibetulkan dihantar semula.';
         },
     });
 }
@@ -96,7 +118,7 @@ function submit(
                 class="flex w-full flex-wrap items-center justify-between gap-3 p-5 text-left text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                 :aria-expanded="selected === row.id"
                 :disabled="form.processing"
-                @click="open(row.id)"
+                @click="open(row)"
             >
                 <span>
                     <strong>{{
@@ -189,6 +211,9 @@ function submit(
                                 >
                                     Tidak sokong
                                 </option>
+                                <option v-if="!cancellations" value="RETURN_FOR_CORRECTION">
+                                    Pulangkan untuk pembetulan
+                                </option>
                             </select>
                         </label>
                         <label class="block space-y-1">
@@ -197,7 +222,7 @@ function submit(
                                 v-model="form.reason"
                                 maxlength="1000"
                                 :required="
-                                    ['REJECT', 'NOT_SUPPORT'].includes(
+                                    ['REJECT', 'NOT_SUPPORT', 'RETURN_FOR_CORRECTION'].includes(
                                         form.decision,
                                     )
                                 "
@@ -221,6 +246,36 @@ function submit(
                             }}
                         </button>
                     </fieldset>
+                </form>
+                <form
+                    v-else-if="row.can_resubmit"
+                    class="max-w-xl space-y-3"
+                    @submit.prevent="resubmit(row.id)"
+                >
+                    <label class="block space-y-1">
+                        <span>Tarikh mula</span>
+                        <input v-model="correction.start" type="date" required :disabled="correction.processing" class="block min-h-11 w-full rounded-lg border border-input bg-background px-3" />
+                    </label>
+                    <label class="block space-y-1">
+                        <span>Tarikh akhir</span>
+                        <input v-model="correction.end" type="date" required :min="correction.start" :disabled="correction.processing" class="block min-h-11 w-full rounded-lg border border-input bg-background px-3" />
+                    </label>
+                    <label class="block space-y-1">
+                        <span>Sesi</span>
+                        <select v-model="correction.session" :disabled="correction.processing" class="block min-h-11 w-full rounded-lg border border-input bg-background px-3">
+                            <option value="FULL">Sehari penuh</option>
+                            <option value="AM">Separuh hari pagi</option>
+                            <option value="PM">Separuh hari petang</option>
+                        </select>
+                    </label>
+                    <label class="block space-y-1">
+                        <span>Sebab / catatan</span>
+                        <textarea v-model="correction.reason" maxlength="1000" :disabled="correction.processing" class="block w-full rounded-lg border border-input bg-background p-3" />
+                    </label>
+                    <p v-for="error in correction.errors" :key="error" role="alert" class="text-destructive">{{ error }}</p>
+                    <button type="submit" :disabled="correction.processing" class="min-h-11 rounded-lg bg-primary px-4 font-semibold text-primary-foreground disabled:opacity-50">
+                        {{ correction.processing ? 'Menghantar…' : 'Hantar semula untuk semakan' }}
+                    </button>
                 </form>
                 <form
                     v-else-if="row.can_withdraw || row.can_request_cancellation || row.can_request_partial"

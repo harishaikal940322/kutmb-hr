@@ -50,9 +50,11 @@ class AnnualLeaveWorkflowController extends Controller
 
         $requests = $this->requests()
             ->join('leave_reservations as reservation', 'reservation.id', '=', 'revision.reservation_id')
-            ->select('leave.id', 'leave.request_key', 'leave.status', 'leave.leave_type', 'employee.display_name', 'revision.requested_units', 'revision.reason', 'reservation.tabung_units', 'leave.current_step_order')
+            ->select('leave.id', 'leave.request_key', 'leave.status', 'leave.leave_type', 'employee.display_name', 'revision.requested_units', 'revision.reason', 'reservation.tabung_units', 'leave.current_step_order', 'leave.current_revision')
             ->selectSub(DB::table('leave_request_days')->whereColumn('revision_id', 'revision.id')->selectRaw('MIN(leave_date)'), 'starts_on')
             ->selectSub(DB::table('leave_request_days')->whereColumn('revision_id', 'revision.id')->selectRaw('MAX(leave_date)'), 'ends_on')
+            ->selectSub(DB::table('leave_request_days')->whereColumn('revision_id', 'revision.id')
+                ->selectRaw("CASE WHEN COUNT(*) = COUNT(DISTINCT leave_date) * 2 THEN 'FULL' WHEN COUNT(*) = 1 THEN MIN(session_code) ELSE 'UNSUPPORTED' END"), 'session_mode')
             ->orderByDesc('leave.id');
         /** @var Paginator<int, \stdClass> $history */
         $history = $this->owned(clone $requests, $userId)
@@ -81,7 +83,7 @@ class AnnualLeaveWorkflowController extends Controller
             $actions = DB::table('leave_workflow_actions as action')
                 ->join('leave_request_revisions as revision', 'revision.id', '=', 'action.revision_id')
                 ->whereIn('revision.request_id', $ids)
-                ->orderBy('action.id')->get(['revision.request_id', 'action.action_code', 'action.created_at'])
+                ->orderBy('action.id')->get(['revision.request_id', 'revision.revision as action_revision', 'action.action_code', 'action.created_at'])
                 ->groupBy('request_id');
             $cancellationActions = $page !== $inbox ? DB::table('leave_request_cancellation_actions')->whereIn('request_id', $ids)
                 ->select('request_id', 'created_at')->selectRaw("CONCAT('CANCELLATION_', action_code) AS action_code")
@@ -93,8 +95,13 @@ class AnnualLeaveWorkflowController extends Controller
             $page->through(static function ($row) use ($actions, $cancellationActions, $partialStates, $page, $history, $today): array {
                 $ownFutureAnnual = $page === $history && $row->leave_type === 'AL' && $row->starts_on > $today;
                 $partialStatus = $partialStates->get($row->id);
+                $requestActions = $actions->get($row->id, collect());
+                $returnedForCorrection = $requestActions->contains(fn ($action): bool => (int) $action->action_revision === (int) $row->current_revision
+                    && $action->action_code === 'RETURN_FOR_CORRECTION');
                 $capabilities = [
                     'partial_status' => $partialStatus,
+                    'can_resubmit' => $page === $history && $row->leave_type === 'AL' && $row->status === 'DRAFT'
+                        && $returnedForCorrection && $row->session_mode !== 'UNSUPPORTED',
                     'can_request_partial' => $page === $history && $row->leave_type === 'AL' && $row->status === 'APPROVED'
                         && $row->starts_on !== null && $row->starts_on <= $today && $row->ends_on > $today
                         && (int) $row->tabung_units === 0 && ! in_array($partialStatus, ['REQUESTED', 'HR_VERIFIED'], true),
@@ -102,9 +109,9 @@ class AnnualLeaveWorkflowController extends Controller
                     'can_request_cancellation' => $ownFutureAnnual && $row->status === 'APPROVED' && (int) $row->tabung_units === 0,
                 ];
                 $result = (array) $row;
-                unset($result['current_step_order'], $result['tabung_units']);
+                unset($result['current_step_order'], $result['tabung_units'], $result['current_revision']);
 
-                return [...$result, ...$capabilities, 'actions' => $actions->get($row->id, collect())->concat($cancellationActions->get($row->id, collect()))->sortBy('created_at')->values()];
+                return [...$result, ...$capabilities, 'actions' => $requestActions->concat($cancellationActions->get($row->id, collect()))->sortBy('created_at')->values()];
             });
         }
 
@@ -173,6 +180,38 @@ class AnnualLeaveWorkflowController extends Controller
         return back()->with('success', 'Permohonan dihantar.');
     }
 
+    public function resubmit(Request $request, int $leaveRequest, LeaveRequestWorkflowService $workflow): RedirectResponse
+    {
+        $actor = $request->user()->id;
+        abort_unless($this->owned($this->requests(), $actor)->where('leave.id', $leaveRequest)->exists(), 404);
+        $data = $request->validate([
+            'start' => ['required', 'date_format:Y-m-d'],
+            'end' => ['required', 'date_format:Y-m-d', 'after_or_equal:start'],
+            'session' => ['required', 'in:FULL,AM,PM'],
+            'reason' => ['nullable', 'string', 'max:1000'],
+            'key' => ['required', 'uuid'],
+        ]);
+        $today = now('Asia/Kuala_Lumpur')->toDateString();
+        $year = (int) substr($today, 0, 4);
+        if ($data['start'] < $today || (int) substr($data['start'], 0, 4) !== $year || (int) substr($data['end'], 0, 4) !== $year
+            || ($data['session'] !== 'FULL' && $data['start'] !== $data['end'])) {
+            throw ValidationException::withMessages(['start' => 'Pilih tarikh bekerja pada hari ini atau selepasnya dalam tahun semasa. Separuh hari terhad kepada satu tarikh.']);
+        }
+        $accounts = $this->accounts($actor, $year);
+        if ($accounts === null) {
+            throw ValidationException::withMessages(['start' => 'Kelayakan tahun semasa perlu disahkan dan dikreditkan sebelum permohonan.']);
+        }
+
+        try {
+            $workflow->resubmitCurrentYearAnnualRange($actor, $leaveRequest, $accounts->annual_id, $accounts->tabung_id,
+                $data['key'], $data['start'], $data['end'], $data['session'], $data['reason'] ?? null);
+        } catch (DomainException|\InvalidArgumentException $exception) {
+            throw ValidationException::withMessages(['start' => $exception->getMessage()]);
+        }
+
+        return back()->with('success', 'Permohonan yang dibetulkan dihantar semula untuk semakan.');
+    }
+
     public function decide(Request $request, int $leaveRequest, LeaveRequestWorkflowService $workflow): RedirectResponse
     {
         $actor = $request->user()->id;
@@ -184,8 +223,8 @@ class AnnualLeaveWorkflowController extends Controller
             ->where('action.operation_key', $key)->exists();
         abort_unless($assigned || $replay, 404);
         $data = $request->validate([
-            'decision' => ['required', 'in:SUPPORT,NOT_SUPPORT,APPROVE,REJECT'],
-            'reason' => ['nullable', 'string', 'max:2000', 'required_if:decision,NOT_SUPPORT,REJECT'],
+            'decision' => ['required', 'in:SUPPORT,NOT_SUPPORT,APPROVE,REJECT,RETURN_FOR_CORRECTION'],
+            'reason' => ['nullable', 'string', 'max:2000', 'required_if:decision,NOT_SUPPORT,REJECT,RETURN_FOR_CORRECTION'],
             'key' => ['required', 'uuid'],
         ]);
 

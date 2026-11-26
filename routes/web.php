@@ -96,6 +96,8 @@ Route::get('/leave/annual/team', [AnnualLeaveWorkflowController::class, 'team'])
 
 Route::middleware(['protected', EnsureLocalHrDevelopment::class])->prefix('leave/annual/requests')->group(function (): void {
     Route::post('/', [AnnualLeaveWorkflowController::class, 'store'])->name('leave.annual.requests.store');
+    Route::post('/{leaveRequest}/resubmit', [AnnualLeaveWorkflowController::class, 'resubmit'])
+        ->whereNumber('leaveRequest')->name('leave.annual.requests.resubmit');
     Route::post('/{leaveRequest}/decision', [AnnualLeaveWorkflowController::class, 'decide'])
         ->whereNumber('leaveRequest')->name('leave.annual.requests.decide');
     Route::post('/{leaveRequest}/withdraw', [AnnualLeaveWorkflowController::class, 'withdraw'])

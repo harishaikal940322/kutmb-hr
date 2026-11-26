@@ -1,3 +1,10 @@
+## 26 November 2026 — correction resubmission and local bootstrap
+
+- Owner direction: local single-factor bootstrap/sign-in uses an 8-character minimum; `AGENTS.md` and `config/iam.php` now match.
+- CT-DEC-023/024: eligible AL reviewers can return future unused requests with a reason. Staff can edit dates/session/reason and resubmit; a fresh reservation and current approval route are created as a new immutable revision. Prior decisions stay in history. EL correction and deadline/notification automation remain gated.
+- Added MySQL transition guard migration `2026_11_26_000046`, applied to verified `kutmb_hr_dev` after target and SQL-preview checks. PHP syntax, Vue type-check/build, and `git diff --check` passed; automated tests were not run.
+- Chromium shows the first-admin setup form with the 8-character local minimum. Owner must enter the credential and submit; then disable bootstrap and verify the System Admin role and `iam.rbac.manage` baseline before authenticated UI review.
+
 ## 26 November 2026 — new-hire prorata preview
 
 - CT-DEC-003/036: Profil & Kelayakan can preview first-year prorata from the employee’s recorded start date and an explicit HR-confirmed annual rate. It includes the entire starting month, rounds to the nearest half day and holds exact ties for HR direction. Termination-year and other unsupported cases remain gated. The preview does not post entitlement or change balances.
