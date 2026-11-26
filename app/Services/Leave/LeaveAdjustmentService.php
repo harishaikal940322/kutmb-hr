@@ -122,8 +122,7 @@ class LeaveAdjustmentService
                     }
                     $sourceBalance = (int) DB::table('leave_ledger_entries')->where('tabung_account_id', $tabung->id)
                         ->where('source_year', $row->source_year)->sum('signed_half_day_units');
-                    $sourceHold = (int) DB::table('leave_reservations')->where('tabung_account_id', $tabung->id)
-                        ->where('tabung_source_year', $row->source_year)->where('status', 'ACTIVE')->sum('tabung_units');
+                    $sourceHold = $this->totals->pendingTabungBySource((int) $tabung->id)[(int) $row->source_year] ?? 0;
                     if ($row->signed_units < 0 && $sourceBalance + (int) $row->signed_units < $sourceHold) {
                         throw new DomainException('Pengurangan melebihi baki tahun sumber Tabung yang bebas.');
                     }

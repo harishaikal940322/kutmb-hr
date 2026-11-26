@@ -22,3 +22,8 @@
 ## Resolution protocol
 
 Record answer, source/requestor, reviewer, date, resulting ADR (if any) and impact on SRS/RTM before closing. Do not resolve these based only on developer assumptions.
+
+
+### Owner development clarification — Tabung (26 November 2026)
+
+TB-Q01–06 resolved for development in [MOD-005 Tabung Owner Clarifications](../decisions/MOD-005_Tabung_Owner_Clarifications_2026-11-26.md). Official HR/IT approval and unrelated open questions remain outstanding.

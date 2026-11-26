@@ -46,6 +46,65 @@ class LedgerPostedTotals
         return $legacy + $allocated;
     }
 
+    /** Pending amounts by actual source; legacy header used only without per-slot allocations. */
+    public function pendingTabungBySource(int $tabungAccountId): array
+    {
+        $legacy = DB::table('leave_reservations as reservation')
+            ->where('reservation.tabung_account_id', $tabungAccountId)->where('reservation.status', 'ACTIVE')
+            ->where('reservation.tabung_units', '>', 0)
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('leave_reservation_slot_allocations as allocation')
+                ->whereColumn('allocation.reservation_id', 'reservation.id'))
+            ->selectRaw('reservation.tabung_source_year AS source_year, SUM(reservation.tabung_units) AS units')
+            ->groupBy('reservation.tabung_source_year')->get();
+        $allocated = DB::table('leave_reservation_slot_allocations as allocation')
+            ->join('leave_reservations as reservation', 'reservation.id', '=', 'allocation.reservation_id')
+            ->where('allocation.tabung_account_id', $tabungAccountId)->where('allocation.allocation_bucket', 'TABUNG')
+            ->where('reservation.status', 'ACTIVE')->selectRaw('allocation.source_year, SUM(allocation.units) AS units')
+            ->groupBy('allocation.source_year')->get();
+        $result = [];
+        foreach ($legacy->concat($allocated) as $row) {
+            if ($row->source_year === null) {
+                throw new \DomainException('Tabung hold has no source year.');
+            }
+            $year = (int) $row->source_year;
+            $result[$year] = ($result[$year] ?? 0) + (int) $row->units;
+        }
+
+        return $result;
+    }
+
+    /** Call with the employee and Tabung account locked; FIFO on free posted units only. */
+    public function allocateTabungFifo(int $tabungAccountId, int $units): array
+    {
+        if ($units < 0) {
+            throw new \DomainException('Tabung allocation must be nonnegative.');
+        }
+        $pending = $this->pendingTabungBySource($tabungAccountId);
+        $cohorts = DB::table('leave_ledger_entries')->where('tabung_account_id', $tabungAccountId)
+            ->selectRaw('source_year, SUM(signed_half_day_units) AS units')->groupBy('source_year')->orderBy('source_year')->get();
+        $allocation = [];
+        $remaining = $units;
+        foreach ($cohorts as $cohort) {
+            $year = (int) $cohort->source_year;
+            $balance = (int) $cohort->units;
+            $hold = $pending[$year] ?? 0;
+            unset($pending[$year]);
+            if ($cohort->source_year === null || $balance < $hold || $hold < 0) {
+                throw new \DomainException('Invalid Tabung source balance or hold.');
+            }
+            $take = min($balance - $hold, $remaining);
+            if ($take > 0) {
+                $allocation[$year] = $take;
+                $remaining -= $take;
+            }
+        }
+        if (array_sum($pending) !== 0 || $remaining !== 0) {
+            throw new \DomainException('Insufficient free Tabung source balance.');
+        }
+
+        return $allocation;
+    }
+
     private function totalFor(string $accountColumn, int $accountId): int
     {
         $total = DB::table('leave_ledger_entries')

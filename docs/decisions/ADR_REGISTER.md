@@ -136,3 +136,6 @@
 ## ADR lifecycle
 
 `PROPOSED` / `ASSUMPTION` / `OPEN` → reviewed decision with explicit approver/date/rationale → `ACCEPTED` or `REJECTED` → `SUPERSEDED` if replaced. Never equate proposal with business authorization. Later technical ADRs should use separate Markdown files and reference this register.
+
+
+- MOD-005: [Tabung Owner development clarifications TB-Q01–06](MOD-005_Tabung_Owner_Clarifications_2026-11-26.md), 26 November 2026; development approval only.

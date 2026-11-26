@@ -428,6 +428,10 @@ CT-DEC-033 explicitly distinguishes full-year rate for Tabung from prorated annu
 
 CT-DEC-016 requires exact original-source refund, current confirmed full-rate cap and separate disposal of excess. Current-year full pre-start cancellation now restores original AL and single-cohort Tabung usage atomically after GM approval, including Tabung-only requests. An excess newly caused by the refund is disposed only if the refunded cohort is the sole positive cohort; no choice of disposal priority is made. Existing over-cap balance, ambiguous multiple cohorts, closed-year reconciliation and partial cancellation remain gated. No automatic restoration of previously disposed units. TB-02 cohort ordering is not specified in the inspected decisions; do not infer FIFO/LIFO. TB-04–06 still require further work within documented scope.
 
+## 8Y. Owner Tabung clarifications and FIFO source allocation
+
+See [Owner TB-Q01–06](../decisions/MOD-005_Tabung_Owner_Clarifications_2026-11-26.md). Development decisions resolve cohort order, disposal order, close timing/order, reconciliation capacity and interim exit settlement tracker; formal HR/IT approval remains outstanding. Same-year per-session FIFO and original-source full pre-start refunds now support multiple cohorts. Migration 000052 replaces source guards without rewriting historical rows. Legacy header is oldest source, authoritative allocation rows drive per-cohort holds/debits/refunds. Unimplemented paths remain fail-closed. Sections 8W/8X single-cohort restrictions are superseded only for these paths.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.

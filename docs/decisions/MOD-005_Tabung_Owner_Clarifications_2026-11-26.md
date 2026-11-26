@@ -1,0 +1,22 @@
+# MOD-005 — Tabung Cuti: Owner development clarifications
+
+Date: 26 November 2026 (Asia/Kuala_Lumpur). Authority: explicit Owner decisions in development discussion; not HR/IT production approval. Source: `docs/issue/KUTMB_HR_Cuti_Tahunan_56_Isu_Keputusan_dan_Pending.docx` (CT-DEC-004/016/018/031/033/038/039/040), and `docs/requirements/modules/CUTI_TAHUNAN_V1.docx`. Preserve the original HR answer document unchanged. These clarifications supersede older development-only blocking notes only for the specified choices.
+
+| ID | Decision | Acceptance |
+|---|---|---|
+| TB-Q01 | FIFO use: AL first, then oldest available Tabung source year, then applicable negative AL policy. | Preserve source year per session and per debit; subtract valid pending holds per cohort; no negative Tabung. |
+| TB-Q02 | FIFO excess disposal from oldest available Tabung source, protecting valid pending holds. | Distinct auditable disposal, no current-year AL reduction for existing Tabung excess; no expiry solely by age. If protected holds preclude disposal, HR exception, no invalidated holds. |
+| TB-Q03 | Automatic annual close 1 January 00:00 MYT, close previous year, apply confirmed new-year full cap, transfer eligible free AL, burn excess, credit new-year AL and settle approved commitments once, audit/report. | Preserve pending original year/source. Missing confirmed entitlement/rate => defer affected employee and report; retry without double posting. Unresolved negative-year transition rules are not overridden. |
+| TB-Q04 | Use full cap effective on actual reconciliation date. | Only newly eligible returned units; never restore previously burned balance automatically. |
+| TB-Q05 | Use actual posted Tabung balance on reconciliation date. | If full, burn newly eligible excess; if room, transfer only within room and burn remainder. Actual leave use requires HR review; no double carry. |
+| TB-Q06 | Interim Penyelesaian Baki submodule inside Cuti Tahunan, with reporting and tracking of outstanding versus settled post-exit residual negative AL; external Payroll performs financial settlement. | Recalculate final prorated AL only under documented rules, offset with valid Tabung FIFO, record residual days, employee, exit date, original deficit, offset, balance, status, payroll reference, settlement date, confirmer and audit. Owner accepted proposed minimum flow with OUTSTANDING / IN_PROGRESS / SETTLED and HR executive prepares, HR manager independently confirms; no RM calculation, payroll integration, automatic deduction or deletion of leave history. |
+
+Do not treat these as approval of unstated exact entitlement-band boundaries, partial-month/tie rounding, negative December rollover, evidence retention or other outstanding HR decisions. Formal HR/IT confirmation remains required before production. For development, source implementation and Owner functional review remain separate.
+
+## Implementation tracking
+
+- TB-01: effective-dated confirmed full cap, source implemented; promotion AL top-up and lower-cap handling outstanding.
+- TB-02: FIFO same-year allocation across cohorts, per-source pending totals, approval and retrospective EL debit; header source is oldest cohort for compatibility; per-slot map authoritative, additive forward trigger migration 000052. Cross-year shortage routing and old-year reconciliation remain gated.
+- TB-03: current-year pre-start cancellation refunds all original cohorts and disposes new excess via FIFO free units. Partial cancellation and full audit snapshots outstanding.
+- TB-04–06: approved development decisions above, implementation pending.
+- No runtime/database/build execution by remote editor. Owner review required.

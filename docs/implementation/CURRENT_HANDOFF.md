@@ -1,3 +1,8 @@
+## 26 November 2026 — Owner TB-Q01–06 and FIFO Tabung
+
+- Recorded all six Owner development decisions in `docs/decisions/MOD-005_Tabung_Owner_Clarifications_2026-11-26.md`; HR source unchanged. Added forward migration 000052, FIFO per-session sources, actual per-cohort pending, per-cohort approved/rejected-retrospective usage, source-exact current-year full cancellation and FIFO excess disposal. Header `tabung_source_year` now oldest allocated year, not sole authoritative cohort. Existing historical rows unchanged. Adjustments honor per-cohort holds. No local runtime validation.
+- Partial cancellation, cross-year shortage, annual close/credit scheduler, late reconciliation, promotion/exit and interim settlement module remain implementation work. Do not reopen accepted decisions or assume unrelated unresolved policy. Owner must migrate before running changed code.
+
 ## 26 November 2026 — TB-03 pre-start Tabung refund (bounded)
 
 - CT-DEC-016/004: enabled current-year full pre-start AL cancellation with original single-cohort Tabung usage, including mixed AL/Tabung and Tabung-only. Existing distinct General Manager approval, reservation/event, original source, immutable reversal and replay controls retained. Confirmed full-rate cap required. Restoration is a separate positive reversal; if it causes excess and the refunded cohort is the only positive cohort, dispose the excess in a distinct negative Tabung ledger entry under the same atomic operation, with audit. No AL reduction or choice of disposal order among multiple cohorts. Pre-existing excess or ambiguous cohorts fail closed. UI exposes cancellation; server still validates eligibility.

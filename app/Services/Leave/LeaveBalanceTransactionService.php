@@ -191,7 +191,12 @@ class LeaveBalanceTransactionService
                 if ((int) $annual->leave_year > $currentYear && ($tabungUnits > 0 || $after['projected_annual'] < 0)) {
                     throw new DomainException('Pre-credit reservations requiring future Tabung or a negative balance await the year-transition transaction contract.');
                 }
-                $tabungSourceYear = $tabungUnits > 0 ? $this->singleAvailableTabungSourceYear($tabungAccountId, $tabungUnits) : null;
+                $tabungAllocation = $tabungUnits > 0 ? $this->totals->allocateTabungFifo($tabungAccountId, $tabungUnits) : [];
+                $tabungSourceYear = array_key_first($tabungAllocation);
+                $tabungSlotYears = [];
+                foreach ($tabungAllocation as $sourceYear => $units) {
+                    $tabungSlotYears = array_merge($tabungSlotYears, array_fill(0, $units, $sourceYear));
+                }
                 $annualPositiveUnits = min(max($before['annual_available'], 0), $requestedUnits);
                 $allocationRows = [];
                 foreach ($slots as $index => $slot) {
@@ -203,7 +208,7 @@ class LeaveBalanceTransactionService
                         'allocation_bucket' => $isTabung ? 'TABUNG' : 'ANNUAL',
                         'annual_account_id' => $isTabung ? null : $annualAccountId,
                         'tabung_account_id' => $isTabung ? $tabungAccountId : null,
-                        'source_year' => $isTabung ? $tabungSourceYear : null,
+                        'source_year' => $isTabung ? $tabungSlotYears[$index - $annualPositiveUnits] : null,
                         'units' => 1,
                         'created_at' => now(),
                     ];
@@ -314,7 +319,7 @@ class LeaveBalanceTransactionService
                 $entryKey = $allocations->isEmpty() ? $operationKey : $operationKey.':year-'.$accountYear;
                 $this->appendUsageEntry($entryReservation, $operation['id'], $actorId, $entryKey, 'annual_account_id', 'annual_units', null);
             }
-            $this->appendUsageEntry($reservation, $operation['id'], $actorId, $operationKey, 'tabung_account_id', 'tabung_units', $reservation->tabung_source_year);
+            $this->appendTabungUsage($reservation, $allocations, $operation['id'], $actorId, $operationKey, 'approved_leave_use');
             $this->resolveReservation($reservationId, 'COMMITTED');
             $this->recordEvent($reservationId, $operation['id'], 'COMMITTED', $actorId);
             $this->audit($hasCommitment ? 'hr.leave.future_year_committed' : 'hr.leave.balance_committed', $reservationId, $operationKey);
@@ -350,6 +355,8 @@ class LeaveBalanceTransactionService
                 || (int) $annual->leave_year !== (int) $reservation->leave_year) {
                 throw new DomainException('The reservation account scope is inconsistent.');
             }
+            $allocations = DB::table('leave_reservation_slot_allocations')->where('reservation_id', $reservationId)->lockForUpdate()->get();
+            $this->assertSlotAllocationConsistency($reservation, $employee, $tabung, $lockedAccounts['annual_accounts'], $allocations);
             $this->assertFinalApprover($actorId, $employee, $finalAssignmentId);
             $payload = ['actor_id' => $actorId, 'assignment_id' => $finalAssignmentId, 'reservation_id' => $reservationId];
             $operation = $this->startOperation($operationKey, 'EL_REJECTION_DEBIT', $payload, (int) $employee->id, $actorId);
@@ -367,7 +374,7 @@ class LeaveBalanceTransactionService
             }
 
             $this->appendUsageEntry($reservation, $operation['id'], $actorId, $operationKey, 'annual_account_id', 'annual_units', null, 'rejected_el_absence_use');
-            $this->appendUsageEntry($reservation, $operation['id'], $actorId, $operationKey, 'tabung_account_id', 'tabung_units', $reservation->tabung_source_year, 'rejected_el_absence_use');
+            $this->appendTabungUsage($reservation, $allocations, $operation['id'], $actorId, $operationKey, 'rejected_el_absence_use');
             $this->resolveReservation($reservationId, 'COMMITTED');
             $this->recordEvent($reservationId, $operation['id'], 'EL_REJECTED', $actorId);
             $this->audit('hr.leave.retrospective_el_rejection_debited', $reservationId, $operationKey);
@@ -445,8 +452,8 @@ class LeaveBalanceTransactionService
 
     /**
      * Reverse an approved AL reservation only after an immutable General Manager confirmation exists.
-     * CT-DEC-016: restore original single-cohort Tabung usage and enforce the
-     * confirmed full-year cap. Ambiguous multi-cohort disposal remains gated.
+     * CT-DEC-016 and Owner TB-Q01/02: restore original source cohorts and
+     * dispose newly caused excess using FIFO free units under the confirmed cap.
      *
      * @return array{reservation_id:int,status:string,leave_year:int,annual_units:int,tabung_units:int}
      */
@@ -520,6 +527,7 @@ class LeaveBalanceTransactionService
                 throw new DomainException('Only a committed approved Annual Leave reservation can be cancelled.');
             }
             $tabungRefundUnits = (int) $reservation->tabung_units;
+            $refundSources = $this->tabungUnitsBySource($reservation, $allocations);
             if ((int) $reservation->annual_units + $tabungRefundUnits < 1) {
                 throw new DomainException('This cancellation has no source units to restore.');
             }
@@ -536,20 +544,7 @@ class LeaveBalanceTransactionService
                     throw new DomainException('Baki Tabung sedia ada memerlukan semakan sebelum pemulangan.');
                 }
                 $tabungExcess = max(0, $posted + $tabungRefundUnits - $cap);
-                if ($tabungExcess > 0) {
-                    // Do not choose a disposal priority between multiple sources.
-                    // If the original refund cohort is the only positive cohort
-                    // after restoration, the disposal source is unambiguous.
-                    $cohorts = DB::table('leave_ledger_entries')->where('tabung_account_id', $tabung->id)
-                        ->select('source_year')->selectRaw('SUM(signed_half_day_units) AS units')->groupBy('source_year')->get();
-                    foreach ($cohorts as $cohort) {
-                        $units = $this->integerTotal((string) $cohort->units);
-                        if ($units < 0 || ($units > 0 && ($cohort->source_year === null
-                            || (int) $cohort->source_year !== (int) $reservation->tabung_source_year))) {
-                            throw new DomainException('Pelupusan lebihan beberapa tahun sumber memerlukan kaedah yang disahkan HR.');
-                        }
-                    }
-                }
+
             }
 
             $committedEvent = DB::table('leave_reservation_events')->where('reservation_id', $reservationId)
@@ -576,10 +571,10 @@ class LeaveBalanceTransactionService
             $annualUsage = $usageEntries->whereNotNull('annual_account_id');
             $tabungUsage = $usageEntries->whereNotNull('tabung_account_id');
             $usageEntriesByAnnualAccount = $annualUsage->keyBy('annual_account_id');
-            if ($usageEntries->count() !== count($postedUnitsByAccount) + ($tabungRefundUnits > 0 ? 1 : 0)
+            if ($usageEntries->count() !== count($postedUnitsByAccount) + count($refundSources)
                 || $annualUsage->count() !== count($postedUnitsByAccount)
                 || $usageEntriesByAnnualAccount->count() !== count($postedUnitsByAccount)
-                || $tabungUsage->count() !== ($tabungRefundUnits > 0 ? 1 : 0)) {
+                || $tabungUsage->count() !== count($refundSources) || $tabungUsage->keyBy('source_year')->count() !== count($refundSources)) {
                 throw new DomainException('The original annual usage entries do not match the per-date source allocation.');
             }
             foreach ($postedUnitsByAccount as $accountId => $units) {
@@ -599,30 +594,30 @@ class LeaveBalanceTransactionService
                 ]);
             }
 
-            if ($tabungRefundUnits > 0) {
-                $usage = $tabungUsage->first();
-                if ($usage->annual_account_id !== null || (int) $usage->tabung_account_id !== (int) $tabung->id
-                    || (int) $usage->signed_half_day_units !== -$tabungRefundUnits
-                    || (int) $usage->source_year !== (int) $reservation->tabung_source_year
-                    || $usage->reverses_entry_id !== null
+            foreach ($refundSources as $sourceYear => $units) {
+                $usage = $tabungUsage->keyBy('source_year')->get($sourceYear);
+                if ($usage === null || $usage->annual_account_id !== null || (int) $usage->tabung_account_id !== (int) $tabung->id
+                    || (int) $usage->signed_half_day_units !== -$units || $usage->reverses_entry_id !== null
                     || DB::table('leave_ledger_entries')->where('reverses_entry_id', $usage->id)->exists()) {
                     throw new DomainException('An original Tabung usage entry is inconsistent or already reversed.');
                 }
                 DB::table('leave_ledger_entries')->insert([
                     'tabung_account_id' => $tabung->id, 'balance_operation_id' => $operation['id'],
-                    'signed_half_day_units' => $tabungRefundUnits, 'kind' => 'approved_leave_cancellation',
-                    'source_year' => $reservation->tabung_source_year, 'operation_key' => $operationKey.':tabung',
+                    'signed_half_day_units' => $units, 'kind' => 'approved_leave_cancellation',
+                    'source_year' => $sourceYear, 'operation_key' => $operationKey.':tabung:'.$sourceYear,
                     'reverses_entry_id' => $usage->id, 'actor_id' => $actorId,
                 ]);
-                if ($tabungExcess > 0) {
+            }
+            if ($tabungExcess > 0) {
+                foreach ($this->totals->allocateTabungFifo((int) $tabung->id, $tabungExcess) as $sourceYear => $units) {
                     DB::table('leave_ledger_entries')->insert([
                         'tabung_account_id' => $tabung->id, 'balance_operation_id' => $operation['id'],
-                        'signed_half_day_units' => -$tabungExcess, 'kind' => 'tabung_cancellation_excess_disposal',
-                        'source_year' => $reservation->tabung_source_year, 'operation_key' => $operationKey.':excess',
+                        'signed_half_day_units' => -$units, 'kind' => 'tabung_cancellation_excess_disposal',
+                        'source_year' => $sourceYear, 'operation_key' => $operationKey.':excess:'.$sourceYear,
                         'actor_id' => $actorId,
                     ]);
-                    $this->audit('hr.leave.tabung_excess_disposed', $reservationId, $operationKey);
                 }
+                $this->audit('hr.leave.tabung_excess_disposed', $reservationId, $operationKey);
             }
 
             $updated = DB::table('leave_reservations')->where('id', $reservationId)->where('status', 'COMMITTED')
@@ -919,46 +914,44 @@ class LeaveBalanceTransactionService
         return $markerId;
     }
 
-    private function singleAvailableTabungSourceYear(int $tabungAccountId, int $unitsNeeded): int
+    /** Per-slot allocation is authoritative; the header stores the oldest source for compatibility. */
+    private function tabungUnitsBySource(stdClass $reservation, Collection $allocations): array
     {
-        $cohorts = DB::table('leave_ledger_entries')->where('tabung_account_id', $tabungAccountId)
-            ->select('source_year')->selectRaw('CAST(COALESCE(SUM(signed_half_day_units), 0) AS CHAR) AS units')
-            ->groupBy('source_year')->get();
-        $pending = DB::table('leave_reservations')->where('tabung_account_id', $tabungAccountId)->where('status', 'ACTIVE')
-            ->select('tabung_source_year')->selectRaw('CAST(COALESCE(SUM(tabung_units), 0) AS CHAR) AS units')
-            ->groupBy('tabung_source_year')->get()->keyBy(fn (stdClass $row): string => $row->tabung_source_year === null ? 'null' : (string) $row->tabung_source_year);
+        if ($allocations->isEmpty()) {
+            if ((int) $reservation->tabung_units === 0) {
+                return [];
+            }
+            if ($reservation->tabung_source_year === null) {
+                throw new DomainException('Missing legacy Tabung source.');
+            }
+            return [(int) $reservation->tabung_source_year => (int) $reservation->tabung_units];
+        }
+        $result = [];
+        foreach ($allocations as $allocation) {
+            if ($allocation->allocation_bucket === 'TABUNG') {
+                $year = (int) $allocation->source_year;
+                $result[$year] = ($result[$year] ?? 0) + (int) $allocation->units;
+            }
+        }
+        ksort($result, SORT_NUMERIC);
 
-        $available = [];
-        foreach ($cohorts as $cohort) {
-            $yearKey = $cohort->source_year === null ? 'null' : (string) $cohort->source_year;
-            $balance = $this->integerTotal($cohort->units);
-            $reserved = $this->integerTotal($pending[$yearKey]->units ?? '0');
-            if ($balance < 0 || $reserved < 0 || $reserved > $balance) {
-                throw new DomainException('Tabung source-year balance or reservation is inconsistent.');
-            }
-            $free = $balance - $reserved;
-            if ($free > 0) {
-                if ($cohort->source_year === null) {
-                    throw new DomainException('Tabung source-year provenance is required before allocation.');
-                }
-                $available[(int) $cohort->source_year] = $free;
-            }
-        }
-        foreach ($pending as $yearKey => $row) {
-            if (! $cohorts->contains(fn (stdClass $cohort): bool => ($cohort->source_year === null ? 'null' : (string) $cohort->source_year) === $yearKey)
-                && $this->integerTotal($row->units) > 0) {
-                throw new DomainException('A Tabung reservation has no matching source-year entry.');
-            }
-        }
-        if (count($available) !== 1) {
-            throw new DomainException('Tabung use is deferred while more than one source year is available.');
-        }
-        $sourceYear = (int) array_key_first($available);
-        if ($available[$sourceYear] < $unitsNeeded) {
-            throw new DomainException('The selected Tabung source year cannot cover the requested allocation.');
-        }
+        return $result;
+    }
 
-        return $sourceYear;
+    private function appendTabungUsage(stdClass $reservation, Collection $allocations, int $operationId, int $actorId, string $operationKey, string $kind): void
+    {
+        $sources = $this->tabungUnitsBySource($reservation, $allocations);
+        $holds = $this->totals->pendingTabungBySource((int) $reservation->tabung_account_id);
+        foreach ($sources as $year => $units) {
+            $balance = (int) DB::table('leave_ledger_entries')->where('tabung_account_id', $reservation->tabung_account_id)
+                ->where('source_year', $year)->sum('signed_half_day_units');
+            if ($balance < ($holds[$year] ?? 0) || ($holds[$year] ?? 0) < $units) {
+                throw new DomainException('Tabung source reservation is no longer covered.');
+            }
+            $entry = (object) ['tabung_account_id' => $reservation->tabung_account_id, 'tabung_units' => $units];
+            $key = count($sources) === 1 ? $operationKey : $operationKey.':'.$year;
+            $this->appendUsageEntry($entry, $operationId, $actorId, $key, 'tabung_account_id', 'tabung_units', $year, $kind);
+        }
     }
 
     private function appendUsageEntry(stdClass $reservation, int $operationId, int $actorId, string $operationKey, string $accountColumn, string $unitsColumn, ?int $sourceYear, string $kind = 'approved_leave_use'): void
@@ -1162,9 +1155,8 @@ class LeaveBalanceTransactionService
         }
 
         if ($annualUnits !== (int) $reservation->annual_units || $tabungUnits !== (int) $reservation->tabung_units
-            || count($tabungSourceYears) > 1
             || ($tabungUnits === 0 && $reservation->tabung_source_year !== null)
-            || ($tabungUnits > 0 && (count($tabungSourceYears) !== 1 || (int) array_key_first($tabungSourceYears) !== (int) $reservation->tabung_source_year))) {
+            || ($tabungUnits > 0 && (empty($tabungSourceYears) || min(array_keys($tabungSourceYears)) !== (int) $reservation->tabung_source_year))) {
             throw new DomainException('The per-date source map does not match the reservation balance totals and Tabung source year.');
         }
 

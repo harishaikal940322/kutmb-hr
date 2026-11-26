@@ -114,3 +114,8 @@ All 56 decisions are recorded as accepted based on the requestor confirmation th
 3. Sources are explicitly split between initial instructions and analysis proposals; proposals are not owner-approved.
 4. No placeholder evidence may be reported as a pass.
 5. The approved status requires recorded reviewer, date, evidence and release gate completion.
+
+
+### MOD-005 Tabung development clarification trace
+
+See [TB-Q01–06](../decisions/MOD-005_Tabung_Owner_Clarifications_2026-11-26.md) for trace to CT-DEC-004/016/018/031/033/038/039/040 and acceptance requirements. FIFO source allocation and current-year full pre-start refund source implemented; other paths remain open, runtime not verified.
