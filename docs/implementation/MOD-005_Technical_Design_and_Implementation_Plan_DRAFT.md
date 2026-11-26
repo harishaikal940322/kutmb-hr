@@ -452,6 +452,10 @@ Ordinary partial cancellation can span supported year accounts using exact per-s
 
 CT-DEC-039/046 and TB-Q04/05: 000057 adds original-source release claims and immutable late reconciliation history. Final late AL rejection does not itself authorize transfer; historical claims protect eligible units while evidence is unresolved. HR finding NO_ABSENCE_CONFIRMED explicitly attests every requested session was not used; outcome and closed-year transfer/burn post atomically. Unclosed year ordinary close accounts for protected claims and includes free units after non-use confirmation. Ambiguous/actual absence stays protected for HR; no payroll or automatic attendance posting. No prior-case backfill or generic historical adjustment yet. Runtime unverified.
 
+## 8AE. TB-05 historical AL adjustment
+
+000058 allows only positively newly eligible AL correction of a closed year under existing independent maker/checker authority and mandatory distinct evidence reference. Explicit attestations rule out cancellation/attendance bypass, duplicated sources and restoration of burned units; HR evidence is not automatically validated. Reconciliation uses actual capacity at approval, posts source credit and transfer/burn atomically. Old-year negative corrections and direct historical Tabung credits remain gated. Runtime unverified.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.

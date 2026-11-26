@@ -24,10 +24,13 @@ class AnnualLeaveAdjustmentController extends Controller
             ->join('employees as employee', 'employee.id', '=', 'adjustment.employee_id')
             ->join('users as maker', 'maker.id', '=', 'adjustment.prepared_by')
             ->leftJoin('users as checker', 'checker.id', '=', 'adjustment.decided_by')
+            ->leftJoin('leave_late_reconciliations as reconciliation', fn ($join) => $join->on('reconciliation.source_id', '=', 'adjustment.id')
+                ->on('reconciliation.annual_account_id', '=', 'adjustment.annual_account_id')->where('reconciliation.source_kind', 'HR_ADJUSTMENT'))
             ->when(! $decide, fn ($query) => $query->where('adjustment.prepared_by', $actor->id))
             ->orderByDesc('adjustment.id')->paginate(25, [
                 'adjustment.id', 'employee.display_name', 'employee.employee_no', 'adjustment.leave_year', 'adjustment.bucket',
                 'adjustment.source_year', 'adjustment.signed_units', 'adjustment.reason', 'adjustment.evidence_reference',
+                'adjustment.historical_eligible', 'reconciliation.transfer_units as reconciliation_transfer', 'reconciliation.burn_units as reconciliation_burn',
                 'adjustment.prepared_balance', 'adjustment.prepared_pending', 'adjustment.status', 'adjustment.before_units',
                 'adjustment.after_units', 'adjustment.decision_reason', 'adjustment.created_at', 'maker.name as prepared_by_name',
                 'checker.name as decided_by_name', 'adjustment.prepared_by', 'employee.user_id as target_user_id',
@@ -67,6 +70,8 @@ class AnnualLeaveAdjustmentController extends Controller
     {
         $data = $request->validate([
             'employee' => ['required', 'integer', 'min:1'], 'bucket' => ['required', 'in:AL,TABUNG'],
+            'leave_year' => ['nullable', 'integer', 'min:1900', 'max:'.now('Asia/Kuala_Lumpur')->year],
+            'historical_eligible' => ['nullable', 'boolean'],
             'source_year' => ['nullable', 'required_if:bucket,TABUNG', 'integer', 'min:1900', 'max:'.now('Asia/Kuala_Lumpur')->year],
             'units' => ['required', 'integer', 'min:-100000', 'max:100000', 'not_in:0'],
             'reason' => ['required', 'string', 'max:1000'], 'evidence_reference' => ['required', 'string', 'max:120'], 'key' => ['required', 'uuid'],
@@ -103,7 +108,7 @@ class AnnualLeaveAdjustmentController extends Controller
 
     public function decide(Request $request, int $adjustment, LeaveAdjustmentService $service): RedirectResponse
     {
-        $data = $request->validate(['decision' => ['required', 'in:APPROVED,REJECTED'], 'reason' => ['required', 'string', 'max:1000'], 'key' => ['required', 'uuid']]);
+        $data = $request->validate(['decision' => ['required', 'in:APPROVED,REJECTED'], 'reason' => ['required', 'string', 'max:1000'], 'key' => ['required', 'uuid'], 'historical_verified' => ['nullable', 'boolean']]);
         try {
             $service->decide($request->user()->id, $adjustment, $data);
         } catch (DomainException $exception) {

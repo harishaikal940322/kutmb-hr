@@ -3,12 +3,12 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import AnnualLeaveNavigation, { type AnnualAccess } from './AnnualLeaveNavigation.vue';
 
-type Adjustment = { id: number; display_name: string; employee_no: string; leave_year: number; bucket: string; source_year: number | null; signed_units: number; reason: string; evidence_reference: string; prepared_balance: number; prepared_pending: number; status: 'PENDING' | 'APPROVED' | 'REJECTED'; before_units: number | null; after_units: number | null; decision_reason: string | null; prepared_by_name: string; decided_by_name: string | null; can_decide: boolean; created_at: string };
+type Adjustment = { historical_eligible: number | boolean; reconciliation_transfer: number | null; reconciliation_burn: number | null; id: number; display_name: string; employee_no: string; leave_year: number; bucket: string; source_year: number | null; signed_units: number; reason: string; evidence_reference: string; prepared_balance: number; prepared_pending: number; status: 'PENDING' | 'APPROVED' | 'REJECTED'; before_units: number | null; after_units: number | null; decision_reason: string | null; prepared_by_name: string; decided_by_name: string | null; can_decide: boolean; created_at: string };
 type SpecialCase = { id: number; request_key: string; display_name: string; employee_no: string; status: string; request_reason: string; evidence_reference: string; actual_return_date: string | null; actual_return_session: string | null; unused_half_day_units: number | null };
 const props = defineProps<{ specialCases: { data: SpecialCase[]; prev_page_url: string | null; next_page_url: string | null }; specialCandidates: { request_key: string; display_name: string; employee_no: string }[]; access: AnnualAccess; canPrepare: boolean; year: number; employees: { id: number; employee_no: string; display_name: string }[]; adjustments: { data: Adjustment[]; prev_page_url: string | null; next_page_url: string | null } }>();
 defineOptions({ layout: { breadcrumbs: [{ title: 'Cuti Tahunan', href: '/leave/annual' }] } });
-const prepare = useForm({ employee: '', bucket: 'AL', source_year: props.year, units: '', reason: '', evidence_reference: '', key: '' });
-const decide = useForm({ decision: 'APPROVED', reason: '', key: '' });
+const prepare = useForm({ employee: '', bucket: 'AL', leave_year: props.year, historical_eligible: false, source_year: props.year, units: '', reason: '', evidence_reference: '', key: '' });
+const decide = useForm({ decision: 'APPROVED', reason: '', key: '', historical_verified: false });
 const special = useForm({ request_key: '', reason: '', evidence_reference: '', key: '' });
 function sendSpecial() {
     special.key ||= crypto.randomUUID();
@@ -40,9 +40,14 @@ function days(value: number | null) { return value === null ? '—' : (Number(va
                 <header><p class="text-xs font-semibold text-primary uppercase">Data pembangunan · {{ year }}</p><h1 class="mt-1 text-2xl font-semibold">Pelarasan baki</h1><p class="mt-2 text-sm text-muted-foreground">Penyedia dan pelulus mesti berbeza. Baki berubah hanya selepas kelulusan bebas.</p></header>
                 <p v-if="notice" role="status" class="rounded-lg border border-border bg-muted/30 p-3 text-sm">{{ notice }}</p>
                 <form v-if="canPrepare" class="space-y-4 rounded-xl border border-border bg-card p-5" @submit.prevent="send">
-                    <h2 class="font-semibold">Sediakan pelarasan tahun semasa</h2>
+                    <h2 class="font-semibold">Sediakan pelarasan baki</h2>
                     <label class="space-y-1 text-sm font-medium">Pekerja<select v-model="prepare.employee" required :class="input"><option value="">Pilih pekerja</option><option v-for="item in employees" :key="item.id" :value="String(item.id)">{{ item.employee_no }} · {{ item.display_name }}</option></select></label>
                     <div class="grid gap-3 sm:grid-cols-2"><label class="space-y-1 text-sm font-medium">Akaun<select v-model="prepare.bucket" :class="input"><option value="AL">Cuti Tahunan</option><option value="TABUNG">Tabung Cuti</option></select></label><label class="space-y-1 text-sm font-medium">Perubahan (unit separuh hari, +/-)<input v-model="prepare.units" type="number" min="-100000" max="100000" required :class="input" /></label><label v-if="prepare.bucket === 'TABUNG'" class="space-y-1 text-sm font-medium">Tahun sumber<input v-model.number="prepare.source_year" type="number" min="1900" :max="year" required :class="input" /></label></div>
+                    <label class="block space-y-1 text-sm font-medium">Tahun akaun AL<input v-model.number="prepare.leave_year" type="number" min="1900" :max="year" required :class="input" /></label>
+                    <div v-if="prepare.leave_year < year" class="space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                        <p>Tahun tertutup: hanya pelarasan AL positif yang baru layak. Rekonsiliasi mengikut kapasiti Tabung sebenar ketika diluluskan; lebihan burn.</p>
+                        <label class="flex items-start gap-2"><input v-model="prepare.historical_eligible" type="checkbox" required class="mt-1 accent-primary" /> <span>Saya mengesahkan bukti ini mewakili kelayakan baru yang belum pernah dipindahkan atau diburn, bukan pembatalan cuti/semakan kehadiran yang memerlukan laluan khusus.</span></label>
+                    </div>
                     <label class="space-y-1 text-sm font-medium">Sebab<textarea v-model="prepare.reason" required maxlength="1000" :class="input" /></label><label class="space-y-1 text-sm font-medium">Rujukan bukti<input v-model="prepare.evidence_reference" required maxlength="120" :class="input" /></label>
                     <p v-for="error in prepare.errors" :key="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
                     <button type="submit" :class="button" :disabled="prepare.processing">Hantar untuk semakan</button>
@@ -74,11 +79,13 @@ function days(value: number | null) { return value === null ? '—' : (Number(va
                         <div class="flex flex-wrap justify-between gap-3"><div><h3 class="font-medium">{{ row.display_name }} · {{ row.employee_no }}</h3><p class="text-xs text-muted-foreground">{{ row.bucket }} · {{ row.leave_year }}<template v-if="row.source_year"> · Sumber {{ row.source_year }}</template></p></div><div class="text-right"><p class="font-semibold">{{ Number(row.signed_units) > 0 ? '+' : '' }}{{ days(row.signed_units) }}</p><p class="text-xs text-muted-foreground">{{ { PENDING: 'Menunggu semakan', APPROVED: 'Diluluskan', REJECTED: 'Ditolak' }[row.status] ?? row.status }}</p></div></div>
                         <p class="text-sm whitespace-pre-wrap">{{ row.reason }}</p><p class="text-xs text-muted-foreground">Rujukan: {{ row.evidence_reference }} · Penyedia: {{ row.prepared_by_name }}</p>
                         <p class="text-sm">Baki ketika disediakan: {{ days(row.prepared_balance) }} · Pending: {{ days(row.prepared_pending) }}</p>
-                        <p v-if="row.status === 'APPROVED'" class="text-sm">Baki sebelum: {{ days(row.before_units) }} · Selepas: {{ days(row.after_units) }}</p>
+                        <p v-if="row.status === 'APPROVED'" class="text-sm">Baki sebelum: {{ days(row.before_units) }} · Selepas pelarasan: {{ days(row.after_units) }}</p>
+                        <p v-if="row.historical_eligible && row.status === 'APPROVED'" class="text-sm">Rekonsiliasi: pindah {{ days(row.reconciliation_transfer) }} · burn {{ days(row.reconciliation_burn) }}</p>
                         <p v-if="row.decided_by_name" class="text-sm text-muted-foreground">{{ row.decided_by_name }}: {{ row.decision_reason }}</p>
                         <button v-if="row.can_decide" type="button" class="min-h-10 rounded-lg border border-border px-4 text-sm" @click="open(row.id)">Semak keputusan</button>
                         <form v-if="selected === row.id && row.can_decide" class="space-y-3 border-t border-border pt-3" @submit.prevent="decision(row.id)">
                             <label class="space-y-1 text-sm font-medium">Keputusan<select v-model="decide.decision" :class="input"><option value="APPROVED">Lulus dan pos</option><option value="REJECTED">Tolak</option></select></label>
+                            <label v-if="row.historical_eligible && decide.decision === 'APPROVED'" class="flex items-start gap-2 text-sm"><input v-model="decide.historical_verified" type="checkbox" required class="mt-1 accent-primary" /><span>Saya telah menyemak bukti secara bebas: baki baru layak, bukan pemulihan burn, bukan kes pembatalan atau kehadiran, dan tiada pertindihan.</span></label>
                             <label class="space-y-1 text-sm font-medium">Sebab keputusan<textarea v-model="decide.reason" required maxlength="1000" :class="input" /></label>
                             <p v-for="error in decide.errors" :key="error" role="alert" class="text-sm text-destructive">{{ error }}</p><button type="submit" :class="button" :disabled="decide.processing">Sahkan keputusan</button>
                         </form>

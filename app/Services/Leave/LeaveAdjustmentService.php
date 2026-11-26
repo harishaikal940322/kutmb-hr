@@ -21,11 +21,20 @@ class LeaveAdjustmentService
             if ($employee === null || (int) $employee->user_id === $actor) {
                 throw new DomainException('Pelarasan sendiri tidak dibenarkan.');
             }
-            $year = (int) now('Asia/Kuala_Lumpur')->format('Y');
+            $current = (int) now('Asia/Kuala_Lumpur')->format('Y');
+            $year = (int) ($data['leave_year'] ?? $current);
+            $historical = $year < $current;
+            if ($year < 1900 || $year > $current || ($historical && ($data['bucket'] !== 'AL' || (int) $data['units'] <= 0
+                || ! ($data['historical_eligible'] ?? false)))) {
+                throw new DomainException('Pelarasan tahun lama terhad kepada AL positif yang baru layak dengan pengakuan HR.');
+            }
             $annual = DB::table('leave_annual_accounts')->where('employee_id', $employee->id)->where('leave_year', $year)->lockForUpdate()->first();
             $tabung = DB::table('leave_tabung_accounts')->where('employee_id', $employee->id)->lockForUpdate()->first();
             if ($annual === null || $tabung === null) {
-                throw new DomainException('Akaun cuti tahun semasa dan Tabung diperlukan.');
+                throw new DomainException('Akaun cuti tahun dipilih dan Tabung diperlukan.');
+            }
+            if ($historical && ! DB::table('leave_annual_year_closes')->where('annual_account_id', $annual->id)->exists()) {
+                throw new DomainException('Tahun sumber mesti sudah ditutup.');
             }
             $payload = [
                 'employee_id' => (int) $employee->id, 'annual_account_id' => (int) $annual->id, 'tabung_account_id' => (int) $tabung->id,
@@ -37,6 +46,10 @@ class LeaveAdjustmentService
                 || ($payload['source_year'] !== null && ($payload['source_year'] < 1900 || $payload['source_year'] > $year))) {
                 throw new DomainException('Amaun, sebab dan rujukan sumber mesti sah.');
             }
+            // Preserve existing current-year replay hashes.
+            if ($historical) {
+                $payload['historical_eligible'] = true;
+            }
             $hash = hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR));
             $existing = DB::table('leave_balance_adjustments')->where('submission_key', $data['key'])->lockForUpdate()->first();
             if ($existing !== null) {
@@ -46,7 +59,14 @@ class LeaveAdjustmentService
 
                 return (int) $existing->id;
             }
+            if ($historical && DB::table('leave_balance_adjustments')->where('annual_account_id', $annual->id)
+                ->where('evidence_reference', $payload['evidence_reference'])->whereIn('status', ['PENDING', 'APPROVED'])->exists()) {
+                throw new DomainException('Rujukan bukti ini sudah digunakan untuk akaun sumber.');
+            }
             [$balance, $pending] = $this->snapshot($annual->id, $tabung->id, $payload['bucket']);
+            if ($historical && $balance < $pending) {
+                throw new DomainException('Defisit tahun tertutup memerlukan semakan khusus HR.');
+            }
             $id = DB::table('leave_balance_adjustments')->insertGetId([
                 ...$payload, 'submission_key' => $data['key'], 'payload_hash' => $hash,
                 'prepared_balance' => $balance, 'prepared_pending' => $pending, 'status' => 'PENDING',
@@ -95,9 +115,13 @@ class LeaveAdjustmentService
                 'decision_reason' => $reason, 'decided_at' => now(), 'updated_at' => now(),
             ];
             if ($data['decision'] === 'APPROVED') {
-                if ((int) $row->leave_year !== (int) now('Asia/Kuala_Lumpur')->format('Y')
-                    || (int) $annual->leave_year !== (int) $row->leave_year) {
-                    throw new DomainException('Pelarasan tahun tertutup memerlukan proses rekonsiliasi berasingan.');
+                $current = (int) now('Asia/Kuala_Lumpur')->format('Y');
+                $historical = (int) $row->leave_year < $current;
+                if ((int) $row->leave_year > $current || (int) $annual->leave_year !== (int) $row->leave_year
+                    || ($historical && (! $row->historical_eligible || $row->bucket !== 'AL' || (int) $row->signed_units <= 0
+                        || ! ($data['historical_verified'] ?? false)
+                        || ! DB::table('leave_annual_year_closes')->where('annual_account_id', $annual->id)->exists()))) {
+                    throw new DomainException('Pelarasan AL tahun tertutup perlu pengakuan kelayakan baru dan pengesahan bebas HR.');
                 }
                 $confirmed = DB::table('leave_annual_entitlement_confirmations')->where('annual_account_id', $annual->id)->first();
                 if ($confirmed === null || ! DB::table('leave_ledger_entries')->where('annual_account_id', $annual->id)
@@ -107,6 +131,9 @@ class LeaveAdjustmentService
                 [$before, $pending] = $this->snapshot($annual->id, $tabung->id, $row->bucket);
                 if ($before !== (int) $row->prepared_balance || $pending !== (int) $row->prepared_pending) {
                     throw new DomainException('Baki atau tempahan berubah selepas penyediaan. Tolak dan sediakan semula.');
+                }
+                if ($historical && $before < $pending) {
+                    throw new DomainException('Defisit tahun tertutup memerlukan semakan khusus HR.');
                 }
                 $after = $before + (int) $row->signed_units;
                 if ($row->signed_units < 0 && $after < $pending) {
@@ -144,7 +171,13 @@ class LeaveAdjustmentService
                     'balance_operation_id' => $operation, 'signed_half_day_units' => $row->signed_units,
                     'kind' => 'hr_manual_adjustment', 'source_year' => $row->source_year, 'operation_key' => $key, 'actor_id' => $actor,
                 ]);
+                // Record original correction separately from its immediate old-year disposition.
                 $update += ['before_units' => $before, 'after_units' => $after, 'ledger_entry_id' => $entry];
+                if ($historical) {
+                    app(AnnualLateReconciliationService::class)->reconcile($actor, (int) $employee->id, (int) $annual->id,
+                        (int) $tabung->id, (int) $row->signed_units, $operation, $key, 'HR_ADJUSTMENT', $id);
+                    $update['historical_verified'] = true;
+                }
             }
             DB::table('leave_balance_adjustments')->where('id', $id)->update($update);
             $this->audit($actor, $id, strtolower($data['decision']), $data['key']);

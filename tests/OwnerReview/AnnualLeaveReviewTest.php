@@ -439,6 +439,33 @@ class AnnualLeaveReviewTest extends TestCase
         $this->assertSame(1, DB::table('leave_late_reconciliations')->where('annual_account_id', $f['annual'])->count());
     }
 
+    public function test_tb_05_historical_positive_adjustment_requires_attestation_and_burns_excess_once(): void
+    {
+        $f = $this->fixture();
+        $maker = $this->actor('historical-maker', ['leave.adjustment.prepare']);
+        $checker = $this->actor('historical-checker', ['leave.adjustment.decide']);
+        Carbon::setTestNow(Carbon::parse(($this->year + 1).'-01-01 09:00:00', 'Asia/Kuala_Lumpur'));
+        app(AnnualEntitlementCreditService::class)->creditConfirmedEntitlementOnJanuaryFirst($f['hr']->id, $f['next_confirmation']);
+        $close = app(AnnualLeaveYearCloseService::class);
+        $preview = $close->eligibility($f['employee'], $this->year, 40);
+        $this->assertTrue($preview['can_post'], (string) $preview['reason']);
+        $close->close($f['hr']->id, $f['employee'], $this->year, 40, $preview['snapshot'], 'Synthetic close');
+        $service = app(LeaveAdjustmentService::class);
+        $payload = ['employee' => $f['employee'], 'leave_year' => $this->year, 'bucket' => 'AL', 'units' => 2,
+            'reason' => 'Synthetic newly eligible correction', 'evidence_reference' => 'SYNTHETIC-HISTORICAL', 'key' => $this->key()];
+        $this->denied(fn () => $service->prepare($maker->id, $payload));
+        $id = $service->prepare($maker->id, [...$payload, 'historical_eligible' => true]);
+        $decision = ['decision' => 'APPROVED', 'reason' => 'Synthetic independent verification', 'key' => $this->key()];
+        $this->denied(fn () => $service->decide($checker->id, $id, $decision));
+        $service->decide($checker->id, $id, [...$decision, 'historical_verified' => true]);
+        $service->decide($checker->id, $id, [...$decision, 'historical_verified' => true]);
+        $this->assertSame(0, $this->annual($f['annual']));
+        $this->assertSame(40, $this->tabung($f['tabung']));
+        $this->assertDatabaseHas('leave_late_reconciliations', ['source_kind' => 'HR_ADJUSTMENT', 'source_id' => $id,
+            'eligible_units' => 2, 'transfer_units' => 0, 'burn_units' => 2]);
+        $this->denied(fn () => $service->prepare($maker->id, [...$payload, 'historical_eligible' => true, 'key' => $this->key()]));
+    }
+
     private function fixture(): array
     {
         $suffix = Str::lower(Str::random(10));
