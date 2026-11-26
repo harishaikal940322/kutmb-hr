@@ -65,6 +65,10 @@ return [
             'label' => 'Putuskan pelarasan baki',
             'description' => 'Independently approve or reject a prepared local balance adjustment.',
             'group' => 'Annual leave', 'submodule' => 'Pelarasan baki', 'action' => 'Decide', 'system_only' => false,
+        ], 'leave.attendance.review' => [
+            'label' => 'Rekod hasil semakan HR',
+            'description' => 'Record an evidence-referenced finding for a rejected leave review; no payroll or balance mutation.',
+            'group' => 'Annual leave', 'submodule' => 'Laporan', 'action' => 'Review', 'system_only' => false,
         ], 'leave.reports.view' => [
             'label' => 'Lihat laporan cuti',
             'description' => 'View HR leave balances, status summaries and attendance review records; no private reasons.',
@@ -159,7 +163,7 @@ return [
                 'hr.organization.manage', 'hr.accounts.link', 'hr.offices.manage',
                 'leave.entitlement.view', 'leave.entitlement.confirm', 'leave.entitlement.credit',
                 'leave.calendar.manage', 'leave.policy.manage', 'leave.partial-cancellation.review',
-                'leave.reports.view', 'leave.year-end.preview', 'leave.year-end.post', 'leave.request.record-on-behalf', 'leave.adjustment.decide',
+                'leave.reports.view', 'leave.year-end.preview', 'leave.year-end.post', 'leave.request.record-on-behalf', 'leave.adjustment.decide', 'leave.attendance.review',
             ],
         ],
         'it-admin' => [
@@ -189,7 +193,7 @@ return [
                     'hr.organization.manage', 'hr.accounts.link', 'hr.offices.manage',
                     'leave.entitlement.view', 'leave.entitlement.confirm', 'leave.entitlement.credit',
                     'leave.calendar.manage', 'leave.policy.manage', 'leave.partial-cancellation.review',
-                'leave.reports.view', 'leave.year-end.preview', 'leave.year-end.post', 'leave.request.record-on-behalf', 'leave.adjustment.decide',
+                'leave.reports.view', 'leave.year-end.preview', 'leave.year-end.post', 'leave.request.record-on-behalf', 'leave.adjustment.decide', 'leave.attendance.review',
                 ],
             ],
             'unit-manager-v1' => [

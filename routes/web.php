@@ -89,6 +89,7 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class])->prefix('leave
     Route::post('/adjustments/{adjustment}/decision', [AnnualLeaveAdjustmentController::class, 'decide'])->whereNumber('adjustment')->middleware('permission:leave.adjustment.decide')->name('leave.annual.adjustments.decide');
     Route::get('/ledger', [AnnualLeaveOperationsController::class, 'ledger'])->middleware('permission:leave.request.self')->name('leave.annual.ledger');
     Route::get('/reports', [AnnualLeaveOperationsController::class, 'reports'])->middleware('permission:leave.reports.view')->name('leave.annual.reports');
+    Route::post('/reports/reviews/{review}/outcome', [AnnualLeaveOperationsController::class, 'recordReviewOutcome'])->whereNumber('review')->middleware(['permission:leave.reports.view', 'permission:leave.attendance.review'])->name('leave.annual.reviews.outcome');
     Route::get('/year-end', [AnnualLeaveOperationsController::class, 'yearEnd'])->middleware('permission:leave.year-end.preview')->name('leave.annual.year-end');
     Route::post('/year-end', [AnnualLeaveOperationsController::class, 'postYearEnd'])->middleware(['permission:leave.year-end.preview', 'permission:leave.year-end.post'])->name('leave.annual.year-end.post');
     Route::get('/record', [AnnualLeaveOperationsController::class, 'record'])->middleware('permission:leave.request.record-on-behalf')->name('leave.annual.record');

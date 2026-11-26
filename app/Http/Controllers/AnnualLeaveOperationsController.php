@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditEvent;
+use App\Models\User;
 use App\Services\Leave\AnnualLeaveYearEndPreview;
 use App\Services\Leave\AnnualLeaveYearCloseService;
 use App\Services\Leave\ConfirmedVersionLookup;
@@ -56,8 +58,17 @@ class AnnualLeaveOperationsController extends Controller
             ->selectRaw('COUNT(*) AS request_count, SUM(revision.requested_units) AS units')->get();
         $reviews = (clone $base)->join('leave_attendance_reviews as review', 'review.revision_id', '=', 'revision.id')
             ->join('employees as employee', 'employee.id', '=', 'request.employee_id')
+            ->leftJoin('leave_attendance_review_outcomes as outcome', 'outcome.review_id', '=', 'review.id')
             ->orderByDesc('review.id')->paginate(25, ['review.id', 'review.review_code', 'review.opened_at',
-                'employee.display_name', 'employee.employee_no', 'request.request_key', 'request.status'], 'review_page')->withQueryString();
+                'employee.display_name', 'employee.employee_no', 'request.request_key', 'request.status',
+                'employee.user_id as target_user_id', 'outcome.finding', 'outcome.created_at as recorded_at'], 'review_page')->withQueryString()
+            ->through(function ($row) use ($request) {
+                $row->can_record = (int) ($request->user()->can('leave.attendance.review')
+                    && (int) $row->target_user_id !== (int) $request->user()->id
+                    && $row->finding === null && $row->status === 'REJECTED');
+                unset($row->target_user_id);
+                return $row;
+            });
 
         $accounts = $this->accountRows($year)->orderBy('employee.display_name')->orderBy('employee.id')
             ->paginate(25, pageName: 'balance_page')->withQueryString();
@@ -67,6 +78,58 @@ class AnnualLeaveOperationsController extends Controller
             'mode' => 'reports', 'year' => $year, 'currentYear' => $this->currentYear(),
             'summary' => $summary, 'reviews' => $reviews, 'accounts' => $accounts,
         ]);
+    }
+
+    public function recordReviewOutcome(Request $request, int $review): RedirectResponse
+    {
+        $data = $request->validate([
+            'finding' => ['required', 'in:ABSENCE_CONFIRMED,ABSENCE_NOT_CONFIRMED,REFERRED'],
+            'note' => ['required', 'string', 'max:1000'],
+            'evidence_reference' => ['required', 'string', 'max:255'],
+            'operation_key' => ['required', 'uuid'],
+        ]);
+        DB::transaction(function () use ($request, $review, $data): void {
+            $actor = User::query()->lockForUpdate()->findOrFail($request->user()->id);
+            abort_unless($actor->status === 'ACTIVE' && $actor->can('leave.attendance.review') && $actor->can('leave.reports.view'), 403);
+            $case = DB::table('leave_attendance_reviews as review')
+                ->join('leave_request_revisions as revision', 'revision.id', '=', 'review.revision_id')
+                ->join('leave_requests as request', 'request.id', '=', 'revision.request_id')
+                ->join('employees as employee', 'employee.id', '=', 'request.employee_id')
+                ->where('review.id', $review)->lockForUpdate()
+                ->first(['review.id', 'request.status', 'request.current_revision', 'revision.revision', 'employee.user_id']);
+            abort_if($case === null, 404);
+            abort_if((int) $case->user_id === (int) $actor->id, 403);
+            if ($case->status !== 'REJECTED' || (int) $case->current_revision !== (int) $case->revision) {
+                throw ValidationException::withMessages(['finding' => 'Kes bukan semakan penolakan revision semasa.']);
+            }
+            $payload = ['finding' => $data['finding'], 'note' => trim($data['note']), 'evidence_reference' => trim($data['evidence_reference'])];
+            if ($payload['note'] === '' || $payload['evidence_reference'] === '') {
+                throw ValidationException::withMessages(['note' => 'Catatan dan rujukan bukti diperlukan.']);
+            }
+            $existing = DB::table('leave_attendance_review_outcomes')->where('review_id', $review)->first();
+            if ($existing !== null) {
+                if ($existing->operation_key === $data['operation_key'] && (int) $existing->reviewer_id === (int) $actor->id
+                    && $existing->finding === $payload['finding'] && $existing->note === $payload['note']
+                    && $existing->evidence_reference === $payload['evidence_reference']) {
+                    return;
+                }
+                throw ValidationException::withMessages(['finding' => 'Hasil semakan sudah direkodkan.']);
+            }
+            if (DB::table('leave_attendance_review_outcomes')->where('operation_key', $data['operation_key'])->exists()) {
+                throw ValidationException::withMessages(['finding' => 'Rujukan operasi telah digunakan.']);
+            }
+            DB::table('leave_attendance_review_outcomes')->insert([
+                'review_id' => $review, 'reviewer_id' => $actor->id, ...$payload,
+                'operation_key' => $data['operation_key'], 'created_at' => now(),
+            ]);
+            AuditEvent::query()->create([
+                'occurred_at' => now(), 'actor_id' => $actor->id,
+                'action_code' => 'hr.leave.attendance_review_recorded', 'target_ref' => 'leave_attendance_review:'.$review,
+                'outcome' => 'SUCCESS',
+                'metadata' => ['source' => 'annual_leave_review', 'reason_code' => $payload['finding'], 'correlation_id' => $data['operation_key']],
+            ]);
+        }, 3);
+        return back()->with('success', 'Hasil semakan HR direkodkan tanpa perubahan baki atau gaji.');
     }
 
     public function yearEnd(Request $request, AnnualLeaveYearEndPreview $preview, LedgerPostedTotals $totals, AnnualLeaveYearCloseService $close): Response

@@ -1,3 +1,7 @@
+## 2026-11-26 — Annual leave HR review outcome recording
+
+Source implementation: HR Manager development grant for explicit evidence-referenced findings on existing rejected AL/EL review cases, immutable per-review outcome, idempotency and audit; no self review, no payroll/attendance classification or further leave balance mutation. Migration 000050 is additive and not applied remotely. Referred cases are recorded referrals, not resolved attendance cases. Same-day EL rejection, shortage handling, automatic expiry and late year-end reconciliation remain outstanding. This is bounded development, not formal policy approval or UAT. No build, tests, database execution or manual CI troubleshooting performed.
+
 ## 26 November 2026 — bounded manual positive carry-forward
 
 - Added forward-only migration 000049 and local HR permission for a manual positive free-AL year-close transfer. A prior-year account may be closed only after both years' matching confirmed entitlements have been credited, the cap is unchanged, there is no existing Tabung source history for that year, no deficit and no excess to dispose. Pending holds remain in the original annual account. Preview, explicit acknowledgement/reason, locked snapshot revalidation, paired immutable ledger movements and once-only close history. No automatic timing/expiry/negative carry policy is inferred; no real HR authority or rate is established.
