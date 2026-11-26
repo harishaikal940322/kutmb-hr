@@ -31,7 +31,7 @@ class AnnualLeaveYearEndPreview
 
         $freeAnnual = $postedAnnualHalfDayUnits - $pendingAnnualHoldHalfDayUnits;
         $eligibleCarry = max(0, $freeAnnual);
-        $capacity = max(0, $confirmedAnnualCapHalfDayUnits - $tabungPostedHalfDayUnits);
+        $capacity = (new TabungCapacity)->snapshot($confirmedAnnualCapHalfDayUnits, $tabungPostedHalfDayUnits)['remaining_units'];
         $transfer = min($eligibleCarry, $capacity);
         $untransferred = $eligibleCarry - $transfer;
 
@@ -69,7 +69,7 @@ class AnnualLeaveYearEndPreview
             throw new InvalidArgumentException('Late reconciliation requires explicit eligible units, a confirmed cap and an opaque source reference.');
         }
 
-        $capacity = max(0, $confirmedAnnualCapHalfDayUnits - $tabungPostedHalfDayUnits);
+        $capacity = (new TabungCapacity)->snapshot($confirmedAnnualCapHalfDayUnits, $tabungPostedHalfDayUnits)['remaining_units'];
         $transfer = min($eligibleUntransferredHalfDayUnits, $capacity);
         $untransferred = $eligibleUntransferredHalfDayUnits - $transfer;
 

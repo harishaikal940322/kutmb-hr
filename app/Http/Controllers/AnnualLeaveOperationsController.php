@@ -9,6 +9,7 @@ use App\Services\Leave\AnnualLeaveYearCloseService;
 use App\Services\Leave\ConfirmedVersionLookup;
 use App\Services\Leave\LeaveRequestWorkflowService;
 use App\Services\Leave\LedgerPostedTotals;
+use App\Services\Leave\TabungCapacity;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -132,14 +133,21 @@ class AnnualLeaveOperationsController extends Controller
         return back()->with('success', 'Hasil semakan HR direkodkan tanpa perubahan baki atau gaji.');
     }
 
-    public function yearEnd(Request $request, AnnualLeaveYearEndPreview $preview, LedgerPostedTotals $totals, AnnualLeaveYearCloseService $close): Response
+    public function yearEnd(Request $request, AnnualLeaveYearEndPreview $preview, LedgerPostedTotals $totals, AnnualLeaveYearCloseService $close, TabungCapacity $capacity): Response
     {
         $year = $this->year($request);
         $data = $request->validate(['employee' => ['nullable', 'integer', 'min:1'], 'cap' => ['nullable', 'integer', 'min:0', 'max:100000']]);
         $result = null;
         $employeeId = isset($data['employee']) ? (int) $data['employee'] : null;
-        if ($employeeId !== null && isset($data['cap'])) {
-            $result = DB::transaction(function () use ($employeeId, $year, $data, $preview, $totals): array {
+        $cap = null;
+        if ($employeeId !== null) {
+            $cap = $capacity->confirmedCapFor($employeeId, $year + 1);
+            if ($cap !== null && isset($data['cap']) && (int) $data['cap'] !== $cap) {
+                throw ValidationException::withMessages(['cap' => 'Cap mesti sepadan dengan kelayakan disahkan tahun penerima.']);
+            }
+        }
+        if ($employeeId !== null && $cap !== null) {
+            $result = DB::transaction(function () use ($employeeId, $year, $cap, $preview, $totals): array {
                 $employee = DB::table('employees')->where('id', $employeeId)->lockForUpdate()->first(['id']);
                 $annual = DB::table('leave_annual_accounts')->where('employee_id', $employeeId)->where('leave_year', $year)->lockForUpdate()->first(['id']);
                 $tabung = DB::table('leave_tabung_accounts')->where('employee_id', $employeeId)->lockForUpdate()->first(['id']);
@@ -150,18 +158,18 @@ class AnnualLeaveOperationsController extends Controller
                 $hold = $totals->pendingAnnualUnits((int) $annual->id);
 
                 return $preview->previewCloseTransfer($employeeId, $year, $posted['annual_half_day_units'], $hold,
-                    $posted['tabung_half_day_units'], (int) $data['cap']);
+                    $posted['tabung_half_day_units'], $cap);
             });
         }
 
-        $eligibility = $employeeId !== null && isset($data['cap']) && $request->user()->can('leave.year-end.post')
-            ? $close->eligibility($employeeId, $year, (int) $data['cap']) : null;
+        $eligibility = $employeeId !== null && $cap !== null && $request->user()->can('leave.year-end.post')
+            ? $close->eligibility($employeeId, $year, $cap) : null;
 
         return Inertia::render('leave/Operations', [
             'access' => AnnualLeaveWorkflowController::capabilities($request->user()),
             'mode' => 'year-end', 'year' => $year, 'currentYear' => $this->currentYear(),
             'employees' => DB::table('employees')->orderBy('display_name')->get(['id', 'employee_no', 'display_name']),
-            'selectedEmployee' => $employeeId, 'cap' => $data['cap'] ?? null, 'preview' => $result,
+            'selectedEmployee' => $employeeId, 'cap' => $cap, 'preview' => $result,
             'closeEligibility' => $eligibility,
         ]);
     }

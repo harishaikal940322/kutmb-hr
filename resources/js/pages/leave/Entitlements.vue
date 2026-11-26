@@ -18,6 +18,7 @@ type Employee = {
     confirmed_half_day_units: number | null;
     entitlement_status: 'NO_ACCOUNT' | 'UNCONFIRMED' | 'CONFIRMED' | 'CREDITED';
     confirmed_at: string | null;
+    tabung_capacity: { cap_units: number | null; posted_units: number | null; remaining_units: number | null; excess_units: number | null };
     rate_suggestion: {
         status: 'REVIEW' | 'NOT_IN_SERVICE' | 'PROBATION' | 'SUGGESTED';
         as_of: string; completed_years: number | null; annual_half_day_units: number | null;
@@ -252,6 +253,19 @@ function date(value: string | null) {
                                                 </div>
                                                 <p class="text-sm text-muted-foreground">{{ row.rate_suggestion.message }}</p>
                                                 <button v-if="canConfirmEntitlement && row.rate_suggestion.status === 'SUGGESTED' && row.rate_suggestion.annual_half_day_units !== null" type="button" class="min-h-10 rounded-lg border border-border px-3 text-sm font-semibold" @click="rateDays = String(row.rate_suggestion.annual_half_day_units / 2)">Guna kadar cadangan untuk pratonton</button>
+                                            </section>
+                                            <section v-if="expanded === row.id" class="mt-4 space-y-3 rounded-lg border border-border bg-card p-4">
+                                                <div><h2 class="font-semibold">Kapasiti Tabung Cuti</h2><p class="mt-1 text-xs text-muted-foreground">Had berdasarkan kelayakan disahkan {{ filters.year }} · dibandingkan dengan baki Tabung dipos semasa, bukan baki sejarah atau ramalan.</p></div>
+                                                <div class="grid gap-3 sm:grid-cols-3">
+                                                    <div><p class="text-xs text-muted-foreground">Had disahkan</p><p class="mt-1 text-xl font-semibold">{{ days(row.tabung_capacity.cap_units) }}</p></div>
+                                                    <div><p class="text-xs text-muted-foreground">Baki Tabung semasa</p><p class="mt-1 text-xl font-semibold">{{ row.tabung_capacity.posted_units === null ? 'Tiada akaun' : days(row.tabung_capacity.posted_units) }}</p></div>
+                                                    <div><p class="text-xs text-muted-foreground">Ruang tambahan</p><p class="mt-1 text-xl font-semibold text-primary">{{ days(row.tabung_capacity.remaining_units) }}</p></div>
+                                                </div>
+                                                <div v-if="row.tabung_capacity.cap_units !== null && row.tabung_capacity.cap_units > 0 && row.tabung_capacity.posted_units !== null" role="meter" aria-label="Penggunaan kapasiti Tabung" :aria-valuenow="Math.min(row.tabung_capacity.posted_units, row.tabung_capacity.cap_units)" :aria-valuemin="0" :aria-valuemax="row.tabung_capacity.cap_units" class="h-2 overflow-hidden rounded-full bg-muted">
+                                                    <div class="h-full rounded-full bg-primary" :style="{ width: Math.min(100, row.tabung_capacity.posted_units / row.tabung_capacity.cap_units * 100) + '%' }" />
+                                                </div>
+                                                <p v-if="(row.tabung_capacity.excess_units ?? 0) > 0" class="text-sm text-destructive">Lebihan {{ days(row.tabung_capacity.excess_units) }} memerlukan semakan HR. Tiada pelupusan automatik.</p>
+                                                <p class="text-xs text-muted-foreground">Kadar cadangan tidak mengubah had. Apabila kelayakan tahun dipilih disahkan, kapasiti dikira semula tanpa kredit ke Tabung.</p>
                                             </section>
                                             <p v-if="expanded === row.id && confirmed" role="status" class="mt-4 text-sm">{{ confirmed }}</p>
                                             <form v-if="expanded === row.id && canConfirmEntitlement"

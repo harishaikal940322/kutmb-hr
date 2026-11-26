@@ -1,3 +1,9 @@
+## 26 November 2026 — dynamic Tabung capacity
+
+- Owner approved linking Tabung capacity to confirmed annual entitlement. Added shared TabungCapacity arithmetic and confirmed-cap lookup; Profil & Kelayakan displays selected-year confirmed cap against current posted Tabung, remaining room and excess, not a historical or future balance projection. Missing confirmation/account is not treated as zero. Seniority rate suggestions and prorata previews do not change cap or ledger.
+- Year-end preview derives cap from confirmed receiving-year entitlement instead of manual input. Posting still requires prior year, both matching credits, unchanged locked snapshot, distinct HR actor, all free AL fitting within cap, no prior source-year history and no deficit. Allows equal or increased confirmed cap; decrease, excess/expiry and late reconciliation remain gated. Positive adjustments retain confirmed cap enforcement. No automatic top-up, disposal, expiry or scheduled posting. Current-year immutable entitlement is not changed by ordinary balance adjustments.
+- Source only; no migration, seed, database write, runtime or build performed remotely. Owner pull/build and review Profil & Kelayakan and Pratonton tutup tahun. No formal production acceptance.
+
 ## 26 November 2026 — automatic seniority rate suggestion
 
 - Owner requested automatic entitlement rate based on service length. Implemented read-only CT-DEC-005 rate resolver for documented strict >2/<5 (manager 25, employee 20 days) and >5 (30/25 days) with existing explicit synthetic category codes. Effective category lookup uses displayed reference date (today/current year, Jan 1 next year, Dec 31 historical); this is a preview snapshot, not an approved award or top-up date. Unconfirmed employment shows separate 6-day probation reference; exact boundaries, unmapped categories and confirmed under-two remain review-only. Existing immutable confirmations/credits unchanged.

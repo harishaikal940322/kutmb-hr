@@ -115,13 +115,20 @@ class AnnualLeaveYearCloseService
         if (DB::table('leave_annual_year_closes')->where('annual_account_id', $annual->id)->exists()) {
             throw new DomainException('Tutup tahun sudah direkodkan.');
         }
+        $confirmedCaps = [];
         foreach ([$annual, $next] as $account) {
             $confirmed = DB::table('leave_annual_entitlement_confirmations')->where('annual_account_id', $account->id)->first();
-            if ($confirmed === null || (int) $confirmed->confirmed_half_day_units !== $cap
-                || ! DB::table('leave_ledger_entries')->where('annual_account_id', $account->id)
-                    ->where('kind', 'annual_entitlement_credit')->where('signed_half_day_units', $cap)->exists()) {
-                throw new DomainException('Kedua-dua tahun mesti dikreditkan dengan kelayakan disahkan yang sama dengan cap; perubahan cap atau urutan kredit memerlukan semakan HR.');
+            if ($confirmed === null || ! DB::table('leave_ledger_entries')->where('annual_account_id', $account->id)
+                ->where('kind', 'annual_entitlement_credit')->where('signed_half_day_units', $confirmed->confirmed_half_day_units)->exists()) {
+                throw new DomainException('Kelayakan kedua-dua tahun mesti disahkan dan dikreditkan.');
             }
+            $confirmedCaps[] = (int) $confirmed->confirmed_half_day_units;
+        }
+        if ($cap !== $confirmedCaps[1]) {
+            throw new DomainException('Cap mesti sepadan dengan kelayakan disahkan tahun penerima.');
+        }
+        if ($confirmedCaps[1] < $confirmedCaps[0]) {
+            throw new DomainException('Penurunan cap memerlukan semakan HR; tiada pelupusan automatik.');
         }
         if (DB::table('leave_ledger_entries')->where('tabung_account_id', $tabung->id)->where('source_year', $year)->exists()) {
             throw new DomainException('Sumber tahun ini sudah mempunyai sejarah Tabung dan memerlukan rekonsiliasi berasingan.');

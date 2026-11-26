@@ -7,6 +7,7 @@ use App\Services\Leave\AnnualEntitlementCreditService;
 use App\Services\Leave\AnnualEntitlementRateResolver;
 use App\Services\Leave\BalanceProjection;
 use App\Services\Leave\LedgerPostedTotals;
+use App\Services\Leave\TabungCapacity;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -88,7 +89,15 @@ class AnnualLeaveController extends Controller
             ->selectRaw("EXISTS (SELECT 1 FROM leave_ledger_entries AS entry WHERE entry.annual_account_id = annual.id AND entry.kind = 'annual_entitlement_credit' AND entry.signed_half_day_units = confirmation.confirmed_half_day_units) AS credited")
             ->get()->keyBy('employee_id');
 
-        $employees->through(function ($employee) use ($assignments, $accounts, $today, $rateDate, $rateAssignments, $rateResolver): array {
+        $tabungBalances = DB::table('leave_tabung_accounts as tabung')
+            ->whereIn('tabung.employee_id', $ids)
+            ->select('tabung.employee_id')
+            ->selectSub(DB::table('leave_ledger_entries')->whereColumn('tabung_account_id', 'tabung.id')
+                ->selectRaw('COALESCE(SUM(signed_half_day_units), 0)'), 'posted_units')
+            ->get()->keyBy('employee_id');
+        $capacity = app(TabungCapacity::class);
+
+        $employees->through(function ($employee) use ($assignments, $accounts, $today, $rateDate, $rateAssignments, $rateResolver, $tabungBalances, $capacity): array {
             $inService = $employee->service_start <= $today
                 && ($employee->service_end === null || $employee->service_end >= $today);
             $current = $assignments->get($employee->id, collect());
@@ -114,6 +123,8 @@ class AnnualLeaveController extends Controller
                 'entitlement_status' => $account === null ? 'NO_ACCOUNT' : ($units === null ? 'UNCONFIRMED' : ($account->credited ? 'CREDITED' : 'CONFIRMED')),
                 'confirmed_at' => $units === null ? null : $account->confirmed_at,
                 'rate_suggestion' => $rate,
+                'tabung_capacity' => $capacity->snapshot($units === null ? null : (int) $units,
+                    $tabungBalances->has($employee->id) ? (int) $tabungBalances->get($employee->id)->posted_units : null),
             ];
         });
 

@@ -416,6 +416,10 @@ CT-DEC-003/036: full-year, new-hire starting-month-inclusive and month-end termi
 
 CT-DEC-005: local synthetic category codes DEV-PENGURUS and DEV-PEKERJA map to the documented strict >2/<5 and >5 bands (25/20 and 30/25 days). The employee's effective category, recorded confirmation and service dates are evaluated at a displayed reference date (today for current year, January 1 for next, December 31 for historical). This is a technical snapshot choice for preview, not a decided annual-award cutoff. Exact 2/5 anniversaries, confirmed under two years, ambiguous leap-day boundaries and unmapped categories remain review-only. Probation 6 days is displayed separately and never fed into annual prorata automatically. HR can copy a suggested annual rate into the existing explicit-rate calculator, not automatically confirm or post. No anniversary top-up, annual-credit duplication, actual category mappings or promotion/midyear award rules are inferred.
 
+## 8V. Dynamic Tabung capacity (26 November 2026)
+
+CT-DEC-004/038: owner approved dynamic cap linkage to confirmed annual entitlement. Preview compares the selected year's confirmed cap with the current posted continuous Tabung balance, without modifying the ledger. Year-close uses the next year's confirmed cap, permits a higher cap only when both years' own credits are posted and the entire free positive AL fits. Same-cap close remains supported; lower cap, excess disposition, late reconciliation and unsettled midyear entitlement changes remain separately gated. No automatic increase in Tabung balance on entitlement confirmation. Runtime verification pending.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.

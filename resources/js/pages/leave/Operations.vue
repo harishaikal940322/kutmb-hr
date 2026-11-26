@@ -17,7 +17,6 @@ defineOptions({ layout: { breadcrumbs: [{ title: 'Cuti Tahunan', href: '/leave/a
 const titles = { ledger: 'Baki & transaksi saya', reports: 'Laporan & semakan HR', 'year-end': 'Pratonton tutup tahun', record: 'Rekod bagi pihak staf' };
 const year = ref(props.year);
 const employee = ref<number | ''>(props.selectedEmployee ?? '');
-const cap = ref<number | ''>(props.cap ?? '');
 const success = ref(false);
 const closeForm = useForm({ employee: 0, year: props.year, cap: 0, annual: 0, pending: 0, tabung: 0, transfer: 0, reason: '', acknowledged: false });
 const closeNotice = ref('');
@@ -43,7 +42,7 @@ const form = useForm({ employee: '', leave_type: 'AL', start: '', end: '', sessi
 const input = 'block min-h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm';
 const button = 'inline-flex min-h-10 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50';
 function filter() {
-    router.get('/leave/annual/' + props.mode, { year: year.value, ...(props.mode === 'year-end' ? { employee: employee.value || undefined, cap: cap.value === '' ? undefined : cap.value } : {}) });
+    router.get('/leave/annual/' + props.mode, { year: year.value, ...(props.mode === 'year-end' ? { employee: employee.value || undefined } : {}) });
 }
 function postClose() {
     const snapshot = props.closeEligibility?.snapshot;
@@ -82,7 +81,7 @@ const previewFields = [
                     <label class="space-y-1 text-sm font-medium">Tahun<input v-model.number="year" type="number" min="1900" :max="currentYear + 1" required :class="input" /></label>
                     <template v-if="mode === 'year-end'">
                         <label class="min-w-48 flex-1 space-y-1 text-sm font-medium">Pekerja<select v-model="employee" required :class="input"><option value="">Pilih pekerja</option><option v-for="item in employees" :key="item.id" :value="item.id">{{ item.employee_no }} · {{ item.display_name }}</option></select></label>
-                        <label class="space-y-1 text-sm font-medium">Cap disahkan HR (unit separuh hari)<input v-model.number="cap" type="number" min="0" max="100000" required :class="input" /></label>
+                        <p class="text-xs text-muted-foreground">Cap diambil daripada kelayakan tahun penerima yang disahkan HR.</p>
                     </template>
                     <button :class="button" type="submit">{{ mode === 'year-end' ? 'Kira pratonton' : 'Semak' }}</button>
                 </form>
@@ -97,7 +96,12 @@ const previewFields = [
                     <section class="overflow-x-auto rounded-xl border border-border bg-card p-4"><h2 class="mb-2 font-semibold">Kes semakan HR</h2><p class="mb-3 text-sm text-muted-foreground">EL retrospektif atau AL lewat ditolak. Ini rekod semakan, bukan keputusan kehadiran atau potongan gaji.</p><table class="w-full min-w-[560px] text-left text-sm"><thead class="border-b border-border text-muted-foreground"><tr><th class="p-2">Staf</th><th class="p-2">Rujukan</th><th class="p-2">Jenis</th><th class="p-2">Dibuka</th><th class="p-2">Hasil / tindakan</th></tr></thead><tbody class="divide-y divide-border"><tr v-for="row in reviews?.data" :key="row.id"><td class="p-2">{{ row.display_name }}</td><td class="p-2 break-all">{{ row.request_key }}</td><td class="p-2">{{ row.review_code }}</td><td class="p-2">{{ row.opened_at }}</td><td class="p-2"><span v-if="row.finding">{{ findingLabels[String(row.finding)] ?? row.finding }}</span><button v-else-if="row.can_record" type="button" class="text-primary underline" @click="openReview(Number(row.id))">Rekod hasil</button><span v-else>Belum direkodkan</span></td></tr></tbody></table><p v-if="reviewNotice" role="status" class="mt-3 text-sm">{{ reviewNotice }}</p><form v-if="selectedReview !== null" class="mt-4 space-y-3 rounded-lg border border-border p-4" @submit.prevent="saveReview"><h3 class="font-semibold">Hasil semakan #{{ selectedReview }}</h3><p class="text-xs text-muted-foreground">Rekod bukti sintetik sahaja. Tiada perubahan baki, klasifikasi gaji atau kehadiran automatik.</p><label class="block text-sm">Dapatan<select v-model="reviewForm.finding" :class="input"><option v-for="(label, code) in findingLabels" :key="code" :value="code">{{ label }}</option></select></label><label class="block text-sm">Catatan<textarea v-model="reviewForm.note" :class="input" required maxlength="1000" /></label><label class="block text-sm">Rujukan bukti<input v-model="reviewForm.evidence_reference" :class="input" required maxlength="255" /></label><p v-for="(error, field) in reviewForm.errors" :key="field" class="text-sm text-destructive">{{ error }}</p><div class="flex gap-3"><button :class="button" :disabled="reviewForm.processing">Simpan hasil</button><button type="button" class="text-sm" @click="selectedReview = null">Batal</button></div></form><p v-if="!reviews?.data.length" class="p-3 text-sm text-muted-foreground">Tiada kes semakan.</p><nav class="mt-3 flex gap-4 text-sm text-primary"><Link v-if="reviews?.prev_page_url" :href="reviews.prev_page_url">Sebelum</Link><Link v-if="reviews?.next_page_url" :href="reviews.next_page_url">Seterusnya</Link></nav></section>
                 </template>
                 <template v-else-if="mode === 'year-end'">
-                    <p class="rounded-xl border border-border bg-muted/30 p-4 text-sm leading-6">Pratonton dahulu. Baki pending tidak dipindahkan. Pindahan manual hanya tersedia jika kedua-dua tahun sudah dikreditkan, cap tidak berubah dan tiada lebihan atau defisit. Tiada pelupusan automatik.</p>
+                    <p class="rounded-xl border border-border bg-muted/30 p-4 text-sm leading-6">Pratonton dahulu. Baki pending tidak dipindahkan. Pindahan manual hanya tersedia jika kedua-dua tahun sudah dikreditkan, cap tidak menurun dan semua baki layak muat dalam Tabung. Tiada pelupusan automatik.</p>
+                    <div v-if="selectedEmployee" class="rounded-xl border border-border bg-card p-4">
+                        <p class="text-sm text-muted-foreground">Had Tabung tahun penerima {{ props.year + 1 }}</p>
+                        <p class="mt-1 text-xl font-semibold">{{ days(props.cap) }}</p>
+                        <p v-if="props.cap == null" class="mt-2 text-sm text-muted-foreground">Sahkan kelayakan tahun penerima di Profil &amp; Kelayakan sebelum membuat pratonton.</p>
+                    </div>
                     <div v-if="preview" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><article v-for="[key, label] in previewFields" :key="key" class="rounded-xl border border-border bg-card p-4"><p class="text-sm text-muted-foreground">{{ label }}</p><p class="mt-2 text-xl font-semibold">{{ days(preview[key]) }}</p></article></div>
                     <p v-if="closeNotice" role="status" class="text-sm">{{ closeNotice }}</p>
                     <p v-if="closeEligibility && !closeEligibility.can_post" class="rounded-lg border border-border bg-muted/30 p-3 text-sm">{{ closeEligibility.reason }}</p>
