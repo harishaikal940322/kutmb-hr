@@ -1,3 +1,9 @@
+## 26 November 2026 — automatic seniority rate suggestion
+
+- Owner requested automatic entitlement rate based on service length. Implemented read-only CT-DEC-005 rate resolver for documented strict >2/<5 (manager 25, employee 20 days) and >5 (30/25 days) with existing explicit synthetic category codes. Effective category lookup uses displayed reference date (today/current year, Jan 1 next year, Dec 31 historical); this is a preview snapshot, not an approved award or top-up date. Unconfirmed employment shows separate 6-day probation reference; exact boundaries, unmapped categories and confirmed under-two remain review-only. Existing immutable confirmations/credits unchanged.
+- Profil & Kelayakan shows the suggestion and can populate the explicit-rate prorata input. No automatic ledger change, anniversary job, credit or new schema. For actual midyear increases, HR must confirm effective date and full difference vs prorata method before an idempotent posting can be implemented.
+- Source only; no local runtime/build/test/database access. Owner pull/build and review DEV-001 (20 days), DEV-002 (30 days), DEV-005 (30 days as of 26 Nov 2026, given fixture start Jan 1 five years prior), DEV-004 (6-day probation reference) if fixtures remain unchanged.
+
 ## 26 November 2026 — explicit-rate entitlement and prorata calculator
 
 - CT-DEC-003/036: extracted exact half-day integer calculation into AnnualEntitlementCalculator, supporting full-year, new hire (start month inclusive), month-end termination and combined start/exit in the same year. Exact rounding ties, mid-month termination and no service overlap fail closed. No automatic selection of category/rate, promotion splitting, appointment override, probation posting or exit settlement. HR supplies the applicable annual rate; the 6-day probation rule is separate.

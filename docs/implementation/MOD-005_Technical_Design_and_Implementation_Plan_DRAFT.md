@@ -412,6 +412,10 @@ CT-DEC-035/037 use explicit synthetic entitlement input until rates and mappings
 
 CT-DEC-003/036: full-year, new-hire starting-month-inclusive and month-end termination previews use exact half-day integer arithmetic with HR-supplied annual rate. The existing protected endpoint and entitlement page show period and eligible months, and may populate an unconfirmed non-exit entitlement for explicit HR confirmation with server recalculation under employee lock. Exit results are review-only. No automatic rates, promotion calculation, probation credit, mid-month exit or tie rounding is inferred. Existing January credit and immutable confirmation remain unchanged. Local source implementation, runtime verification pending.
 
+## 8U. Automatic seniority rate suggestion (26 November 2026)
+
+CT-DEC-005: local synthetic category codes DEV-PENGURUS and DEV-PEKERJA map to the documented strict >2/<5 and >5 bands (25/20 and 30/25 days). The employee's effective category, recorded confirmation and service dates are evaluated at a displayed reference date (today for current year, January 1 for next, December 31 for historical). This is a technical snapshot choice for preview, not a decided annual-award cutoff. Exact 2/5 anniversaries, confirmed under two years, ambiguous leap-day boundaries and unmapped categories remain review-only. Probation 6 days is displayed separately and never fed into annual prorata automatically. HR can copy a suggested annual rate into the existing explicit-rate calculator, not automatically confirm or post. No anniversary top-up, annual-credit duplication, actual category mappings or promotion/midyear award rules are inferred.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.

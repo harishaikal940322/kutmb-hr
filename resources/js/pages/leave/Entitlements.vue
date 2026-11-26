@@ -18,6 +18,11 @@ type Employee = {
     confirmed_half_day_units: number | null;
     entitlement_status: 'NO_ACCOUNT' | 'UNCONFIRMED' | 'CONFIRMED' | 'CREDITED';
     confirmed_at: string | null;
+    rate_suggestion: {
+        status: 'REVIEW' | 'NOT_IN_SERVICE' | 'PROBATION' | 'SUGGESTED';
+        as_of: string; completed_years: number | null; annual_half_day_units: number | null;
+        probation_half_day_units: number | null; band: string | null; message: string;
+    };
 };
 type PaginationLink = { url: string | null; label: string; active: boolean };
 const props = defineProps<{
@@ -232,12 +237,28 @@ function date(value: string | null) {
                                                 <div><dt class="text-xs text-muted-foreground">Tarikh tamat</dt><dd class="mt-1 font-medium">{{ date(row.service_end) }}</dd></div>
                                                 <div><dt class="text-xs text-muted-foreground">Tarikh pengesahan kelayakan</dt><dd class="mt-1 font-medium">{{ date(row.confirmed_at) }}</dd></div>
                                             </dl>
+                                            <section v-if="expanded === row.id" class="mt-4 space-y-3 rounded-lg border border-border bg-card p-4">
+                                                <div class="flex flex-wrap items-start justify-between gap-2">
+                                                    <div>
+                                                        <h2 class="font-semibold">Kadar automatik berdasarkan tempoh perkhidmatan</h2>
+                                                        <p class="mt-1 text-xs text-muted-foreground">Cadangan kategori demo · Tarikh rujukan {{ date(row.rate_suggestion.as_of) }}</p>
+                                                    </div>
+                                                    <span class="rounded-full bg-muted px-2.5 py-1 text-xs font-medium">{{ row.rate_suggestion.status === 'SUGGESTED' ? 'Kadar dikenal pasti' : row.rate_suggestion.status === 'PROBATION' ? 'Probation' : 'Semakan HR' }}</span>
+                                                </div>
+                                                <div class="grid gap-3 sm:grid-cols-3">
+                                                    <div><p class="text-xs text-muted-foreground">Tempoh lengkap</p><p class="mt-1 text-lg font-semibold">{{ row.rate_suggestion.completed_years === null ? '—' : row.rate_suggestion.completed_years + ' tahun' }}</p></div>
+                                                    <div><p class="text-xs text-muted-foreground">Band</p><p class="mt-1 text-lg font-semibold">{{ row.rate_suggestion.band ?? '—' }}</p></div>
+                                                    <div><p class="text-xs text-muted-foreground">{{ row.rate_suggestion.status === 'PROBATION' ? 'Kredit probation (belum dipos)' : 'Kadar tahunan cadangan' }}</p><p class="mt-1 text-xl font-semibold text-primary">{{ days(row.rate_suggestion.annual_half_day_units ?? row.rate_suggestion.probation_half_day_units) }}</p></div>
+                                                </div>
+                                                <p class="text-sm text-muted-foreground">{{ row.rate_suggestion.message }}</p>
+                                                <button v-if="canConfirmEntitlement && row.rate_suggestion.status === 'SUGGESTED' && row.rate_suggestion.annual_half_day_units !== null" type="button" class="min-h-10 rounded-lg border border-border px-3 text-sm font-semibold" @click="rateDays = String(row.rate_suggestion.annual_half_day_units / 2)">Guna kadar cadangan untuk pratonton</button>
+                                            </section>
                                             <p v-if="expanded === row.id && confirmed" role="status" class="mt-4 text-sm">{{ confirmed }}</p>
                                             <form v-if="expanded === row.id && canConfirmEntitlement"
                                                 class="mt-4 space-y-4 border-t border-border pt-4" @submit.prevent="previewProrata(row)">
                                                 <div>
                                                     <p class="font-semibold">Pengiraan kelayakan &amp; prorata</p>
-                                                    <p class="mt-1 text-sm text-muted-foreground">Masukkan kadar tahunan yang telah disemak HR. Pengiraan menggunakan tarikh perkhidmatan, bukan penetapan kategori atau kadar automatik.</p>
+                                                    <p class="mt-1 text-sm text-muted-foreground">Gunakan kadar cadangan di atas atau masukkan kadar tahunan yang telah disemak HR. Hasil pengiraan tidak mengubah kelayakan yang telah disahkan.</p>
                                                 </div>
                                                 <div class="grid gap-3 sm:grid-cols-2">
                                                     <label class="block space-y-1 text-sm">

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Leave\AnnualEntitlementCalculator;
 use App\Services\Leave\AnnualEntitlementCreditService;
+use App\Services\Leave\AnnualEntitlementRateResolver;
 use App\Services\Leave\BalanceProjection;
 use App\Services\Leave\LedgerPostedTotals;
 use DomainException;
@@ -65,6 +66,17 @@ class AnnualLeaveController extends Controller
             ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', $today))
             ->get(['employee_assignments.employee_id', 'organization_units.name as unit', 'employment_categories.name as category'])
             ->groupBy('employee_id');
+        // Snapshot date for display only, not an approved annual award cutoff.
+        $rateDate = $year === $currentYear ? $today : ($year > $currentYear ? sprintf('%04d-01-01', $year) : sprintf('%04d-12-31', $year));
+        $rateAssignments = DB::table('employee_assignments')
+            ->join('employment_categories', 'employment_categories.id', '=', 'employee_assignments.category_id')
+            ->whereIn('employee_assignments.employee_id', $ids)
+            ->where('effective_from', '<=', $rateDate)
+            ->where(fn ($query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', $rateDate))
+            ->get(['employee_assignments.employee_id', 'employment_categories.code as category_code'])
+            ->groupBy('employee_id');
+        $rateResolver = app(AnnualEntitlementRateResolver::class);
+
         $accounts = DB::table('leave_annual_accounts as annual')
             ->leftJoin('leave_annual_entitlement_confirmations as confirmation', function ($join): void {
                 $join->on('confirmation.annual_account_id', '=', 'annual.id')
@@ -76,13 +88,16 @@ class AnnualLeaveController extends Controller
             ->selectRaw("EXISTS (SELECT 1 FROM leave_ledger_entries AS entry WHERE entry.annual_account_id = annual.id AND entry.kind = 'annual_entitlement_credit' AND entry.signed_half_day_units = confirmation.confirmed_half_day_units) AS credited")
             ->get()->keyBy('employee_id');
 
-        $employees->through(function ($employee) use ($assignments, $accounts, $today): array {
+        $employees->through(function ($employee) use ($assignments, $accounts, $today, $rateDate, $rateAssignments, $rateResolver): array {
             $inService = $employee->service_start <= $today
                 && ($employee->service_end === null || $employee->service_end >= $today);
             $current = $assignments->get($employee->id, collect());
             $assignment = $inService && $current->count() === 1 ? $current->first() : null;
             $account = $accounts->get($employee->id);
             $units = $account?->confirmed_half_day_units;
+            $rateAssignment = $rateAssignments->get($employee->id, collect());
+            $rate = $rateResolver->resolve($employee->service_start, $employee->confirmation_date, $employee->service_end,
+                $rateAssignment->count() === 1 ? $rateAssignment->first()->category_code : null, $rateDate);
 
             return [
                 'id' => (int) $employee->id,
@@ -98,6 +113,7 @@ class AnnualLeaveController extends Controller
                 'confirmed_half_day_units' => $units === null ? null : (int) $units,
                 'entitlement_status' => $account === null ? 'NO_ACCOUNT' : ($units === null ? 'UNCONFIRMED' : ($account->credited ? 'CREDITED' : 'CONFIRMED')),
                 'confirmed_at' => $units === null ? null : $account->confirmed_at,
+                'rate_suggestion' => $rate,
             ];
         });
 
