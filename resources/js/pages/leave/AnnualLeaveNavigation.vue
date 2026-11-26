@@ -4,7 +4,7 @@ import { CalendarDays, ChevronDown, ClipboardList, FileText, ListChecks, UsersRo
 import { computed, nextTick, ref, watch } from 'vue';
 
 export type AnnualSection = 'apply' | 'requests' | 'approvals' | 'team' | 'staff';
-type NavigationSection = AnnualSection | 'calendar' | 'policy' | 'ledger' | 'reports' | 'year-end' | 'record';
+type NavigationSection = AnnualSection | 'calendar' | 'policy' | 'ledger' | 'reports' | 'year-end' | 'record' | 'adjustments';
 export type AnnualAccess = {
     sections: AnnualSection[];
     module: boolean;
@@ -19,10 +19,12 @@ export type AnnualAccess = {
     can_view_reports: boolean;
     can_preview_year_end: boolean;
     can_record_on_behalf: boolean;
+    can_manage_adjustments: boolean;
     can_view_own_ledger: boolean;
 };
 const props = defineProps<{ access: AnnualAccess; active: NavigationSection | null }>();
 const catalog = {
+    adjustments: { label: 'Pelarasan baki', icon: SlidersHorizontal, href: '/leave/annual/adjustments' },
     ledger: { label: 'Baki & transaksi saya', icon: FileText, href: '/leave/annual/ledger' },
     reports: { label: 'Laporan & semakan HR', icon: ListChecks, href: '/leave/annual/reports' },
     'year-end': { label: 'Tutup tahun', icon: CalendarDays, href: '/leave/annual/year-end' },
@@ -42,6 +44,7 @@ const groups = computed(() => {
     if (props.access.can_view_reports) management.push('reports');
     if (props.access.can_preview_year_end) management.push('year-end');
     if (props.access.can_record_on_behalf) management.push('record');
+    if (props.access.can_manage_adjustments) management.push('adjustments');
     const personal: NavigationSection[] = props.access.sections.filter(item => item !== 'staff');
     if (props.access.can_view_own_ledger) personal.push('ledger');
     return [

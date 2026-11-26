@@ -34,6 +34,7 @@ class AnnualLeaveWorkflowController extends Controller
         $reports = $user->can('leave.reports.view');
         $yearEnd = $user->can('leave.year-end.preview');
         $record = $user->can('leave.request.record-on-behalf');
+        $adjustments = $user->can('leave.adjustment.prepare') || $user->can('leave.adjustment.decide');
 
         $unitAvailable = false;
         if ($team && $linked) {
@@ -66,12 +67,13 @@ class AnnualLeaveWorkflowController extends Controller
 
         return [
             'sections' => $sections,
-            'module' => $self || $decision || $team || $review || $entitlements || $technical || $calendar || $policy || $reports || $yearEnd || $record,
+            'module' => $self || $decision || $team || $review || $entitlements || $technical || $calendar || $policy || $reports || $yearEnd || $record || $adjustments,
             'can_manage_calendar' => $calendar,
             'can_manage_policy' => $policy,
             'can_view_reports' => $reports,
             'can_preview_year_end' => $yearEnd,
             'can_record_on_behalf' => $record,
+            'can_manage_adjustments' => $adjustments,
             'can_view_own_ledger' => $self && $linked,
             'technical' => $technical,
             'needs_employee' => ($self || $team) && ! $linked,

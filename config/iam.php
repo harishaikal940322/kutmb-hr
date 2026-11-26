@@ -57,6 +57,14 @@ return [
             'label' => 'Semak pembatalan separa',
             'description' => 'Verify actual return date for a supported partial leave cancellation.',
             'group' => 'Annual leave', 'submodule' => 'Pindaan dan pembatalan', 'action' => 'Review', 'system_only' => false,
+        ], 'leave.adjustment.prepare' => [
+            'label' => 'Sediakan pelarasan baki',
+            'description' => 'Prepare a documented local adjustment without posting any balance.',
+            'group' => 'Annual leave', 'submodule' => 'Pelarasan baki', 'action' => 'Prepare', 'system_only' => false,
+        ], 'leave.adjustment.decide' => [
+            'label' => 'Putuskan pelarasan baki',
+            'description' => 'Independently approve or reject a prepared local balance adjustment.',
+            'group' => 'Annual leave', 'submodule' => 'Pelarasan baki', 'action' => 'Decide', 'system_only' => false,
         ], 'leave.reports.view' => [
             'label' => 'Lihat laporan cuti',
             'description' => 'View HR leave balances, status summaries and attendance review records; no private reasons.',
@@ -138,7 +146,7 @@ return [
         ],
         'hr-executive' => [
             'label' => 'Eksekutif HR',
-            'permissions' => ['hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage', 'leave.entitlement.view', 'leave.reports.view', 'leave.request.record-on-behalf'],
+            'permissions' => ['hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage', 'leave.entitlement.view', 'leave.reports.view', 'leave.request.record-on-behalf', 'leave.adjustment.prepare'],
         ],
         'hr-manager' => [
             'label' => 'Pengurus HR',
@@ -147,7 +155,7 @@ return [
                 'hr.organization.manage', 'hr.accounts.link', 'hr.offices.manage',
                 'leave.entitlement.view', 'leave.entitlement.confirm', 'leave.entitlement.credit',
                 'leave.calendar.manage', 'leave.policy.manage', 'leave.partial-cancellation.review',
-                'leave.reports.view', 'leave.year-end.preview', 'leave.request.record-on-behalf',
+                'leave.reports.view', 'leave.year-end.preview', 'leave.request.record-on-behalf', 'leave.adjustment.decide',
             ],
         ],
         'it-admin' => [
@@ -168,7 +176,7 @@ return [
             ],
             'hr-executive-v1' => [
                 'label' => 'Eksekutif HR', 'description' => 'Profil pekerja, penempatan dan semakan kelayakan pembangunan.',
-                'permissions' => ['hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage', 'leave.entitlement.view', 'leave.reports.view', 'leave.request.record-on-behalf'],
+                'permissions' => ['hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage', 'leave.entitlement.view', 'leave.reports.view', 'leave.request.record-on-behalf', 'leave.adjustment.prepare'],
             ],
             'hr-manager-v1' => [
                 'label' => 'Pengurus HR', 'description' => 'Pengurusan pekerja, organisasi dan operasi kelayakan cuti pembangunan.',
@@ -177,7 +185,7 @@ return [
                     'hr.organization.manage', 'hr.accounts.link', 'hr.offices.manage',
                     'leave.entitlement.view', 'leave.entitlement.confirm', 'leave.entitlement.credit',
                     'leave.calendar.manage', 'leave.policy.manage', 'leave.partial-cancellation.review',
-                'leave.reports.view', 'leave.year-end.preview', 'leave.request.record-on-behalf',
+                'leave.reports.view', 'leave.year-end.preview', 'leave.request.record-on-behalf', 'leave.adjustment.decide',
                 ],
             ],
             'unit-manager-v1' => [

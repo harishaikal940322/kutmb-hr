@@ -1,3 +1,9 @@
+## 26 November 2026 — CT-DEC-040 local adjustment maker/checker
+
+- Added additive migration 000047 and explicit prepare/decide permission gates, current-year AL/Tabung adjustments with distinct maker and checker, reason/reference, immutable preparation, once-only terminal decision, before/after snapshot, ledger posting and audit. Pending/rejected does not affect balances. Neither actor can adjust their own balance; stale balance/pending snapshot requires rejection and new preparation. Local synthetic HR Executive/Manager grants are opt-in via DevelopmentLeaveAccessSeeder.
+- Supports only adjustments not requiring unresolved historical reconciliation, deficit creation or interference with pending holds. Tabung cap uses credited current-year entitlement, source-year reductions respect source holds; historical-source additions remain gated. Evidence is an opaque reference, not an attachment system. No automatic attendance/payroll action. Actual authority/evidence/retention rules and broader adjustment cases remain outside operational acceptance.
+- No migration applied, build, automated test or database access here. Owner must apply the additive migration to existing dev DB and rerun access seeder before using this page.
+
 ## 26 November 2026 — remaining workflow integration slice
 
 - Connected CT-DEC-051 assisted submission to a protected local HR form using the existing consent-aware service, actual employee applicant, explicit prior confirmation timestamp and evidence reference. Same-year requests only; no impersonation or attachment upload. Added local reporting and year-end preview permissions; rerun explicit DevelopmentLeaveAccessSeeder for synthetic HR roles.

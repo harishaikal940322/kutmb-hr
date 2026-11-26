@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AnnualLeaveController;
 use App\Http\Controllers\AnnualLeaveOperationsController;
+use App\Http\Controllers\AnnualLeaveAdjustmentController;
 use App\Http\Controllers\AnnualLeaveWorkflowController;
 use App\Http\Controllers\ApprovalOfficeController;
 use App\Http\Controllers\EmployeeAccountLinkController;
@@ -83,6 +84,9 @@ Route::middleware('protected')->group(function () {
 });
 
 Route::middleware(['protected', EnsureLocalHrDevelopment::class])->prefix('leave/annual')->group(function (): void {
+    Route::get('/adjustments', [AnnualLeaveAdjustmentController::class, 'index'])->name('leave.annual.adjustments');
+    Route::post('/adjustments', [AnnualLeaveAdjustmentController::class, 'store'])->middleware('permission:leave.adjustment.prepare')->name('leave.annual.adjustments.store');
+    Route::post('/adjustments/{adjustment}/decision', [AnnualLeaveAdjustmentController::class, 'decide'])->whereNumber('adjustment')->middleware('permission:leave.adjustment.decide')->name('leave.annual.adjustments.decide');
     Route::get('/ledger', [AnnualLeaveOperationsController::class, 'ledger'])->middleware('permission:leave.request.self')->name('leave.annual.ledger');
     Route::get('/reports', [AnnualLeaveOperationsController::class, 'reports'])->middleware('permission:leave.reports.view')->name('leave.annual.reports');
     Route::get('/year-end', [AnnualLeaveOperationsController::class, 'yearEnd'])->middleware('permission:leave.year-end.preview')->name('leave.annual.year-end');
