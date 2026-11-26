@@ -49,7 +49,7 @@ class LedgerPostedTotals
     /** Late rejected AL from a historical year stays protected until HR confirms actual non-use. */
     public function pendingHistoricalReviewUnits(int $annualAccountId): int
     {
-        return (int) DB::table('leave_late_release_claims as claim')
+        $recorded = (int) DB::table('leave_late_release_claims as claim')
             ->where('claim.annual_account_id', $annualAccountId)
             ->where('claim.source_year', '<', (int) now('Asia/Kuala_Lumpur')->format('Y'))
             ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('leave_request_revisions as revision')
@@ -58,6 +58,30 @@ class LedgerPostedTotals
                 ->whereColumn('revision.reservation_id', 'claim.reservation_id')
                 ->where('review.review_code', 'LATE_AL_REJECTION')->where('outcome.finding', 'NO_ABSENCE_CONFIRMED'))
             ->sum('claim.units');
+
+        // Protect unresolved legacy historical releases even without a 000057 claim.
+        $account = DB::table('leave_annual_accounts')->where('id', $annualAccountId)->first(['leave_year']);
+        if ($account === null || (int) $account->leave_year >= (int) now('Asia/Kuala_Lumpur')->format('Y')) {
+            return $recorded;
+        }
+        $legacy = DB::table('leave_reservations as reservation')
+            ->join('leave_request_revisions as revision', 'revision.reservation_id', '=', 'reservation.id')
+            ->join('leave_requests as request', 'request.id', '=', 'revision.request_id')
+            ->join('leave_attendance_reviews as review', 'review.revision_id', '=', 'revision.id')
+            ->where('request.leave_type', 'AL')->where('request.status', 'REJECTED')
+            ->whereColumn('request.current_revision', 'revision.revision')
+            ->where('reservation.status', 'RELEASED')->where('review.review_code', 'LATE_AL_REJECTION')
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('leave_late_release_claims as claim')
+                ->whereColumn('claim.reservation_id', 'reservation.id'))
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('leave_attendance_review_outcomes as outcome')
+                ->whereColumn('outcome.review_id', 'review.id')->where('outcome.finding', 'NO_ABSENCE_CONFIRMED'));
+        $header = (int) (clone $legacy)->where('reservation.annual_account_id', $annualAccountId)
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('leave_reservation_slot_allocations as allocation')
+                ->whereColumn('allocation.reservation_id', 'reservation.id'))->sum('reservation.annual_units');
+        $mapped = (int) (clone $legacy)->join('leave_reservation_slot_allocations as allocation', 'allocation.reservation_id', '=', 'reservation.id')
+            ->where('allocation.annual_account_id', $annualAccountId)->where('allocation.allocation_bucket', 'ANNUAL')->sum('allocation.units');
+
+        return $recorded + $header + $mapped;
     }
 
     /** Pending amounts by actual source; legacy header used only without per-slot allocations. */

@@ -95,6 +95,9 @@ class AnnualLateReconciliationService
         if ($employee === null) {
             throw new DomainException('Rekod pekerja tidak ditemui.');
         }
+        if ($claims->isEmpty()) {
+            $claims = $this->recoverLegacyAttendanceClaim((int) $review->reservation_id, (int) $employee->id);
+        }
         // If not yet closed, the ordinary close will include these newly free units.
         $closed = $claims->filter(fn ($claim): bool => DB::table('leave_annual_year_closes')->where('annual_account_id', $claim->annual_account_id)->exists());
         if ($closed->isEmpty()) {
@@ -116,5 +119,71 @@ class AnnualLateReconciliationService
             $this->reconcile($actor, (int) $employee->id, (int) $claim->annual_account_id, $tabungId,
                 (int) $claim->units, $operation, $operationKey, 'ATTENDANCE', (int) $claim->id);
         }
+    }
+
+    /** Recover only a provable historical annual-only release, within the HR outcome transaction. */
+    private function recoverLegacyAttendanceClaim(int $reservationId, int $employeeId): \Illuminate\Support\Collection
+    {
+        $reservation = DB::table('leave_reservations')->where('id', $reservationId)->lockForUpdate()->first();
+        if ($reservation === null || (int) $reservation->employee_id !== $employeeId || $reservation->status !== 'RELEASED') {
+            throw new DomainException('Rekod pelepasan asal tidak sah.');
+        }
+        $current = (int) now('Asia/Kuala_Lumpur')->format('Y');
+        if ((int) $reservation->annual_units === 0 || (int) $reservation->leave_year >= $current
+            || DB::table('leave_late_release_claims')->where('reservation_id', $reservationId)->exists()) {
+            return collect();
+        }
+        $units = (int) $reservation->annual_units;
+        $annual = DB::table('leave_annual_accounts')->where('id', $reservation->annual_account_id)->lockForUpdate()->first();
+        $tabung = DB::table('leave_tabung_accounts')->where('id', $reservation->tabung_account_id)->lockForUpdate()->first();
+        $slots = DB::table('leave_reservation_slot_allocations')->where('reservation_id', $reservationId)->lockForUpdate()->get();
+        $release = DB::table('leave_reservation_events as event')
+            ->join('leave_balance_operations as operation', 'operation.id', '=', 'event.balance_operation_id')
+            ->where('event.reservation_id', $reservationId)->where('event.event_code', 'RELEASED')
+            ->where('operation.operation_type', 'RELEASE')->where('operation.employee_id', $employeeId)
+            ->get(['event.balance_operation_id']);
+        $reserved = DB::table('leave_reservation_events')->where('reservation_id', $reservationId)
+            ->where('event_code', 'RESERVED')->get(['balance_operation_id']);
+        if ($annual === null || $tabung === null || (int) $annual->employee_id !== $employeeId
+            || (int) $tabung->employee_id !== $employeeId || (int) $annual->leave_year !== (int) $reservation->leave_year
+            || (int) $reservation->tabung_units !== 0 || (int) $reservation->requested_units !== $units
+            || $units < 1 || $slots->count() !== $units || $release->count() !== 1 || $reserved->count() !== 1
+            || $slots->contains(fn ($slot): bool => $slot->allocation_bucket !== 'ANNUAL'
+                || (int) $slot->annual_account_id !== (int) $annual->id || (int) $slot->leave_year !== (int) $annual->leave_year
+                || (int) substr($slot->leave_date, 0, 4) !== (int) $annual->leave_year
+                || ! in_array($slot->session_code, ['AM', 'PM'], true) || (int) $slot->units !== 1
+                || $slot->tabung_account_id !== null || $slot->source_year !== null)) {
+            throw new DomainException('Sumber sesi legacy tidak dapat dibuktikan sepenuhnya; rujuk HR untuk rekonsiliasi manual.');
+        }
+        $releaseId = (int) $release->first()->balance_operation_id;
+        $reserveId = (int) $reserved->first()->balance_operation_id;
+        if ($releaseId <= $reserveId || DB::table('leave_ledger_entries')->where('balance_operation_id', $releaseId)->exists()
+            || DB::table('leave_late_reconciliations')->where('source_kind', 'RELEASE')->where('source_id', $reservationId)->exists()) {
+            throw new DomainException('Pelepasan legacy mungkin telah diproses; tiada pindahan automatik.');
+        }
+        $close = DB::table('leave_annual_year_closes')->where('annual_account_id', $annual->id)->first();
+        $posted = $this->totals->forAccounts((int) $annual->id, (int) $tabung->id);
+        $pending = $this->totals->pendingAnnualUnits((int) $annual->id);
+        $free = $posted['annual_half_day_units'] - $pending;
+        if ($close !== null) {
+            // Prove held at close, released afterwards, and no intervening annual ledger movement.
+            $closeOp = (int) $close->balance_operation_id;
+            if ($reserveId >= $closeOp || $releaseId <= $closeOp
+                || (int) $close->employee_id !== $employeeId || (int) $close->tabung_account_id !== (int) $tabung->id
+                || (int) $close->annual_before - (int) $close->transfer_units - (int) $close->burn_units !== (int) $close->annual_pending
+                || $units > (int) $close->annual_pending || $free !== $units
+                || $posted['annual_half_day_units'] !== (int) $close->annual_pending
+                || DB::table('leave_ledger_entries')->where('annual_account_id', $annual->id)->where('balance_operation_id', '>', $closeOp)->exists()) {
+                throw new DomainException('Sejarah tutup tahun legacy tidak membuktikan baki baru yang tepat; tiada pindahan automatik.');
+            }
+        } elseif ($free < $units) {
+            throw new DomainException('Baki bebas legacy tidak mencukupi untuk rekonsiliasi.');
+        }
+        $id = DB::table('leave_late_release_claims')->insertGetId([
+            'reservation_id' => $reservationId, 'release_operation_id' => $releaseId,
+            'annual_account_id' => $annual->id, 'tabung_account_id' => $tabung->id,
+            'source_year' => $annual->leave_year, 'units' => $units, 'created_at' => now(),
+        ]);
+        return DB::table('leave_late_release_claims')->where('id', $id)->get();
     }
 }

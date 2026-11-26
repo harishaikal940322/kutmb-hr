@@ -59,11 +59,13 @@ class AnnualLeaveOperationsController extends Controller
             ->select('request.leave_type', 'request.status')
             ->selectRaw('COUNT(*) AS request_count, SUM(revision.requested_units) AS units')->get();
         $reviews = (clone $base)->join('leave_attendance_reviews as review', 'review.revision_id', '=', 'revision.id')
+            ->leftJoin('leave_reservations as reservation', 'reservation.id', '=', 'revision.reservation_id')
             ->join('employees as employee', 'employee.id', '=', 'request.employee_id')
             ->leftJoin('leave_attendance_review_outcomes as outcome', 'outcome.review_id', '=', 'review.id')
             ->orderByDesc('review.id')->paginate(25, ['review.id', 'review.review_code', 'review.opened_at',
                 'employee.display_name', 'employee.employee_no', 'request.request_key', 'request.status',
-                'employee.user_id as target_user_id', 'outcome.finding', 'outcome.created_at as recorded_at'], 'review_page')->withQueryString()
+                'employee.user_id as target_user_id', 'outcome.finding', 'outcome.created_at as recorded_at',
+                DB::raw("CASE WHEN review.review_code = 'LATE_AL_REJECTION' AND reservation.annual_units > 0 AND NOT EXISTS (SELECT 1 FROM leave_late_release_claims AS claim WHERE claim.reservation_id = reservation.id) THEN 1 ELSE 0 END AS legacy_missing_claim")], 'review_page')->withQueryString()
             ->through(function ($row) use ($request) {
                 $row->can_record = (int) ($request->user()->can('leave.attendance.review')
                     && (int) $row->target_user_id !== (int) $request->user()->id
@@ -73,7 +75,14 @@ class AnnualLeaveOperationsController extends Controller
             });
 
         $accounts = $this->accountRows($year)->orderBy('employee.display_name')->orderBy('employee.id')
-            ->paginate(25, pageName: 'balance_page')->withQueryString();
+            ->paginate(25, pageName: 'balance_page')->withQueryString()
+            ->through(function ($row) {
+                if ($row->annual_account_id !== null) {
+                    $row->annual_pending = (int) $row->annual_pending + app(LedgerPostedTotals::class)->pendingHistoricalReviewUnits((int) $row->annual_account_id);
+                }
+                unset($row->annual_account_id);
+                return $row;
+            });
 
         return Inertia::render('leave/Operations', [
             'access' => AnnualLeaveWorkflowController::capabilities($request->user()),
@@ -310,7 +319,7 @@ class AnnualLeaveOperationsController extends Controller
             ->leftJoin('leave_annual_accounts as annual', fn ($join) => $join->on('annual.employee_id', '=', 'employee.id')->where('annual.leave_year', $year))
             ->leftJoin('leave_tabung_accounts as tabung', 'tabung.employee_id', '=', 'employee.id')
             ->leftJoin('leave_annual_entitlement_confirmations as entitlement', 'entitlement.annual_account_id', '=', 'annual.id')
-            ->select('employee.id', 'employee.employee_no', 'employee.display_name', 'entitlement.confirmed_half_day_units')
+            ->select('employee.id', 'employee.employee_no', 'employee.display_name', 'annual.id as annual_account_id', 'entitlement.confirmed_half_day_units')
             ->selectSub(DB::table('leave_ledger_entries')->whereColumn('annual_account_id', 'annual.id')->selectRaw('COALESCE(SUM(signed_half_day_units), 0)'), 'annual_posted')
             ->selectSub(DB::table('leave_ledger_entries')->whereColumn('tabung_account_id', 'tabung.id')->selectRaw('COALESCE(SUM(signed_half_day_units), 0)'), 'tabung_posted')
             ->selectRaw("(SELECT COALESCE(SUM(reservation.annual_units), 0) FROM leave_reservations AS reservation WHERE reservation.annual_account_id = annual.id AND reservation.status = 'ACTIVE' AND NOT EXISTS (SELECT 1 FROM leave_reservation_slot_allocations AS allocation WHERE allocation.reservation_id = reservation.id)) + (SELECT COALESCE(SUM(allocation.units), 0) FROM leave_reservation_slot_allocations AS allocation INNER JOIN leave_reservations AS reservation ON reservation.id = allocation.reservation_id WHERE allocation.annual_account_id = annual.id AND allocation.allocation_bucket = 'ANNUAL' AND reservation.status = 'ACTIVE') AS annual_pending" )
