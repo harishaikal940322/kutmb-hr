@@ -21,6 +21,7 @@ type Workspace = {
         combined_available: number;
         pending: number;
     } | null;
+    future_balance: { confirmed: number; pending: number; committed: number; available: number } | null;
     history: RequestPage;
     inbox: RequestPage;
     cancellations: RequestPage | null;
@@ -50,8 +51,10 @@ const metrics = computed(() => {
         { label: 'Jumlah baki tersedia', value: balance.combined_available, note: 'selepas tempahan' },
     ];
 });
+const isFuture = computed(() => Boolean(props.workspace && submission.leave_type === 'AL' && submission.start.slice(0, 4) === String(Number(props.workspace.today.slice(0, 4)) + 1)));
+const canSubmit = computed(() => Boolean(props.workspace?.linked && (isFuture.value ? props.workspace.future_balance : props.workspace.balance)));
 function submitRequest() {
-    if (!props.workspace?.linked || !props.workspace.balance || !props.access.sections.includes('apply')) return;
+    if (!canSubmit.value || !props.access.sections.includes('apply')) return;
     submission.key ||= crypto.randomUUID();
     submission.post('/leave/annual/requests', {
         preserveScroll: true,
@@ -100,6 +103,16 @@ function submitRequest() {
                             </div>
                             <p v-else class="text-sm text-muted-foreground">Kelayakan tahun semasa perlu disahkan dan dikreditkan sebelum permohonan.</p>
                         </section>
+                        <section v-if="workspace.future_balance" class="space-y-2 rounded-xl border border-border bg-card p-4">
+                            <h2 class="font-semibold">Kelayakan tahun hadapan · belum dikreditkan</h2>
+                            <div class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                                <div><p class="text-xs text-muted-foreground">Disahkan</p><p class="font-semibold">{{ workspace.future_balance.confirmed / 2 }} hari</p></div>
+                                <div><p class="text-xs text-muted-foreground">Pending</p><p class="font-semibold">{{ workspace.future_balance.pending / 2 }} hari</p></div>
+                                <div><p class="text-xs text-muted-foreground">Komitmen diluluskan</p><p class="font-semibold">{{ workspace.future_balance.committed / 2 }} hari</p></div>
+                                <div><p class="text-xs text-muted-foreground">Tersedia</p><p class="font-semibold">{{ workspace.future_balance.available / 2 }} hari</p></div>
+                            </div>
+                            <p class="text-xs text-muted-foreground">AL tahun hadapan sahaja; tidak menggunakan Tabung atau baki negatif sebelum kredit.</p>
+                        </section>
                         <form class="max-w-3xl space-y-5 rounded-2xl border border-border bg-card p-5 shadow-sm @min-[560px]/leave-content:p-7" @submit.prevent="submitRequest">
                             <section class="space-y-4">
                                 <label class="block space-y-2 text-sm font-medium">Jenis cuti
@@ -125,7 +138,7 @@ function submitRequest() {
                                 <p v-if="submission.leave_type === 'EL'" class="rounded-xl border border-amber-500/20 bg-amber-500/[0.07] p-4 text-sm leading-6"><strong>EL retrospektif:</strong> Pilih tarikh ketidakhadiran dalam tahun semasa.</p>
                             </section>
                             <p v-for="error in submission.errors" :key="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
-                            <div class="flex justify-end border-t border-border pt-5"><button type="submit" :disabled="submission.processing || !workspace.balance" class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"><ArrowRight class="size-4" aria-hidden="true" />{{ submission.processing ? 'Menghantar…' : 'Hantar permohonan' }}</button></div>
+                            <div class="flex justify-end border-t border-border pt-5"><button type="submit" :disabled="submission.processing || !canSubmit" class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"><ArrowRight class="size-4" aria-hidden="true" />{{ submission.processing ? 'Menghantar…' : 'Hantar permohonan' }}</button></div>
                         </form>
                     </template>
                     <AnnualRequestList v-else-if="workspace && section === 'requests' && workspace.linked" :page="workspace.history" :approvals="false" />

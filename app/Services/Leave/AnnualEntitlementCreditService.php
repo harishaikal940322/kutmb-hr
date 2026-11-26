@@ -207,6 +207,36 @@ class AnnualEntitlementCreditService
                 'operation_key' => $operationKey,
                 'actor_id' => $actorId,
             ]);
+            // Convert every still-approved pre-credit commitment in the same transaction.
+            $commitments = DB::table('leave_annual_commitments')->where('annual_account_id', $annual->id)
+                ->where('status', 'COMMITTED')->orderBy('id')->lockForUpdate()->get();
+            if ((int) $commitments->sum('units') > (int) $confirmation->confirmed_half_day_units) {
+                throw new DomainException('Approved commitments exceed confirmed entitlement.');
+            }
+            foreach ($commitments as $commitment) {
+                $reservation = DB::table('leave_reservations')->where('id', $commitment->reservation_id)->lockForUpdate()->first();
+                $approval = DB::table('leave_balance_operations')->where('id', $commitment->approval_operation_id)->first();
+                if ($reservation === null || $reservation->status !== 'COMMITTED' || $approval === null
+                    || (int) $reservation->annual_account_id !== (int) $annual->id
+                    || (int) $reservation->employee_id !== (int) $employee->id
+                    || (int) $reservation->annual_units !== (int) $commitment->units
+                    || (int) $reservation->tabung_units !== 0
+                    || $approval->operation_type !== 'COMMIT' || (int) $approval->actor_id !== (int) $commitment->approved_by
+                    || (int) $approval->employee_id !== (int) $employee->id) {
+                    throw new DomainException('Approved commitment history is inconsistent.');
+                }
+                $usageId = DB::table('leave_ledger_entries')->insertGetId([
+                    'annual_account_id' => $annual->id, 'balance_operation_id' => $approval->id,
+                    'signed_half_day_units' => -(int) $commitment->units, 'kind' => 'approved_leave_use',
+                    'source_year' => null, 'operation_key' => $approval->operation_key.':commitment',
+                    'actor_id' => $commitment->approved_by,
+                ]);
+                DB::table('leave_annual_commitments')->where('id', $commitment->id)->update([
+                    'status' => 'SETTLED', 'settled_ledger_entry_id' => $usageId, 'resolved_at' => now(),
+                ]);
+                $this->audit('hr.leave.future_commitment_settled', (int) $annual->id, $actorId, 'commitment:'.$commitment->id);
+            }
+
             if ($fixture) {
                 AuditEvent::query()->create([
                     'occurred_at' => now(), 'actor_id' => null,

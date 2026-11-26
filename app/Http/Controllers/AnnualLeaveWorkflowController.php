@@ -110,6 +110,17 @@ class AnnualLeaveWorkflowController extends Controller
             return [...$posted, ...$projection->project($posted['annual_half_day_units'], $posted['tabung_half_day_units'], $annual, $tabung, 0), 'pending' => $annual + $tabung];
         });
 
+        $nextYear = (int) substr($today, 0, 4) + 1;
+        $future = $canSelf ? $this->accounts($userId, $nextYear, true) : null;
+        $futureBalance = $future === null ? null : DB::transaction(function () use ($future): array {
+            DB::table('leave_annual_accounts')->where('id', $future->annual_id)->lockForUpdate()->first();
+            $pending = (int) DB::table('leave_reservations')->where('annual_account_id', $future->annual_id)->where('status', 'ACTIVE')->sum('annual_units');
+            $commitments = (int) DB::table('leave_annual_commitments')->where('annual_account_id', $future->annual_id)->where('status', 'COMMITTED')->sum('units');
+
+            return ['confirmed' => (int) $future->confirmed_half_day_units, 'pending' => $pending,
+                'committed' => $commitments, 'available' => (int) $future->confirmed_half_day_units - $pending - $commitments];
+        });
+
         $requests = $this->requests()
             ->join('leave_reservations as reservation', 'reservation.id', '=', 'revision.reservation_id')
             ->select('leave.id', 'leave.request_key', 'leave.status', 'leave.leave_type', 'employee.display_name', 'revision.requested_units', 'revision.reason', 'reservation.tabung_units', 'leave.current_step_order', 'leave.current_revision')
@@ -189,6 +200,7 @@ class AnnualLeaveWorkflowController extends Controller
             'linked' => $canSelf,
             'can_view_team' => in_array('team', $access['sections'], true),
             'balance' => $balance,
+            'future_balance' => $futureBalance,
             'history' => $history->appends(['view' => 'workflow', 'section' => 'requests']),
             'cancellations' => $cancellations?->appends(['view' => 'workflow', 'section' => 'approvals', ...request()->only(['approval_page', 'partial_page'])]),
             'inbox' => $inbox->appends(['view' => 'workflow', 'section' => 'approvals', ...request()->only(['cancellation_page', 'partial_page'])]),
@@ -229,14 +241,16 @@ class AnnualLeaveWorkflowController extends Controller
                 ? 'Pilih tarikh mula pada hari ini atau selepasnya.'
                 : 'EL terhad kepada hari ini atau tarikh yang telah berlalu.']);
         }
-        if ((int) substr($data['start'], 0, 4) !== $year || (int) substr($data['end'], 0, 4) !== $year
+        $requestedYear = (int) substr($data['start'], 0, 4);
+        $future = $type === 'AL' && $requestedYear === $year + 1;
+        if ((! $future && $requestedYear !== $year) || (int) substr($data['end'], 0, 4) !== $requestedYear
             || ($data['session'] !== 'FULL' && $data['start'] !== $data['end'])) {
-            throw ValidationException::withMessages(['start' => 'Pilih tarikh dalam tahun semasa. Separuh hari terhad kepada satu tarikh.']);
+            throw ValidationException::withMessages(['start' => 'Gunakan satu tahun kalendar: tahun semasa atau AL tahun hadapan. Separuh hari terhad kepada satu tarikh.']);
         }
 
-        $accounts = $this->accounts($userId, $year);
+        $accounts = $this->accounts($userId, $requestedYear, $future);
         if ($accounts === null) {
-            throw ValidationException::withMessages(['start' => 'Kelayakan tahun semasa perlu disahkan dan dikreditkan sebelum permohonan.']);
+            throw ValidationException::withMessages(['start' => $future ? 'Kelayakan tahun hadapan perlu disahkan oleh HR.' : 'Kelayakan tahun semasa perlu disahkan dan dikreditkan sebelum permohonan.']);
         }
 
         try {
@@ -468,17 +482,20 @@ class AnnualLeaveWorkflowController extends Controller
         return $generalManagers->count() === 1 && (int) $generalManagers->first() === $actor;
     }
 
-    private function accounts(int $userId, int $year): ?\stdClass
+    private function accounts(int $userId, int $year, bool $future = false): ?\stdClass
     {
-        return DB::table('employees as employee')
+        $query = DB::table('employees as employee')
             ->join('leave_annual_accounts as annual', 'annual.employee_id', '=', 'employee.id')
             ->join('leave_tabung_accounts as tabung', 'tabung.employee_id', '=', 'employee.id')
             ->join('leave_annual_entitlement_confirmations as entitlement', 'entitlement.annual_account_id', '=', 'annual.id')
-            ->join('leave_ledger_entries as credit', 'credit.annual_account_id', '=', 'annual.id')
-            ->where('employee.user_id', $userId)->where('annual.leave_year', $year)
-            ->where('credit.kind', 'annual_entitlement_credit')
-            ->whereColumn('credit.signed_half_day_units', 'entitlement.confirmed_half_day_units')
-            ->first(['annual.id as annual_id', 'tabung.id as tabung_id']);
+            ->where('employee.user_id', $userId)->where('annual.leave_year', $year);
+        if (! $future) {
+            $query->join('leave_ledger_entries as credit', 'credit.annual_account_id', '=', 'annual.id')
+                ->where('credit.kind', 'annual_entitlement_credit')
+                ->whereColumn('credit.signed_half_day_units', 'entitlement.confirmed_half_day_units');
+        }
+
+        return $query->first(['annual.id as annual_id', 'tabung.id as tabung_id', 'entitlement.confirmed_half_day_units']);
     }
 
     private function requests(): Builder

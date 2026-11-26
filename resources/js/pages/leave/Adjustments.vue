@@ -3,7 +3,7 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import AnnualLeaveNavigation, { type AnnualAccess } from './AnnualLeaveNavigation.vue';
 
-type Adjustment = { id: number; display_name: string; employee_no: string; leave_year: number; bucket: string; source_year: number | null; signed_units: number; reason: string; evidence_reference: string; prepared_balance: number; prepared_pending: number; status: string; before_units: number | null; after_units: number | null; decision_reason: string | null; prepared_by_name: string; decided_by_name: string | null; can_decide: boolean; created_at: string };
+type Adjustment = { id: number; display_name: string; employee_no: string; leave_year: number; bucket: string; source_year: number | null; signed_units: number; reason: string; evidence_reference: string; prepared_balance: number; prepared_pending: number; status: 'PENDING' | 'APPROVED' | 'REJECTED'; before_units: number | null; after_units: number | null; decision_reason: string | null; prepared_by_name: string; decided_by_name: string | null; can_decide: boolean; created_at: string };
 const props = defineProps<{ access: AnnualAccess; canPrepare: boolean; year: number; employees: { id: number; employee_no: string; display_name: string }[]; adjustments: { data: Adjustment[]; prev_page_url: string | null; next_page_url: string | null } }>();
 defineOptions({ layout: { breadcrumbs: [{ title: 'Cuti Tahunan', href: '/leave/annual' }] } });
 const prepare = useForm({ employee: '', bucket: 'AL', source_year: props.year, units: '', reason: '', evidence_reference: '', key: '' });

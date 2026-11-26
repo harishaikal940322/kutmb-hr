@@ -71,6 +71,18 @@ class DevelopmentLeaveConfigurationSeeder extends Seeder
                 $day = $day->addDay();
             }
 
+            $nextYear = $year + 1;
+            $nextFrom = sprintf('%04d-01-01', $nextYear);
+            $nextTo = sprintf('%04d-12-31', $nextYear);
+            $this->configureCalendar($actor, $nextYear, $nextFrom, $nextTo);
+            $this->configureSchedule($actor, $nextYear, $nextFrom, $nextTo);
+            $day = \Carbon\CarbonImmutable::parse($nextFrom, 'Asia/Kuala_Lumpur');
+            while ($day->toDateString() <= $nextTo) {
+                $lookup->calendarFor($day->toDateString());
+                $lookup->workingScheduleFor($day->toDateString());
+                $day = $day->addDay();
+            }
+
             $service = app(AnnualEntitlementCreditService::class);
             $credited = 0;
             $preserved = 0;
@@ -101,6 +113,23 @@ class DevelopmentLeaveConfigurationSeeder extends Seeder
                 );
                 $service->creditDevelopmentFixture($actor->id, $confirmation['confirmation_id']);
                 $credited++;
+            }
+
+            foreach ($employees as [$employee, $units]) {
+                if ($employee->service_end !== null && $employee->service_end < $nextFrom) {
+                    continue;
+                }
+                $future = DB::table('leave_annual_accounts')->where('employee_id', $employee->id)->where('leave_year', $nextYear)->lockForUpdate()->first();
+                if ($future !== null && (DB::table('leave_annual_entitlement_confirmations')->where('annual_account_id', $future->id)->exists()
+                    || DB::table('leave_ledger_entries')->where('annual_account_id', $future->id)->exists()
+                    || DB::table('leave_reservations')->where('annual_account_id', $future->id)->exists())) {
+                    continue;
+                }
+                $futureId = $future?->id ?? DB::table('leave_annual_accounts')->insertGetId([
+                    'employee_id' => $employee->id, 'leave_year' => $nextYear, 'created_at' => now(), 'updated_at' => now(),
+                ]);
+                $service->confirmAnnualEntitlement($actor->id, $futureId, $units,
+                    'DEV-FIXTURE-FUTURE-'.$nextYear, 'dev-fixture-future:'.$futureId.':'.$nextYear);
             }
 
             return [$year, $credited, $preserved];
