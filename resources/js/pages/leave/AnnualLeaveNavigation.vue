@@ -10,6 +10,7 @@ export type AnnualAccess = {
     technical: boolean;
     needs_employee: boolean;
     needs_office: boolean;
+    needs_unit: boolean;
     can_decide: boolean;
     can_review_partial: boolean;
 };

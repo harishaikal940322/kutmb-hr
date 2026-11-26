@@ -80,10 +80,11 @@ function submitRequest() {
                         <p class="text-xs font-semibold tracking-[0.14em] text-primary uppercase">{{ heading.eyebrow }}</p>
                         <h1 id="annual-heading" class="text-2xl font-semibold tracking-tight @min-[560px]/leave-content:text-3xl">{{ heading.label }}</h1>
                     </header>
-                    <div v-if="access.needs_employee || access.needs_office" class="flex items-start gap-3 rounded-xl border border-border bg-muted/30 p-4 text-sm leading-6">
+                    <div v-if="access.needs_employee || access.needs_office || access.needs_unit" class="flex items-start gap-3 rounded-xl border border-border bg-muted/30 p-4 text-sm leading-6">
                         <Info class="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                         <div class="space-y-1">
                             <p v-if="access.needs_employee">Akaun ini perlu dipautkan kepada rekod pekerja oleh HR sebelum urusan cuti sendiri atau jadual unit tersedia.</p>
+                            <p v-if="access.needs_unit">Jadual unit memerlukan rekod pekerja aktif dan satu penempatan unit aktif yang sah.</p>
                             <p v-if="access.needs_office">Akaun ini mempunyai permission kelulusan, tetapi belum mempunyai penetapan jawatan pelulus yang berkuat kuasa.</p>
                         </div>
                     </div>
@@ -113,8 +114,8 @@ function submitRequest() {
                                     <label class="space-y-2 text-sm font-medium">Tarikh akhir<input v-model="submission.end" :min="submission.start" :max="submission.leave_type === 'EL' ? workspace.today : undefined" :disabled="submission.session !== 'FULL'" required type="date" class="block h-11 w-full rounded-lg border border-input bg-background px-3 text-sm disabled:opacity-60" /></label>
                                 </div>
                                 <div class="grid gap-3 @min-[560px]/leave-content:grid-cols-2">
-                                    <label class="flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm" :class="submission.session === 'FULL' ? 'border-primary bg-primary/[0.035]' : 'border-border'"><input v-model="submission.session" type="radio" value="FULL" class="accent-primary" /> Penuh hari</label>
-                                    <label class="flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm" :class="submission.session !== 'FULL' ? 'border-primary bg-primary/[0.035]' : 'border-border'"><input type="radio" :checked="submission.session !== 'FULL'" name="half-day" class="accent-primary" @change="submission.session = 'AM'" /> Separuh hari</label>
+                                    <label class="flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm" :class="submission.session === 'FULL' ? 'border-primary bg-primary/[0.035]' : 'border-border'"><input v-model="submission.session" type="radio" name="leave-length" value="FULL" class="accent-primary" /> Penuh hari</label>
+                                    <label class="flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm" :class="submission.session !== 'FULL' ? 'border-primary bg-primary/[0.035]' : 'border-border'"><input type="radio" :checked="submission.session !== 'FULL'" name="leave-length" class="accent-primary" @change="submission.session = 'AM'" /> Separuh hari</label>
                                 </div>
                                 <label v-if="submission.session !== 'FULL'" class="block space-y-2 text-sm font-medium">Sesi<select v-model="submission.session" class="block h-11 w-full rounded-lg border border-input bg-background px-3"><option value="AM">Pagi</option><option value="PM">Petang</option></select></label>
                             </section>

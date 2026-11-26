@@ -30,6 +30,20 @@ class AnnualLeaveWorkflowController extends Controller
         $entitlements = $user->can('leave.entitlement.view');
         $technical = $user->can('iam.rbac.manage');
 
+        $unitAvailable = false;
+        if ($team && $linked) {
+            $units = DB::table('employee_assignments as assignment')
+                ->join('employees as employee', 'employee.id', '=', 'assignment.employee_id')
+                ->join('organization_units as unit', 'unit.id', '=', 'assignment.unit_id')
+                ->where('employee.user_id', $user->id)
+                ->where('employee.service_start', '<=', $today)
+                ->where(fn (Builder $query) => $query->whereNull('employee.service_end')->orWhere('employee.service_end', '>=', $today))
+                ->where('assignment.effective_from', '<=', $today)
+                ->where(fn (Builder $query) => $query->whereNull('assignment.effective_to')->orWhere('assignment.effective_to', '>=', $today))
+                ->limit(2)->get(['unit.active']);
+            $unitAvailable = $units->count() === 1 && (bool) $units->first()->active;
+        }
+
         $sections = [];
         if ($self && $linked) {
             $sections[] = 'apply';
@@ -38,7 +52,7 @@ class AnnualLeaveWorkflowController extends Controller
         if ($review || ($decision && self::isApprover($user->id, $today))) {
             $sections[] = 'approvals';
         }
-        if ($team && $linked) {
+        if ($team && $unitAvailable) {
             $sections[] = 'team';
         }
         if ($entitlements) {
@@ -50,6 +64,7 @@ class AnnualLeaveWorkflowController extends Controller
             'module' => $self || $decision || $team || $review || $entitlements || $technical,
             'technical' => $technical,
             'needs_employee' => ($self || $team) && ! $linked,
+            'needs_unit' => $team && $linked && ! $unitAvailable,
             'needs_office' => $decision && ! self::isApprover($user->id, $today),
             'can_decide' => $decision,
             'can_review_partial' => $review,

@@ -154,28 +154,33 @@ return [
         ],
         ...(in_array($appEnvironment, ['local', 'testing'], true) ? [
             'staff-v1' => [
-                'label' => 'Staf', 'description' => 'Profil pekerja sendiri yang dipautkan.',
-                'permissions' => ['hr.profile.self.view'],
+                'label' => 'Staf', 'description' => 'Profil dan permohonan cuti sendiri; pautan pekerja diperlukan.',
+                'permissions' => ['hr.profile.self.view', 'leave.request.self', 'leave.calendar.team.view'],
             ],
             'hr-executive-v1' => [
-                'label' => 'Eksekutif HR', 'description' => 'Profil pekerja dan penempatan pembangunan.',
-                'permissions' => ['hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage'],
+                'label' => 'Eksekutif HR', 'description' => 'Profil pekerja, penempatan dan semakan kelayakan pembangunan.',
+                'permissions' => ['hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage', 'leave.entitlement.view'],
             ],
             'hr-manager-v1' => [
-                'label' => 'Pengurus HR', 'description' => 'Pekerja, organisasi, pautan akaun dan penetapan pegawai pembangunan.',
-                'permissions' => ['hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage', 'hr.organization.manage', 'hr.accounts.link', 'hr.offices.manage'],
+                'label' => 'Pengurus HR', 'description' => 'Pengurusan pekerja, organisasi dan operasi kelayakan cuti pembangunan.',
+                'permissions' => [
+                    'hr.employees.view', 'hr.employees.manage', 'hr.assignments.manage',
+                    'hr.organization.manage', 'hr.accounts.link', 'hr.offices.manage',
+                    'leave.entitlement.view', 'leave.entitlement.confirm', 'leave.entitlement.credit',
+                    'leave.calendar.manage', 'leave.policy.manage', 'leave.partial-cancellation.review',
+                ],
             ],
             'unit-manager-v1' => [
-                'label' => 'Pengurus Unit', 'description' => 'Profil sendiri dan skop tugasan; skop cuti belum tersedia.',
-                'permissions' => ['hr.profile.self.view', 'hr.organization.scoped.view'],
+                'label' => 'Pengurus Unit', 'description' => 'Cuti sendiri dan sokongan dalam penetapan unit semasa.',
+                'permissions' => ['hr.profile.self.view', 'leave.request.self', 'leave.request.decide', 'leave.calendar.team.view'],
             ],
             'general-manager-v1' => [
-                'label' => 'Pengurus Besar', 'description' => 'Profil sendiri dan skop tugasan; skop cuti belum tersedia.',
-                'permissions' => ['hr.profile.self.view', 'hr.organization.scoped.view'],
+                'label' => 'Pengurus Besar', 'description' => 'Cuti sendiri dan tindakan mengikut penetapan jawatan semasa.',
+                'permissions' => ['hr.profile.self.view', 'leave.request.self', 'leave.request.decide', 'leave.calendar.team.view'],
             ],
             'alk-secretary-v1' => [
-                'label' => 'Setiausaha ALK', 'description' => 'Skop tugasan kelulusan belum tersedia.',
-                'permissions' => ['hr.organization.scoped.view'],
+                'label' => 'Setiausaha ALK', 'description' => 'Kelulusan dalam penetapan jawatan semasa.',
+                'permissions' => ['leave.request.decide'],
             ],
         ] : []),
     ],
