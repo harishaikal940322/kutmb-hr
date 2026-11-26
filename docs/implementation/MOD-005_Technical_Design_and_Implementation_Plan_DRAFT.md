@@ -392,6 +392,10 @@ Next scope: one end-to-end same-year AL local/testing vertical slice with explic
 
 No new migration is needed for this slice. Use the existing migrated local/testing environment and synthetic fixtures. The local boundary continues to apply before any operational deployment.
 
+## 8P. Local same-year EL integration (26 November 2026)
+
+CT-DEC-026–029/041/042/049 use the same approved workflow hierarchy, working calendar, employee account and routes as AL. `POST /leave/annual/requests` accepts optional `leave_type` (AL by default), with EL requiring a reason and ending on or before the current Malaysian date. HTTP tests cover a retrospective PM session, reason and date validation, scoped visibility, support, final rejection and the resulting half-day debit and attendance-review entry. Service tests verify rollback on a source shortage and preservation of the hold when EL submitted on the absence date is rejected later. CT-DEC-029 applies the retrospective transaction based on the date of submission. HR review and shortage handling beyond creation of the funded retrospective review record are pending. The Vue form and records use the current type and real workflow data. No schema, grants, upload or notification changes.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.

@@ -294,6 +294,12 @@ class LeaveBalanceTransactionService
                 throw new DomainException('Only an active pending reservation can settle a retrospective EL rejection.');
             }
 
+            $posted = $this->totals->forAccounts((int) $annual->id, (int) $tabung->id);
+            if (($reservation->annual_units > 0 && $posted['annual_half_day_units'] < $reservation->annual_units)
+                || ($reservation->tabung_units > 0 && $posted['tabung_half_day_units'] < $reservation->tabung_units)) {
+                throw new DomainException('Baki bagi penolakan EL tidak mencukupi. Kes ini memerlukan semakan HR.');
+            }
+
             $this->appendUsageEntry($reservation, $operation['id'], $actorId, $operationKey, 'annual_account_id', 'annual_units', null, 'rejected_el_absence_use');
             $this->appendUsageEntry($reservation, $operation['id'], $actorId, $operationKey, 'tabung_account_id', 'tabung_units', $reservation->tabung_source_year, 'rejected_el_absence_use');
             $this->resolveReservation($reservationId, 'COMMITTED');

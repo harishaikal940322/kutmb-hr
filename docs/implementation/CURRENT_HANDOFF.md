@@ -1,3 +1,9 @@
+## 26 November 2026 — same-year Emergency Leave
+
+- Connected same-year EL through the existing Cuti Tahunan form, history, scoped approval queue and shared AL/Tabung balance. The submit route accepts `leave_type=EL`, requires a reason, accepts current or elapsed dates within the supported year, and applies no additional maximum lookback. The current-year confirmed and credited entitlement and confirmed working calendar remain prerequisites.
+- CT-DEC-026–029/041/042/049: the server limits reasons to the linked applicant and currently assigned approver. Funded retrospective rejection keeps the rejected status, posts a once-only debit and records HR attendance review. An application submitted on the absence date or a rejection whose reserved sources cannot cover the debit retains the pending hold for HR review. The HR shortage/review workspace, EL attachments and prior-year processing remain outstanding.
+- Focused workflow and balance regressions passed on existing MySQL with rollback isolation (36 tests, 344 assertions). Targeted Pint, PHPStan, Vue lint, TypeScript and asset build passed. This slice uses the existing tables and permissions. Next ready scope is pending AL withdrawal and the supported pre-start cancellation flow.
+
 ## 26 November 2026 — linked same-year Annual Leave workspace
 
 - Verified local `main` against `origin/main`, the tracked HR answer register blob, and the existing `kutmb_hr_dev` MySQL migration status. All migrations through 000045 were already applied. No schema change or permission grants were required.

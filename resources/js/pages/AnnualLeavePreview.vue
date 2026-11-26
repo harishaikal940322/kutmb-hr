@@ -19,7 +19,7 @@ export type AnnualWorkspace = {
 };
 
 const props = defineProps<{ workspace?: AnnualWorkspace }>();
-const submission = useForm({ start: '', end: '', session: 'FULL', reason: '', key: '' });
+const submission = useForm({ leave_type: 'AL', start: '', end: '', session: 'FULL', reason: '', key: '' });
 import { computed, defineComponent, h, nextTick, ref, watch, type Component } from 'vue';
 import {
     ArrowRight,
@@ -647,6 +647,7 @@ function showPreviewMessage(message: string) {
 
 function submitRequest() {
     if (props.workspace) {
+        submission.leave_type = leaveType.value;
         submission.start = startDate.value;
         submission.end = leaveLength.value === 'Separuh hari' ? startDate.value : endDate.value;
         submission.session = leaveLength.value === 'Separuh hari' ? (session.value === 'Pagi' ? 'AM' : 'PM') : 'FULL';
@@ -1826,10 +1827,10 @@ const CalendarRow = defineComponent({
                                             class="block min-h-11 w-full rounded-lg border border-input bg-background px-3 text-sm"
                                         >
                                             <option value="AL">Cuti Tahunan (AL)</option>
-                                            <option v-if="!workspace" value="EL">Emergency Leave (EL)</option>
+                                            <option value="EL">Emergency Leave (EL)</option>
                                         </select>
                                         <span class="block text-xs font-normal text-muted-foreground">
-                                            {{ leaveType === 'AL' ? (workspace ? 'Alasan diperlukan untuk permohonan dengan notis singkat.' : 'Permohonan Cuti Tahunan biasa. Alasan pilihan.') : 'Alasan kecemasan wajib; dokumen sokongan pilihan.' }}
+                                            {{ leaveType === 'AL' ? (workspace ? 'Alasan diperlukan untuk permohonan dengan notis singkat.' : 'Permohonan Cuti Tahunan biasa. Alasan pilihan.') : (workspace ? 'Alasan kecemasan wajib.' : 'Alasan kecemasan wajib; dokumen sokongan pilihan.') }}
                                         </span>
                                     </label>
                                 </section>
@@ -1851,7 +1852,8 @@ const CalendarRow = defineComponent({
                                             class="space-y-2 text-sm font-medium"
                                             >Tarikh mula<input
                                                 v-model="startDate"
-                                                :min="workspace?.today"
+                                                :min="workspace && leaveType === 'AL' ? workspace.today : undefined"
+                                                :max="workspace && leaveType === 'EL' ? workspace.today : undefined"
                                                 :required="!!workspace"
                                                 type="date"
                                                 class="block h-11 w-full rounded-lg border border-input bg-background px-3 text-sm" /></label
@@ -1862,6 +1864,7 @@ const CalendarRow = defineComponent({
                                                 :required="!!workspace"
                                                 type="date"
                                                 :min="startDate"
+                                                :max="workspace && leaveType === 'EL' ? workspace.today : undefined"
                                                 :disabled="leaveLength === 'Separuh hari'"
                                                 class="block h-11 w-full rounded-lg border border-input bg-background px-3 text-sm disabled:opacity-60"
                                         /></label>
@@ -1955,7 +1958,7 @@ const CalendarRow = defineComponent({
                                             class="block w-full resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm"
                                         ></textarea></label
                                     ><label
-                                        v-if="leaveType === 'EL'"
+                                        v-if="!workspace && leaveType === 'EL'"
                                         class="space-y-2 text-sm font-medium"
                                         >Dokumen sokongan
                                         <span
@@ -1975,14 +1978,17 @@ const CalendarRow = defineComponent({
                                         v-if="leaveType === 'EL'"
                                         class="rounded-xl border border-amber-500/20 bg-amber-500/[0.07] p-4 text-sm leading-6"
                                     >
-                                        <strong>EL retrospektif:</strong> had
+                                        <template v-if="workspace">
+                                            <strong>EL retrospektif:</strong> Pilih tarikh ketidakhadiran dalam tahun semasa.
+                                        </template>
+                                        <template v-else><strong>EL retrospektif:</strong> had
                                         penghantaran ditentukan melalui
                                         konfigurasi HR. Bilangan hari dan kaedah
                                         kiraan masih perlu pengesahan HR; tiada
                                         had hardcoded dalam reka bentuk.
                                         Pemakluman awal kepada penyokong dibuat
                                         di luar sistem, contohnya WhatsApp, dan
-                                        bukan kepada pelulus (CT-DEC-027/028).
+                                        bukan kepada pelulus (CT-DEC-027/028).</template>
                                     </p>
                                 </section>
                                 <p v-for="error in submission.errors" :key="error" role="alert" class="text-sm text-destructive">{{ error }}</p>

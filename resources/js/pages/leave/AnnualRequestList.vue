@@ -5,6 +5,7 @@ import { ref } from 'vue';
 type Entry = {
     id: number;
     request_key: string;
+    leave_type: 'AL' | 'EL';
     status: string;
     display_name: string;
     requested_units: number;
@@ -78,10 +79,15 @@ function decide(id: number) {
             >
                 <span>
                     <strong>{{
-                        approvals ? row.display_name : 'Cuti Tahunan'
+                        approvals
+                            ? row.display_name
+                            : row.leave_type === 'EL'
+                              ? 'Emergency Leave'
+                              : 'Cuti Tahunan'
                     }}</strong>
                     <span class="block text-muted-foreground"
-                        >{{ row.starts_on }} – {{ row.ends_on }} ·
+                        >{{ row.leave_type }} · {{ row.starts_on }} –
+                        {{ row.ends_on }} ·
                         {{ row.requested_units / 2 }} hari</span
                     >
                 </span>

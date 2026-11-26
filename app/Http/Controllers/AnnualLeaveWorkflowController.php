@@ -9,6 +9,7 @@ use DomainException;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -46,14 +47,14 @@ class AnnualLeaveWorkflowController extends Controller
         });
 
         $requests = $this->requests()->join('employees as employee', 'employee.id', '=', 'leave.employee_id')
-            ->select('leave.id', 'leave.request_key', 'leave.status', 'employee.display_name', 'revision.requested_units', 'revision.reason')
+            ->select('leave.id', 'leave.request_key', 'leave.status', 'leave.leave_type', 'employee.display_name', 'revision.requested_units', 'revision.reason')
             ->selectSub(DB::table('leave_request_days')->whereColumn('revision_id', 'revision.id')->selectRaw('MIN(leave_date)'), 'starts_on')
             ->selectSub(DB::table('leave_request_days')->whereColumn('revision_id', 'revision.id')->selectRaw('MAX(leave_date)'), 'ends_on')
             ->orderByDesc('leave.id');
-        /** @var \Illuminate\Pagination\Paginator<int, \stdClass> $history */
+        /** @var Paginator<int, \stdClass> $history */
         $history = (clone $requests)->where('leave.requester_user_id', $userId)->where('employee.user_id', $userId)
             ->simplePaginate(20, pageName: 'history_page');
-        /** @var \Illuminate\Pagination\Paginator<int, \stdClass> $inbox */
+        /** @var Paginator<int, \stdClass> $inbox */
         $inbox = $this->assigned($requests, $userId)
             ->addSelect('step.is_final')->simplePaginate(20, pageName: 'approval_page');
 
@@ -81,13 +82,21 @@ class AnnualLeaveWorkflowController extends Controller
         $userId = $request->user()->id;
         abort_unless(DB::table('employees')->where('user_id', $userId)->exists(), 403);
         $data = $request->validate([
-            'start' => ['required', 'date_format:Y-m-d', 'after_or_equal:'.now('Asia/Kuala_Lumpur')->toDateString()],
+            'leave_type' => ['sometimes', 'required', 'in:AL,EL'],
+            'start' => ['required', 'date_format:Y-m-d'],
             'end' => ['required', 'date_format:Y-m-d', 'after_or_equal:start'],
             'session' => ['required', 'in:FULL,AM,PM'],
-            'reason' => ['nullable', 'string', 'max:2000'],
+            'reason' => ['nullable', 'string', 'max:1000', 'required_if:leave_type,EL'],
             'key' => ['required', 'uuid'],
         ]);
-        $year = (int) now('Asia/Kuala_Lumpur')->format('Y');
+        $type = $data['leave_type'] ?? 'AL';
+        $today = now('Asia/Kuala_Lumpur')->toDateString();
+        $year = (int) substr($today, 0, 4);
+        if (($type === 'AL' && $data['start'] < $today) || ($type === 'EL' && $data['end'] > $today)) {
+            throw ValidationException::withMessages(['start' => $type === 'AL'
+                ? 'Pilih tarikh mula pada hari ini atau selepasnya.'
+                : 'EL terhad kepada hari ini atau tarikh yang telah berlalu.']);
+        }
         if ((int) substr($data['start'], 0, 4) !== $year || (int) substr($data['end'], 0, 4) !== $year
             || ($data['session'] !== 'FULL' && $data['start'] !== $data['end'])) {
             throw ValidationException::withMessages(['start' => 'Pilih tarikh dalam tahun semasa. Separuh hari terhad kepada satu tarikh.']);
@@ -99,8 +108,8 @@ class AnnualLeaveWorkflowController extends Controller
         }
 
         try {
-            $workflow->submitAnnualRange($userId, $accounts->annual_id, $accounts->tabung_id,
-                $data['key'], $data['start'], $data['end'], $data['session'], $data['reason'] ?? null);
+            $workflow->submitCurrentYearRange($userId, $accounts->annual_id, $accounts->tabung_id,
+                $data['key'], $type, $data['start'], $data['end'], $data['session'], $data['reason'] ?? null);
         } catch (DomainException|\InvalidArgumentException $exception) {
             throw ValidationException::withMessages(['start' => $exception->getMessage()]);
         }
@@ -151,7 +160,7 @@ class AnnualLeaveWorkflowController extends Controller
         return DB::table('leave_requests as leave')
             ->join('leave_request_revisions as revision', fn ($join) => $join
                 ->on('revision.request_id', '=', 'leave.id')->on('revision.revision', '=', 'leave.current_revision'))
-            ->where('leave.leave_type', 'AL');
+            ->whereIn('leave.leave_type', ['AL', 'EL']);
     }
 
     private function assigned(Builder $query, int $actor): Builder

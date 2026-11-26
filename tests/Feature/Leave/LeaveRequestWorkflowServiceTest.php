@@ -33,13 +33,7 @@ class LeaveRequestWorkflowServiceTest extends TestCase
     {
         $fixture = $this->fixture('workspace');
         $approvers = $this->staffApprovers($fixture);
-        $creditor = $this->user('creditor');
-        $creditor->givePermissionTo(['leave.entitlement.confirm', 'leave.entitlement.credit']);
-        $credits = app(AnnualEntitlementCreditService::class);
-        Carbon::setTestNow('2026-01-01T09:00:00+08:00');
-        $confirmed = $credits->confirmAnnualEntitlement($creditor->id, $fixture['annual_id'], 20, 'synthetic-input', 'confirm-'.$fixture['suffix']);
-        $credits->creditConfirmedEntitlementOnJanuaryFirst($creditor->id, $confirmed['confirmation_id']);
-        Carbon::setTestNow('2026-03-02T09:00:00+08:00');
+        $this->creditSyntheticEntitlement($fixture['annual_id'], $fixture['suffix']);
 
         $staff = $fixture['user'];
         $outsider = $this->user('outsider');
@@ -90,6 +84,48 @@ class LeaveRequestWorkflowServiceTest extends TestCase
         } finally {
             app()->instance('env', $env);
         }
+    }
+
+    public function test_same_year_emergency_workspace_requires_reason_and_records_retrospective_rejection(): void
+    {
+        $fixture = $this->fixture('elworkspace');
+        $approvers = $this->staffApprovers($fixture);
+        $this->creditSyntheticEntitlement($fixture['annual_id'], $fixture['suffix']);
+        $staff = $fixture['user'];
+        foreach ([$staff, $approvers['pu'], $approvers['pb']] as $actor) {
+            $actor->forceFill(['two_factor_secret' => 'synthetic', 'two_factor_confirmed_at' => now()])->save();
+        }
+
+        $url = '/leave/annual';
+        $this->withSession(['_token' => 'synthetic-token'])->withHeader('X-CSRF-TOKEN', 'synthetic-token');
+        $submission = [
+            'leave_type' => 'EL',
+            'start' => '2026-01-02',
+            'end' => '2026-01-02',
+            'session' => 'PM',
+            'key' => (string) Str::uuid(),
+        ];
+        $this->actingAs($staff)->from($url)->post($url.'/requests', $submission)->assertSessionHasErrors('reason');
+        $this->post($url.'/requests', [...$submission, 'start' => '2026-03-03', 'end' => '2026-03-03', 'reason' => 'Synthetic emergency'])
+            ->assertSessionHasErrors('start');
+        $this->post($url.'/requests', [...$submission, 'reason' => 'Synthetic emergency'])
+            ->assertRedirect($url)->assertSessionHasNoErrors();
+
+        $requestId = DB::table('leave_requests')->where('submission_key', $submission['key'])->value('id');
+        $decisionUrl = $url.'/requests/'.$requestId.'/decision';
+        $this->actingAs($approvers['pb'])->get($url)->assertInertia(fn (Assert $page) => $page->has('workspace.inbox.data', 0));
+        $this->actingAs($approvers['pu'])->get($url)->assertInertia(fn (Assert $page) => $page
+            ->where('workspace.inbox.data.0.leave_type', 'EL')
+            ->where('workspace.inbox.data.0.reason', 'Synthetic emergency')
+            ->where('workspace.inbox.data.0.requested_units', 1));
+        $this->post($decisionUrl, ['decision' => 'SUPPORT', 'key' => (string) Str::uuid()])->assertSessionHasNoErrors();
+        $this->actingAs($approvers['pb'])->post($decisionUrl, [
+            'decision' => 'REJECT', 'key' => (string) Str::uuid(), 'reason' => 'Synthetic rejection',
+        ])->assertSessionHasNoErrors();
+        $this->actingAs($staff)->get($url)->assertInertia(fn (Assert $page) => $page
+            ->where('workspace.history.data.0.status', 'REJECTED')
+            ->where('workspace.balance.annual_half_day_units', 19)->where('workspace.balance.pending', 0));
+        $this->assertDatabaseHas('leave_attendance_reviews', ['review_code' => 'RETROSPECTIVE_EL_REJECTION']);
     }
 
     public function test_submission_is_atomic_snapshots_the_route_and_replays_by_payload_key(): void
@@ -724,6 +760,7 @@ class LeaveRequestWorkflowServiceTest extends TestCase
     public function test_rejected_retrospective_el_posts_the_documented_debit_and_opens_hr_review(): void
     {
         $fixture = $this->fixture('retroel');
+        $this->creditSyntheticEntitlement($fixture['annual_id'], $fixture['suffix']);
         $approvers = $this->staffApprovers($fixture);
         $service = app(LeaveRequestWorkflowService::class);
         $submitted = $service->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'], 'retro-el-'.$fixture['suffix'], 'EL', [['date' => '2026-02-27', 'session' => 'AM']], 'Synthetic emergency reason');
@@ -737,6 +774,40 @@ class LeaveRequestWorkflowServiceTest extends TestCase
         $this->assertSame(1, DB::table('leave_ledger_entries')->where('kind', 'rejected_el_absence_use')->count());
         $this->assertSame('RETROSPECTIVE_EL_REJECTION', DB::table('leave_attendance_reviews')->where('revision_id', $revisionId)->value('review_code'));
         $this->assertTrue((bool) DB::table('leave_requests')->where('id', $submitted['request_id'])->value('attendance_review_required'));
+    }
+
+    public function test_retrospective_el_rejection_with_insufficient_funds_preserves_the_pending_hold(): void
+    {
+        $fixture = $this->fixture('elshortage');
+        $approvers = $this->staffApprovers($fixture);
+        $workflow = app(LeaveRequestWorkflowService::class);
+        $submitted = $workflow->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'],
+            'shortage-'.$fixture['suffix'], 'EL', [['date' => '2026-02-27', 'session' => 'AM']], 'Synthetic emergency');
+        $workflow->decide($approvers['pu']->id, $submitted['request_id'], 'support-'.$fixture['suffix'], 'SUPPORT');
+
+        $this->assertDomainException(fn () => $workflow->decide($approvers['pb']->id, $submitted['request_id'],
+            'reject-'.$fixture['suffix'], 'REJECT', 'Synthetic rejection'));
+
+        $this->assertDatabaseHas('leave_requests', ['id' => $submitted['request_id'], 'status' => 'WAITING_GENERAL_MANAGER_FINAL']);
+        $this->assertDatabaseHas('leave_reservations', ['id' => $submitted['reservation_id'], 'status' => 'ACTIVE']);
+        $this->assertDatabaseMissing('leave_ledger_entries', ['annual_account_id' => $fixture['annual_id'], 'kind' => 'rejected_el_absence_use']);
+    }
+
+    public function test_el_submitted_on_the_absence_date_still_requires_review_after_that_date(): void
+    {
+        $fixture = $this->fixture('elsameday');
+        $approvers = $this->staffApprovers($fixture);
+        $this->creditSyntheticEntitlement($fixture['annual_id'], $fixture['suffix']);
+        $workflow = app(LeaveRequestWorkflowService::class);
+        $submitted = $workflow->submit($fixture['user']->id, $fixture['annual_id'], $fixture['tabung_id'],
+            'same-day-'.$fixture['suffix'], 'EL', [['date' => '2026-03-02', 'session' => 'AM']], 'Synthetic emergency');
+        $workflow->decide($approvers['pu']->id, $submitted['request_id'], 'support-'.$fixture['suffix'], 'SUPPORT');
+        Carbon::setTestNow('2026-03-03T09:00:00+08:00');
+
+        $this->assertDomainException(fn () => $workflow->decide($approvers['pb']->id, $submitted['request_id'],
+            'reject-'.$fixture['suffix'], 'REJECT', 'Synthetic rejection'));
+
+        $this->assertDatabaseHas('leave_reservations', ['id' => $submitted['reservation_id'], 'status' => 'ACTIVE']);
     }
 
     public function test_short_notice_needs_a_reason_and_ambiguous_counting_boundary_fails_closed(): void
@@ -777,6 +848,17 @@ class LeaveRequestWorkflowServiceTest extends TestCase
         $this->assertSame(0, DB::table('leave_workflow_actions')->count());
         $this->assertSame(1, DB::table('leave_requests')->count());
         $this->assertSame('ACTIVE', DB::table('leave_reservations')->where('id', $submitted['reservation_id'])->value('status'));
+    }
+
+    private function creditSyntheticEntitlement(int $annualId, string $suffix): void
+    {
+        $creditor = $this->user('creditor');
+        $creditor->givePermissionTo(['leave.entitlement.confirm', 'leave.entitlement.credit']);
+        $credits = app(AnnualEntitlementCreditService::class);
+        Carbon::setTestNow('2026-01-01T09:00:00+08:00');
+        $confirmed = $credits->confirmAnnualEntitlement($creditor->id, $annualId, 20, 'synthetic-input', 'confirm-'.$suffix);
+        $credits->creditConfirmedEntitlementOnJanuaryFirst($creditor->id, $confirmed['confirmation_id']);
+        Carbon::setTestNow('2026-03-02T09:00:00+08:00');
     }
 
     /** @return array{suffix:string,user:User,employee_id:int,unit_id:int,annual_id:int,tabung_id:int} */

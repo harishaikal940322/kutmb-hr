@@ -4,6 +4,7 @@ namespace App\Services\Leave;
 
 use App\Models\AuditEvent;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use DateInterval;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -15,7 +16,7 @@ use Illuminate\Support\Str;
 use RuntimeException;
 use stdClass;
 
-/** Local-only internal P04/P05 transaction boundary; intentionally not connected to a route or UI. */
+/** Local/testing transaction boundary for leave applications and decisions. */
 class LeaveRequestWorkflowService
 {
     public function __construct(
@@ -52,12 +53,12 @@ class LeaveRequestWorkflowService
     }
 
     /** @return array{request_id:int,request_key:string,status:string,current_step_order:?int,reservation_id:int,replayed:bool} */
-    public function submitAnnualRange(
-        int $userId, int $annualId, int $tabungId, string $key, string $start, string $end, string $session, ?string $reason,
+    public function submitCurrentYearRange(
+        int $userId, int $annualId, int $tabungId, string $key, string $type, string $start, string $end, string $session, ?string $reason,
     ): array {
         $this->assertLocal();
 
-        return DB::transaction(function () use ($userId, $annualId, $tabungId, $key, $start, $end, $session, $reason): array {
+        return DB::transaction(function () use ($userId, $annualId, $tabungId, $key, $type, $start, $end, $session, $reason): array {
             $this->lockSubmissionGuards();
             if (DB::table('employees')->where('user_id', $userId)->lockForUpdate()->first(['id']) === null) {
                 throw new DomainException('Only the linked employee can submit this request.');
@@ -74,7 +75,7 @@ class LeaveRequestWorkflowService
                 }
             }
 
-            return $this->submit($userId, $annualId, $tabungId, $key, 'AL', $slots, $reason);
+            return $this->submit($userId, $annualId, $tabungId, $key, $type, $slots, $reason);
         });
     }
 
@@ -398,8 +399,10 @@ class LeaveRequestWorkflowService
                 $today = now('Asia/Kuala_Lumpur')->toDateString();
                 $hasStarted = collect($dates)->contains(fn (string $date): bool => $date <= $today);
                 if ($request->leave_type === 'EL') {
-                    if ($dates === [] || collect($dates)->contains(fn (string $date): bool => $date >= $today)) {
-                        throw new DomainException('Final rejection of current-day EL requires HR confirmation of actual absence.');
+                    $submittedOn = CarbonImmutable::parse($request->created_at, config('app.timezone'))
+                        ->setTimezone('Asia/Kuala_Lumpur')->toDateString();
+                    if ($dates === [] || collect($dates)->contains(fn (string $date): bool => $date >= $submittedOn)) {
+                        throw new DomainException('Final rejection of EL submitted on the absence date requires HR confirmation of actual absence.');
                     }
                     $this->balances->debitRetrospectiveElRejection($actorId, (int) $revision->reservation_id, (int) $currentStep->assignment_id, $operationKey.':e');
                     $reviewCode = 'RETROSPECTIVE_EL_REJECTION';
