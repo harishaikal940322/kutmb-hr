@@ -1,5 +1,7 @@
 # MOD-005 | Cuti Tahunan: Technical Design & Implementation Plan
 
+> **Current implementation checkpoint (26 November 2026):** [CURRENT_HANDOFF.md — Development resume checkpoint](CURRENT_HANDOFF.md#mod-005--development-resume-checkpoint-26-november-2026) records the latest code baseline, TB-01–06/CR coverage, migration 000060, remaining REM-01–06 and verification limits. Historical progress paragraphs below (including the 25 November result) are snapshots, not the current implementation state. No change to normative requirements or formal acceptance.
+
 **Status:** v0.4 TECHNICAL PLANNING BASELINE / UX FROZEN / LOCAL DEVELOPMENT AUTHORIZED / OPERATIONAL HOLD · 24 November 2026  
 **Repository:** `harishaikal940322/kutmb-hr`, remote `main` reviewed  
 **Frozen UX source commit:** `ffdeda34062ae0dd5c9edbd08ec5e7ca44cab6a5` (UX-R01–R05)

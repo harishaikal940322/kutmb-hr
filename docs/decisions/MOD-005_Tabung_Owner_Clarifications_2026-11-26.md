@@ -15,6 +15,8 @@ Do not treat these as approval of unstated exact entitlement-band boundaries, pa
 
 ## Implementation tracking
 
+**Latest consolidated status (26 November 2026):** TB-01–03 source implemented within documented bounds; TB-04 manual close implemented, automatic TB-Q03 pending; TB-05 main source and bounded follow-ups A–C implemented, D report-only/policy-gated; TB-06 bounded source implemented through 000060. Promotion top-up, lower-rate transition and unresolved negative/prorata cases remain open. [Current handoff and resume order](../implementation/CURRENT_HANDOFF.md). The entries below are chronological snapshots; earlier outstanding items may have been delivered by later entries. No latest runtime acceptance.
+
 - TB-01: effective-dated confirmed full cap, source implemented; promotion AL top-up and lower-cap handling outstanding.
 - TB-02: FIFO same-year allocation across cohorts, per-source pending totals, approval and retrospective EL debit; header source is oldest cohort for compatibility; per-slot map authoritative, additive forward trigger migration 000052. Cross-year shortage routing and old-year reconciliation remain gated.
 - TB-03: current-year pre-start cancellation refunds all original cohorts and disposes new excess via FIFO free units. Current-year same-year partial cancellation with AM/PM implemented under CR-Q01/02; cross-year partial, special HR route and full audit snapshots outstanding.

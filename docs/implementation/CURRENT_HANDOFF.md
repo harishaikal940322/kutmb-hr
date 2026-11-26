@@ -1,3 +1,100 @@
+# MOD-005 — Development resume checkpoint, 26 November 2026
+
+**Read this checkpoint first.** Consolidated at Owner request to preserve progress before continuing. This is an implementation inventory, not new HR policy, code freeze, release acceptance or evidence of completed tests. Older dated entries below remain historical; use this checkpoint and linked decisions for current scope.
+
+- Repository: harishaikal940322/kutmb-hr, branch main. Code baseline before this documentation-only commit: [52f7d3bd40a1b53ba940577cba574cfdeda8f6e9](https://github.com/harishaikal940322/kutmb-hr/commit/52f7d3bd40a1b53ba940577cba574cfdeda8f6e9).
+- Stack: Laravel / Vue / Inertia / MySQL; existing local Docker checkout and existing synthetic kutmb_hr_dev only. UX baseline accepted earlier; new feature screens require local review. MOD-005 major functionality implemented in source, not fully complete. Production remains disabled.
+- Owner direction: implementation first; targeted checks and Owner functional/browser review during development; consolidated QA/UAT and HR/IT acceptance later. No new DB, containers, destructive operations, actual staff data or production grants. The existing manually confirmed Owner-only reset exception is not permission for an agent to reset. Preserve incident/recovery evidence.
+- Authority: current 56-issue DOCX HR answer fields plus explicit [TB-Q01–06](../decisions/MOD-005_Tabung_Owner_Clarifications_2026-11-26.md) and [CR-Q01–04](../decisions/MOD-005_Cancellation_Owner_Clarifications_2026-11-26.md). Older provisional ADR/plan statements do not override current detailed answers. No normative SRS/RTM change in this checkpoint.
+
+## Current development inventory
+
+Status vocabulary: IMPLEMENTED = source present, not latest runtime acceptance; BOUNDED = supported subset only; PENDING = technical work not delivered; POLICY GATED = no invented rule or mutation.
+
+| Scope | Status | Current behavior / remaining boundary |
+|---|---|---|
+| CT-P01/02 local workspace, calendar and policy | IMPLEMENTED / BOUNDED | Existing permission-driven content subnavigation, confirmed calendar/working schedule and entitlement draft management; synthetic data, unresolved policy boundaries remain. |
+| Profile and entitlement | IMPLEMENTED / BOUNDED | HR explicit annual confirmation, current/future account, once-only Jan 1 credit, suggested seniority rates, new-hire prorata; exact bands, promotions, mid-month exit and rounding ties not fully defined/implemented. |
+| AL/EL submission, reservation and approval | IMPLEMENTED / BOUNDED | AM/PM, normal hierarchy, negative AL with warning after AL then Tabung, pending counted once, no negative Tabung; late rejection/attendance review, future-year confirmed entitlement and approved pre-credit commitments. Cross-year shortage allocation and ambiguous December boundary remain gated. |
+| Corrections, withdrawals and cancellations | IMPLEMENTED / BOUNDED | Supported future unused correction/resubmission, withdrawal, original-source pre-start refund, AM/PM partial refund, HR after-end special case; ordinary cross-year partial refund and historical after-end source-mapped subset. EL correction/expiry automation, independent HR rejection before special verification and repeated confirmed-partial corrections remain gated or unimplemented. |
+| HR recording and team availability | IMPLEMENTED / BOUNDED | Prior consent and separate applicant/recorder, confirmed current/future cross-year supported accounts; team availability privacy projection. Real evidence channel and authority remain release gates. |
+| Ledger, reports and HR review | IMPLEMENTED / BOUNDED | Own ledger, HR balances/status, evidence-referenced review, posted historical deficits versus projected shortfall; no automatic attendance charge or payroll. |
+| TB-01 full cap | IMPLEMENTED / BOUNDED | Effective-dated confirmed full annual rate separate from prorated AL. Promotion top-up and lower-cap transition outstanding. |
+| TB-02 FIFO | IMPLEMENTED / BOUNDED | Same-year AL first, oldest free Tabung cohort, permitted negative AL; per-session original sources and holds. Cross-year shortages not generalized. |
+| TB-03 cancellation refund | IMPLEMENTED / BOUNDED | Original-source pre-start and supported partial refunds; FIFO disposal protects valid holds. Historical/cross-year partial subset via CR-Q04 and TB-05C. |
+| TB-04 annual close | IMPLEMENTED MANUAL / PENDING AUTO | Eligible prior-year free AL transfers within receiving cap; excess burn; existing Tabung excess FIFO disposal; protected holds, no negative carry. Manual requires both credited years. Automatic Jan 1 00:00 MYT ordering, retries and exception report not implemented. |
+| TB-05 late release | IMPLEMENTED / BOUNDED | Historical late rejection claims protected; explicit HR all-session non-use reconciles newly eligible AL using actual current Tabung and effective cap. |
+| TB-05 positive historical adjustment | IMPLEMENTED / BOUNDED | Independent maker/checker and evidence; only newly eligible positive AL, immediate transfer/burn. |
+| TB-05A legacy claims | IMPLEMENTED / BOUNDED | Recover only provable historical annual-only source maps with exact immutable event/close history; ambiguous cases remain protected. |
+| TB-05B partial non-use | IMPLEMENTED / BOUNDED | Exact confirmed unused historical annual-only sessions; unselected claims remain protected; mixed-source cases not generalized. |
+| TB-05C historical special adjustment | IMPLEMENTED / BOUNDED | HR maker, independent HR checker, distinct GM; posted original-source refund and 000056 reconciliation. Incomplete maps, unsettled commitments and unsupported sources blocked. |
+| TB-05D historical negative adjustment | REPORT ONLY / POLICY GATED | Filter posted historical AL deficits; separately show projected shortfall and close status. No historic debit, inter-year offset or payroll mutation. |
+| TB-06 exit balance settlement | IMPLEMENTED / BOUNDED | Current-year elapsed month-end exit with single confirmed full rate and provable credit/history; maker snapshot, independent HR confirmation posts prorata and FIFO offset once; external evidence and separate confirmation. OUTSTANDING / IN_PROGRESS / SETTLED; no RM/payroll module or deletion. Unsupported exit dates/rates/history and stale case correction remain gated. |
+
+## Latest migrations and code trace
+
+Latest migration in repository: 2026_11_26_000060_create_leave_exit_settlements.php. Source presence is not local application evidence.
+
+| Migration / slice | Commit(s), in chronological order |
+|---|---|
+| 000051 effective-dated full Tabung cap | 9d509a8 (dynamic cap precursor), ba19ab4 |
+| 000052 per-session FIFO sources | 7b8d05d (pre-start refund), 31ef904 |
+| 000053 annual burn / FIFO excess | 87d7eb5 |
+| 000054 AM/PM cancellation | fa17669 |
+| 000055 after-end HR special case | 786d85e |
+| 000056 closed-year partial refund | af9f417 |
+| 000057 late release claims / reconciliation | fb6cca7 |
+| 000058 positive historical adjustment | b7757a9 |
+| TB-05A legacy claim recovery (no new migration) | 465d88d |
+| 000059 partial attendance non-use slots | 8f73559 |
+| TB-05C historical special (no new migration) | 3d8bda1 |
+| TB-05D historical deficit reporting (no new migration) | 1767521 |
+| 000060 exit settlement and separate permissions | 8e57a71, 52f7d3b |
+
+Primary implementation locations: app/Services/Leave (LeaveRequestWorkflowService, LeaveBalanceTransactionService, LedgerPostedTotals, TabungCapacity, AnnualEntitlementCalculator, AnnualEntitlementCreditService, AnnualLeaveYearCloseService, AnnualLateReconciliationService, LeaveAdjustmentService, LeaveExitSettlementService); app/Http/Controllers (AnnualLeaveController, AnnualLeaveWorkflowController, AnnualLeaveOperationsController, AnnualLeaveAdjustmentController, LeaveSettlementController); resources/js/pages/leave (AnnualLeaveNavigation.vue, Operations.vue, Adjustments.vue, Settlements.vue); routes/web.php; config/iam.php; DevelopmentLeaveAccessSeeder; tests/OwnerReview/AnnualLeaveReviewTest.php.
+
+## Local verification and recovery
+
+- Owner previously reported 7 tests / 263 assertions on earlier code after b65276f. This is not evidence for any later commit.
+- Owner reported opening Cuti Tahunan failed until missing migrations were applied after TB-05B; then page opened. Exact local SHA, applied migration inventory and later TB-06 runtime are not independently verified. Do not record migration 000060 as applied or the new scenarios as passing.
+- Remote editor confirmed main SHA and committed source; local checkout/worktree, PHP lint, migration SQL/application, Vue type/build, database tests and browser acceptance of recent slices remain unverified. No production use or formal UAT.
+- Resume in existing local checkout: fetch and inspect main/worktree, preserve unrelated changes, pull only when safe; confirm existing local synthetic DB identity; inspect migration status and pending additive migration plan before applying. No reset needed for this checkpoint.
+- After verifying target, apply pending migrations (including 000060 if absent), run existing local DevelopmentLeaveAccessSeeder explicitly for TB-06 permissions, rebuild frontend, then verify menu/routes and HR roles. Use existing environment/credentials only. Commands:
+
+    git fetch origin
+    git status --short
+    git log -1 --oneline
+    git pull --ff-only origin main
+    docker compose -f docker-compose.local.yml exec app php artisan migrate:status
+    docker compose -f docker-compose.local.yml exec app php artisan migrate --pretend
+    docker compose -f docker-compose.local.yml exec app php artisan migrate
+    docker compose -f docker-compose.local.yml exec app php artisan db:seed --class=DevelopmentLeaveAccessSeeder
+    npm run build
+
+- Local Owner opt-in rollback-only suite, after schema/configuration checks and uncached config (never run parallel/destructive/default DB tests):
+
+    docker compose -f docker-compose.local.yml exec -e KUTMB_OWNER_LEAVE_REVIEW=1 -e APP_ENV=testing -e DB_DATABASE=kutmb_hr_dev -e DB_URL= app php vendor/bin/phpunit -c phpunit.annual-leave.xml --testdox
+
+- Verify TB-06 via Cuti Tahunan > Penyelesaian Baki, /leave/annual/settlements: separate HR Executive/Manager actions, staff denial, unchanged balance before independent confirmation, exact prorata/offset, replay, external evidence/status and stale-case denial. Review previously delivered historical reconciliation, pending protection and cancellation source mapping in the same targeted review. Record actual results/errors in this handoff; do not claim unrun checks passed.
+
+## Remaining work and resume order
+
+The REM identifiers below are checkpoint labels only, not new SRS IDs or Owner approvals. Proposed sequence from the preceding conversation, not a decision to freeze or start work.
+
+| ID | Status | Scope / next action |
+|---|---|---|
+| REM-01 | PENDING, rule approved | TB-Q03 automatic Jan 1 00:00 MYT year close; explicit per-employee orchestration, confirmed receiving cap and entitlement, protected holds, transfer/burn, once-only credit/commitment settlement, retry and exception report. Inspect existing manual both-credited prerequisite and existing credit service before adding scheduler; no blanket negative rollover. |
+| REM-02 | PARTIAL | Promotion AL top-up: effective-dated rate already supported; implement only documented prorata/rate transition behavior, isolate unresolved exact band/rounding rules. |
+| REM-03 | PENDING / POLICY BOUNDARY | Lower Tabung cap handling: TB-Q02 FIFO disposal of free excess is approved; separate explicit rate-decrease transition and authorization need review, never invalidate protected holds. |
+| REM-04 | POLICY GATED | Historic negative correction / negative year transition, 25 December inclusive boundary conflict and excess beyond next-year confirmed entitlement; no invented offset. |
+| REM-05 | POLICY GATED / BOUNDED | Exact eligibility bands, mid-month exit, rounding tie, complex historical/mixed source cases, stale settlement correction; do not infer new policy or restore burn. |
+| REM-06 | VERIFICATION PENDING | Owner local migration/seeding/build, targeted tests and functional/browser bug fixing, then consolidated review before declaring module complete. |
+| Additional documented gaps | PENDING / POLICY GATED | Correction expiry/notifications, reminder values/channels (CT-DEC-054), affected unit-transfer/reassignment and ambiguous calendar change paths, HR rejection before special verification; trace current SRS/RTM and exact HR answers before marking complete. |
+
+**Resume point:** after verifying the current local baseline, REM-01 (automatic year-end close) is the next proposed implementation slice. Do not repeat TB-05/TB-06 from scratch. Continue REM-02/03 only where policy is unambiguous. Do not mark MOD-005 100% complete or freeze until outstanding technical scope and acceptance are reconciled. Production, real HR authority, SSO/MFA, recovery and formal QA/UAT remain separate gates.
+
+---
+
 ## 26 November 2026 — TB-06 exit balance settlement (bounded)
 
 - Added 000060 append-only case/events, explicit separate development settlement permissions, routes, service and existing content subnavigation UI. Maker prepares immutable prorata/deficit/FIFO snapshot; independent checker verifies unchanged source and atomically posts final reduction and FIFO offset, IN_PROGRESS. Maker records external settlement reference/date (or full-offset evidence if zero residual); independent checker confirms SETTLED. No RM, payroll integration, financial deduction, or deletion; external settlement is a status, not an additional AL credit.
