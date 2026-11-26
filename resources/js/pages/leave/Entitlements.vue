@@ -27,6 +27,7 @@ const props = defineProps<{
     canReviewDesign: boolean;
     canUseWorkflow: boolean;
     canConfirmEntitlement: boolean;
+    canCreditEntitlement: boolean;
     canManageEmployees: boolean;
 }>();
 defineOptions({
@@ -37,12 +38,23 @@ const year = ref(props.filters.year);
 const expanded = ref<number | null>(null);
 const confirmation = useForm({ year: props.filters.year, units: '', reference: '', key: '' });
 const confirmed = ref('');
+const credit = useForm({});
 
 function expand(row: Employee) {
     expanded.value = expanded.value === row.id ? null : row.id;
     confirmation.reset();
     confirmation.clearErrors();
+    credit.clearErrors();
     confirmed.value = '';
+}
+
+function postCredit(row: Employee) {
+    credit.post(`/leave/annual/entitlements/${row.id}/credit`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            confirmed.value = 'Kelayakan dikreditkan.';
+        },
+    });
 }
 
 function confirm(row: Employee) {
@@ -62,6 +74,7 @@ watch([() => props.filters.search, () => props.filters.year], ([nextSearch, next
     expanded.value = null;
     confirmation.reset();
     confirmation.clearErrors();
+    credit.clearErrors();
     confirmed.value = '';
 });
 const statusLabels = {
@@ -154,7 +167,7 @@ function date(value: string | null) {
                                         <td class="px-3 py-4"><span v-if="row.assignment_status === 'CURRENT'">{{ row.unit }}<span class="block text-xs text-muted-foreground">{{ row.category }}</span></span><span v-else class="text-muted-foreground">{{ row.assignment_status === 'REVIEW' ? 'Perlu semakan penempatan' : 'Tiada penempatan semasa' }}</span></td>
                                         <td class="px-3 py-4 font-medium">{{ days(row.confirmed_half_day_units) }}</td>
                                         <td class="px-3 py-4"><span class="inline-block rounded-full px-2.5 py-1 text-xs font-medium" :class="row.entitlement_status === 'CREDITED' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-muted text-foreground'">{{ statusLabels[row.entitlement_status] }}</span><span class="mt-1 block text-xs text-muted-foreground">{{ employmentLabels[row.employment_status] }}</span></td>
-                                        <td class="px-3 py-4"><button type="button" :aria-expanded="expanded === row.id" :aria-controls="'employee-detail-' + row.id" class="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-sm font-medium text-primary hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" :disabled="confirmation.processing" @click="expand(row)">Profil <ChevronDown class="size-4" :class="expanded === row.id ? 'rotate-180' : ''" aria-hidden="true" /></button></td>
+                                        <td class="px-3 py-4"><button type="button" :aria-expanded="expanded === row.id" :aria-controls="'employee-detail-' + row.id" class="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-sm font-medium text-primary hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" :disabled="confirmation.processing || credit.processing" @click="expand(row)">Profil <ChevronDown class="size-4" :class="expanded === row.id ? 'rotate-180' : ''" aria-hidden="true" /></button></td>
                                     </tr>
                                     <tr v-show="expanded === row.id" :id="'employee-detail-' + row.id">
                                         <td colspan="5" class="bg-muted/30 px-4 py-4">
@@ -165,6 +178,13 @@ function date(value: string | null) {
                                                 <div><dt class="text-xs text-muted-foreground">Tarikh pengesahan kelayakan</dt><dd class="mt-1 font-medium">{{ date(row.confirmed_at) }}</dd></div>
                                             </dl>
                                             <p v-if="expanded === row.id && confirmed" role="status" class="mt-4 text-sm">{{ confirmed }}</p>
+                                            <form v-if="expanded === row.id && canCreditEntitlement && row.entitlement_status === 'CONFIRMED'"
+                                                class="mt-4 space-y-3 border-t border-border pt-4" @submit.prevent="postCredit(row)">
+                                                <p v-for="error in credit.errors" :key="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
+                                                <button type="submit" :disabled="credit.processing" class="min-h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+                                                    {{ credit.processing ? 'Merekod…' : 'Kreditkan kelayakan 1 Januari' }}
+                                                </button>
+                                            </form>
                                             <form
                                                 v-if="expanded === row.id && canConfirmEntitlement && ['NO_ACCOUNT', 'UNCONFIRMED'].includes(row.entitlement_status)"
                                                 class="mt-4 space-y-3 border-t border-border pt-4"

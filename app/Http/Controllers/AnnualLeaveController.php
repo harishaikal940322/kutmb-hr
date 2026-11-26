@@ -109,9 +109,30 @@ class AnnualLeaveController extends Controller
             'asOf' => $today,
             'canReviewDesign' => $canReview,
             'canUseWorkflow' => $canWork,
+            'canCreditEntitlement' => $today === sprintf('%04d-01-01', $year) && $user->can('leave.entitlement.credit'),
             'canConfirmEntitlement' => $year >= $currentYear && $user->can('leave.entitlement.confirm'),
             'canManageEmployees' => $user->can('hr.employees.view'),
         ]);
+    }
+
+    public function credit(Request $request, int $employee, AnnualEntitlementCreditService $entitlements): RedirectResponse
+    {
+        $today = now('Asia/Kuala_Lumpur');
+        if ($today->format('m-d') !== '01-01') {
+            throw ValidationException::withMessages(['credit' => 'Kelayakan hanya boleh dikreditkan pada 1 Januari.']);
+        }
+
+        $confirmationId = DB::table('leave_annual_entitlement_confirmations')
+            ->where('employee_id', $employee)->where('leave_year', (int) $today->format('Y'))->value('id');
+        abort_if($confirmationId === null, 404);
+
+        try {
+            $entitlements->creditConfirmedEntitlementOnJanuaryFirst($request->user()->id, $confirmationId);
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages(['credit' => $exception->getMessage()]);
+        }
+
+        return back();
     }
 
     public function confirm(Request $request, int $employee, AnnualEntitlementCreditService $entitlements): RedirectResponse

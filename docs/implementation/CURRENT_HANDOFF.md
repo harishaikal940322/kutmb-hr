@@ -1,3 +1,9 @@
+## 26 November 2026 — January 1 credit integration
+
+- CT-DEC-035: an authorized entitlement operator can post a confirmed current-year amount on 1 January from Profil & Kelayakan. The local/testing route requires both entitlement view and credit permissions and delegates to the existing once-only ledger service. No scheduler, missed-date posting, inferred rate, or new migration was added.
+- PHP syntax and Vue build passed. Authenticated Chromium review remains unavailable with zero accounts and disabled bootstrap. Formal testing and recovery remain deferred.
+- Outstanding scope: rate and prorata mapping await confirmed policy inputs. Cross-year transactions, pre-credit commitments, year-end posting and expiry, HR adjustments and reporting, correction resubmission, and EL review resolution remain incomplete. The exact December cutoff, year-end disposition and adjustment authority remain unresolved separately from the implementation gaps.
+
 ## 26 November 2026 — owner-directed implementation resumed
 
 - Owner authorized implementation-first development and deferred automated QA and recovery. The REC-01 assessment remains preserved locally. No restoration, role grants or authentication bypass occurred.
