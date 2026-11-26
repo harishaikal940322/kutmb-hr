@@ -1,3 +1,9 @@
+## 26 November 2026 — remaining workflow integration slice
+
+- Connected CT-DEC-051 assisted submission to a protected local HR form using the existing consent-aware service, actual employee applicant, explicit prior confirmation timestamp and evidence reference. Same-year requests only; no impersonation or attachment upload. Added local reporting and year-end preview permissions; rerun explicit DevelopmentLeaveAccessSeeder for synthetic HR roles.
+- Added own posted ledger, HR request status/balance summaries and attendance review inventory without private leave reasons, and CT-DEC-038 arithmetic preview with explicit cap and actual account totals/holds. Year-end is read-only; no automatic posting or resolution. Reports are a subset, not full RR-01–08 completion.
+- No changes to cross-year multi-account transactions, future-year commitment, year-close/expiry writer, manual adjustment approval or attendance resolution. These remain incomplete, with genuine policy boundaries separately noted in §8N and later design records. No migration, tests, build, database access or CI action performed here.
+
 ## 26 November 2026 — development leave account and configuration setup
 
 - Added explicit `DevelopmentLeaveConfigurationSeeder` after existing employee/organization mapping. Restricted to local kutmb_hr_dev and recorded development user/employee fixtures; existing HR Manager permissions are required. No new role grants, migration, database, infrastructure or account creation.

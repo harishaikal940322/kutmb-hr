@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AnnualLeaveController;
+use App\Http\Controllers\AnnualLeaveOperationsController;
 use App\Http\Controllers\AnnualLeaveWorkflowController;
 use App\Http\Controllers\ApprovalOfficeController;
 use App\Http\Controllers\EmployeeAccountLinkController;
@@ -81,6 +82,13 @@ Route::middleware('protected')->group(function () {
     });
 });
 
+Route::middleware(['protected', EnsureLocalHrDevelopment::class])->prefix('leave/annual')->group(function (): void {
+    Route::get('/ledger', [AnnualLeaveOperationsController::class, 'ledger'])->middleware('permission:leave.request.self')->name('leave.annual.ledger');
+    Route::get('/reports', [AnnualLeaveOperationsController::class, 'reports'])->middleware('permission:leave.reports.view')->name('leave.annual.reports');
+    Route::get('/year-end', [AnnualLeaveOperationsController::class, 'yearEnd'])->middleware('permission:leave.year-end.preview')->name('leave.annual.year-end');
+    Route::get('/record', [AnnualLeaveOperationsController::class, 'record'])->middleware('permission:leave.request.record-on-behalf')->name('leave.annual.record');
+    Route::post('/record', [AnnualLeaveOperationsController::class, 'submitRecord'])->middleware('permission:leave.request.record-on-behalf')->name('leave.annual.record.store');
+});
 Route::get('/leave/annual', AnnualLeaveController::class)
     ->middleware(['protected', EnsureLocalHrDevelopment::class])
     ->name('leave.annual.index');

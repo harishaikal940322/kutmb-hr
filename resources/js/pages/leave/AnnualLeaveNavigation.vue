@@ -4,7 +4,7 @@ import { CalendarDays, ChevronDown, ClipboardList, FileText, ListChecks, UsersRo
 import { computed, nextTick, ref, watch } from 'vue';
 
 export type AnnualSection = 'apply' | 'requests' | 'approvals' | 'team' | 'staff';
-type NavigationSection = AnnualSection | 'calendar' | 'policy';
+type NavigationSection = AnnualSection | 'calendar' | 'policy' | 'ledger' | 'reports' | 'year-end' | 'record';
 export type AnnualAccess = {
     sections: AnnualSection[];
     module: boolean;
@@ -16,9 +16,17 @@ export type AnnualAccess = {
     can_review_partial: boolean;
     can_manage_calendar: boolean;
     can_manage_policy: boolean;
+    can_view_reports: boolean;
+    can_preview_year_end: boolean;
+    can_record_on_behalf: boolean;
+    can_view_own_ledger: boolean;
 };
 const props = defineProps<{ access: AnnualAccess; active: NavigationSection | null }>();
 const catalog = {
+    ledger: { label: 'Baki & transaksi saya', icon: FileText, href: '/leave/annual/ledger' },
+    reports: { label: 'Laporan & semakan HR', icon: ListChecks, href: '/leave/annual/reports' },
+    'year-end': { label: 'Tutup tahun', icon: CalendarDays, href: '/leave/annual/year-end' },
+    record: { label: 'Rekod bagi pihak staf', icon: ClipboardList, href: '/leave/annual/record' },
     apply: { label: 'Mohon cuti', icon: ClipboardList, href: '/leave/annual?view=workflow&section=apply' },
     requests: { label: 'Permohonan saya', icon: FileText, href: '/leave/annual?view=workflow&section=requests' },
     approvals: { label: 'Sokongan & kelulusan', icon: ListChecks, href: '/leave/annual?view=workflow&section=approvals' },
@@ -31,8 +39,13 @@ const groups = computed(() => {
     const management: NavigationSection[] = props.access.sections.filter(item => item === 'staff');
     if (props.access.can_manage_calendar) management.push('calendar');
     if (props.access.can_manage_policy) management.push('policy');
+    if (props.access.can_view_reports) management.push('reports');
+    if (props.access.can_preview_year_end) management.push('year-end');
+    if (props.access.can_record_on_behalf) management.push('record');
+    const personal: NavigationSection[] = props.access.sections.filter(item => item !== 'staff');
+    if (props.access.can_view_own_ledger) personal.push('ledger');
     return [
-        { label: 'Urusan cuti', items: props.access.sections.filter(item => item !== 'staff') as NavigationSection[] },
+        { label: 'Urusan cuti', items: personal },
         { label: 'Pengurusan cuti', items: management },
     ].filter(group => group.items.length);
 });

@@ -31,6 +31,9 @@ class AnnualLeaveWorkflowController extends Controller
         $technical = $user->can('iam.rbac.manage');
         $calendar = $user->can('leave.calendar.manage');
         $policy = $user->can('leave.policy.manage');
+        $reports = $user->can('leave.reports.view');
+        $yearEnd = $user->can('leave.year-end.preview');
+        $record = $user->can('leave.request.record-on-behalf');
 
         $unitAvailable = false;
         if ($team && $linked) {
@@ -63,9 +66,13 @@ class AnnualLeaveWorkflowController extends Controller
 
         return [
             'sections' => $sections,
-            'module' => $self || $decision || $team || $review || $entitlements || $technical || $calendar || $policy,
+            'module' => $self || $decision || $team || $review || $entitlements || $technical || $calendar || $policy || $reports || $yearEnd || $record,
             'can_manage_calendar' => $calendar,
             'can_manage_policy' => $policy,
+            'can_view_reports' => $reports,
+            'can_preview_year_end' => $yearEnd,
+            'can_record_on_behalf' => $record,
+            'can_view_own_ledger' => $self && $linked,
             'technical' => $technical,
             'needs_employee' => ($self || $team) && ! $linked,
             'needs_unit' => $team && $linked && ! $unitAvailable,
