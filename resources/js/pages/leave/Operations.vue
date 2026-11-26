@@ -11,6 +11,7 @@ const props = defineProps<{
     entries?: Page; balance?: { annual_half_day_units: number; tabung_half_day_units: number } | null; employeeName?: string;
     summary?: Row[]; reviews?: Page; accounts?: Page; employees?: { id: number; employee_no: string; display_name: string }[];
     selectedEmployee?: number | null; cap?: number | null; preview?: Record<string, number | string | boolean> | null;
+    closeEligibility?: { can_post: boolean; reason: string | null; snapshot: { annual: number; pending: number; tabung: number; transfer: number } | null } | null;
 }>();
 defineOptions({ layout: { breadcrumbs: [{ title: 'Cuti Tahunan', href: '/leave/annual' }] } });
 const titles = { ledger: 'Baki & transaksi saya', reports: 'Laporan & semakan HR', 'year-end': 'Pratonton tutup tahun', record: 'Rekod bagi pihak staf' };
@@ -18,11 +19,22 @@ const year = ref(props.year);
 const employee = ref<number | ''>(props.selectedEmployee ?? '');
 const cap = ref<number | ''>(props.cap ?? '');
 const success = ref(false);
+const closeForm = useForm({ employee: 0, year: props.year, cap: 0, annual: 0, pending: 0, tabung: 0, transfer: 0, reason: '', acknowledged: false });
+const closeNotice = ref('');
 const form = useForm({ employee: '', leave_type: 'AL', start: '', end: '', session: 'FULL', reason: '', recording_reason: '', consent_reference: '', confirmed_at: '', consent_acknowledged: false, key: '' });
 const input = 'block min-h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm';
 const button = 'inline-flex min-h-10 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50';
 function filter() {
     router.get('/leave/annual/' + props.mode, { year: year.value, ...(props.mode === 'year-end' ? { employee: employee.value || undefined, cap: cap.value === '' ? undefined : cap.value } : {}) });
+}
+function postClose() {
+    const snapshot = props.closeEligibility?.snapshot;
+    if (!props.closeEligibility?.can_post || !snapshot || !props.selectedEmployee || props.cap == null) return;
+    closeForm.employee = props.selectedEmployee;
+    closeForm.year = props.year;
+    closeForm.cap = props.cap;
+    Object.assign(closeForm, snapshot);
+    closeForm.post('/leave/annual/year-end', { preserveScroll: true, onSuccess: () => { closeForm.reset(); closeNotice.value = 'Pindahan tutup tahun direkodkan.'; } });
 }
 function submit() {
     if (form.session !== 'FULL') form.end = form.start;
@@ -67,8 +79,17 @@ const previewFields = [
                     <section class="overflow-x-auto rounded-xl border border-border bg-card p-4"><h2 class="mb-2 font-semibold">Kes semakan HR</h2><p class="mb-3 text-sm text-muted-foreground">EL retrospektif atau AL lewat ditolak. Ini rekod semakan, bukan keputusan kehadiran atau potongan gaji.</p><table class="w-full min-w-[560px] text-left text-sm"><thead class="border-b border-border text-muted-foreground"><tr><th class="p-2">Staf</th><th class="p-2">Rujukan</th><th class="p-2">Jenis</th><th class="p-2">Dibuka</th></tr></thead><tbody class="divide-y divide-border"><tr v-for="row in reviews?.data" :key="row.id"><td class="p-2">{{ row.display_name }}</td><td class="p-2 break-all">{{ row.request_key }}</td><td class="p-2">{{ row.review_code }}</td><td class="p-2">{{ row.opened_at }}</td></tr></tbody></table><p v-if="!reviews?.data.length" class="p-3 text-sm text-muted-foreground">Tiada kes semakan.</p><nav class="mt-3 flex gap-4 text-sm text-primary"><Link v-if="reviews?.prev_page_url" :href="reviews.prev_page_url">Sebelum</Link><Link v-if="reviews?.next_page_url" :href="reviews.next_page_url">Seterusnya</Link></nav></section>
                 </template>
                 <template v-else-if="mode === 'year-end'">
-                    <p class="rounded-xl border border-border bg-muted/30 p-4 text-sm leading-6">Pratonton sahaja. Baki pending tidak dipindahkan. Cap mesti dibekalkan secara eksplisit. Tiada kredit, pindahan, pelupusan atau tutup akaun dijalankan.</p>
+                    <p class="rounded-xl border border-border bg-muted/30 p-4 text-sm leading-6">Pratonton dahulu. Baki pending tidak dipindahkan. Pindahan manual hanya tersedia jika kedua-dua tahun sudah dikreditkan, cap tidak berubah dan tiada lebihan atau defisit. Tiada pelupusan automatik.</p>
                     <div v-if="preview" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><article v-for="[key, label] in previewFields" :key="key" class="rounded-xl border border-border bg-card p-4"><p class="text-sm text-muted-foreground">{{ label }}</p><p class="mt-2 text-xl font-semibold">{{ days(preview[key]) }}</p></article></div>
+                    <p v-if="closeNotice" role="status" class="text-sm">{{ closeNotice }}</p>
+                    <p v-if="closeEligibility && !closeEligibility.can_post" class="rounded-lg border border-border bg-muted/30 p-3 text-sm">{{ closeEligibility.reason }}</p>
+                    <form v-if="closeEligibility?.can_post" class="space-y-4 rounded-xl border border-border bg-card p-4" @submit.prevent="postClose">
+                        <h2 class="font-semibold">Pengesahan pindahan</h2>
+                        <label class="space-y-1 text-sm font-medium">Sebab / rujukan pengesahan<textarea v-model="closeForm.reason" required maxlength="1000" :class="input" /></label>
+                        <label class="flex gap-2 text-sm"><input v-model="closeForm.acknowledged" type="checkbox" required class="accent-primary" /> Saya telah menyemak baki, tempahan dan cap. Pos pindahan yang dipratonton sahaja.</label>
+                        <p v-for="error in closeForm.errors" :key="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
+                        <button :class="button" :disabled="closeForm.processing" type="submit">Sahkan dan pos pindahan</button>
+                    </form>
                 </template>
                 <form v-else class="max-w-3xl space-y-5 rounded-xl border border-border bg-card p-5" @submit.prevent="submit">
                     <p class="text-sm text-muted-foreground">Rekod hanya selepas staf memberi persetujuan dan mengesahkan permohonan. Staf kekal sebagai pemohon; akaun HR direkodkan sebagai pelaksana.</p>

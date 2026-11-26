@@ -90,6 +90,7 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class])->prefix('leave
     Route::get('/ledger', [AnnualLeaveOperationsController::class, 'ledger'])->middleware('permission:leave.request.self')->name('leave.annual.ledger');
     Route::get('/reports', [AnnualLeaveOperationsController::class, 'reports'])->middleware('permission:leave.reports.view')->name('leave.annual.reports');
     Route::get('/year-end', [AnnualLeaveOperationsController::class, 'yearEnd'])->middleware('permission:leave.year-end.preview')->name('leave.annual.year-end');
+    Route::post('/year-end', [AnnualLeaveOperationsController::class, 'postYearEnd'])->middleware(['permission:leave.year-end.preview', 'permission:leave.year-end.post'])->name('leave.annual.year-end.post');
     Route::get('/record', [AnnualLeaveOperationsController::class, 'record'])->middleware('permission:leave.request.record-on-behalf')->name('leave.annual.record');
     Route::post('/record', [AnnualLeaveOperationsController::class, 'submitRecord'])->middleware('permission:leave.request.record-on-behalf')->name('leave.annual.record.store');
 });

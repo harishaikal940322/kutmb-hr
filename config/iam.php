@@ -69,6 +69,10 @@ return [
             'label' => 'Lihat laporan cuti',
             'description' => 'View HR leave balances, status summaries and attendance review records; no private reasons.',
             'group' => 'Annual leave', 'submodule' => 'Laporan', 'action' => 'View', 'system_only' => false,
+        ], 'leave.year-end.post' => [
+            'label' => 'Pos pindahan tutup tahun',
+            'description' => 'Explicitly post a supported positive year-close transfer after reviewing the balances.',
+            'group' => 'Annual leave', 'submodule' => 'Tutup tahun', 'action' => 'Post', 'system_only' => false,
         ], 'leave.year-end.preview' => [
             'label' => 'Pratonton tutup tahun',
             'description' => 'Preview eligible carry-forward using recorded balances and explicit confirmed cap input.',
@@ -155,7 +159,7 @@ return [
                 'hr.organization.manage', 'hr.accounts.link', 'hr.offices.manage',
                 'leave.entitlement.view', 'leave.entitlement.confirm', 'leave.entitlement.credit',
                 'leave.calendar.manage', 'leave.policy.manage', 'leave.partial-cancellation.review',
-                'leave.reports.view', 'leave.year-end.preview', 'leave.request.record-on-behalf', 'leave.adjustment.decide',
+                'leave.reports.view', 'leave.year-end.preview', 'leave.year-end.post', 'leave.request.record-on-behalf', 'leave.adjustment.decide',
             ],
         ],
         'it-admin' => [
@@ -185,7 +189,7 @@ return [
                     'hr.organization.manage', 'hr.accounts.link', 'hr.offices.manage',
                     'leave.entitlement.view', 'leave.entitlement.confirm', 'leave.entitlement.credit',
                     'leave.calendar.manage', 'leave.policy.manage', 'leave.partial-cancellation.review',
-                'leave.reports.view', 'leave.year-end.preview', 'leave.request.record-on-behalf', 'leave.adjustment.decide',
+                'leave.reports.view', 'leave.year-end.preview', 'leave.year-end.post', 'leave.request.record-on-behalf', 'leave.adjustment.decide',
                 ],
             ],
             'unit-manager-v1' => [

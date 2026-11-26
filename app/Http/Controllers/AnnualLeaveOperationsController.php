@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Leave\AnnualLeaveYearEndPreview;
+use App\Services\Leave\AnnualLeaveYearCloseService;
 use App\Services\Leave\ConfirmedVersionLookup;
 use App\Services\Leave\LeaveRequestWorkflowService;
 use App\Services\Leave\LedgerPostedTotals;
@@ -68,7 +69,7 @@ class AnnualLeaveOperationsController extends Controller
         ]);
     }
 
-    public function yearEnd(Request $request, AnnualLeaveYearEndPreview $preview, LedgerPostedTotals $totals): Response
+    public function yearEnd(Request $request, AnnualLeaveYearEndPreview $preview, LedgerPostedTotals $totals, AnnualLeaveYearCloseService $close): Response
     {
         $year = $this->year($request);
         $data = $request->validate(['employee' => ['nullable', 'integer', 'min:1'], 'cap' => ['nullable', 'integer', 'min:0', 'max:100000']]);
@@ -90,12 +91,37 @@ class AnnualLeaveOperationsController extends Controller
             });
         }
 
+        $eligibility = $employeeId !== null && isset($data['cap']) && $request->user()->can('leave.year-end.post')
+            ? $close->eligibility($employeeId, $year, (int) $data['cap']) : null;
+
         return Inertia::render('leave/Operations', [
             'access' => AnnualLeaveWorkflowController::capabilities($request->user()),
             'mode' => 'year-end', 'year' => $year, 'currentYear' => $this->currentYear(),
             'employees' => DB::table('employees')->orderBy('display_name')->get(['id', 'employee_no', 'display_name']),
             'selectedEmployee' => $employeeId, 'cap' => $data['cap'] ?? null, 'preview' => $result,
+            'closeEligibility' => $eligibility,
         ]);
+    }
+
+    public function postYearEnd(Request $request, AnnualLeaveYearCloseService $close): RedirectResponse
+    {
+        $data = $request->validate([
+            'employee' => ['required', 'integer', 'min:1'], 'year' => ['required', 'integer', 'min:1900'],
+            'cap' => ['required', 'integer', 'min:0', 'max:100000'],
+            'annual' => ['required', 'integer'], 'pending' => ['required', 'integer', 'min:0'],
+            'tabung' => ['required', 'integer', 'min:0'], 'transfer' => ['required', 'integer', 'min:0'],
+            'reason' => ['required', 'string', 'max:1000'], 'acknowledged' => ['accepted'],
+        ]);
+        try {
+            $close->close($request->user()->id, (int) $data['employee'], (int) $data['year'], (int) $data['cap'], [
+                'annual' => (int) $data['annual'], 'pending' => (int) $data['pending'],
+                'tabung' => (int) $data['tabung'], 'transfer' => (int) $data['transfer'],
+            ], $data['reason']);
+        } catch (DomainException $e) {
+            throw ValidationException::withMessages(['close' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Pindahan tutup tahun direkodkan.');
     }
 
     public function record(Request $request): Response

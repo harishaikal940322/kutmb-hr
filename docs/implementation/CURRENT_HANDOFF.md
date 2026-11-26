@@ -1,3 +1,8 @@
+## 26 November 2026 — bounded manual positive carry-forward
+
+- Added forward-only migration 000049 and local HR permission for a manual positive free-AL year-close transfer. A prior-year account may be closed only after both years' matching confirmed entitlements have been credited, the cap is unchanged, there is no existing Tabung source history for that year, no deficit and no excess to dispose. Pending holds remain in the original annual account. Preview, explicit acknowledgement/reason, locked snapshot revalidation, paired immutable ledger movements and once-only close history. No automatic timing/expiry/negative carry policy is inferred; no real HR authority or rate is established.
+- Current production/operational rules remain gated; changed cap, late reconciliation, excess/expiry, negative rollover and historical Tabung cases remain blocked. Explicit development grants via DevelopmentLeaveAccessSeeder. Migration not applied, no build/test/database access.
+
 ## 26 November 2026 — CT-DEC-034 bounded cross-year AL integration
 
 - Enabled current-to-next-calendar-year AL with sufficient annual-only entitlement in each year: one request/revision/approval route, per-session year/account source map, sorted annual-account locks, atomic reserve, posting or approved future commitment, and pre-start cancellation reversal of posted sources plus release of unposted commitment. The anchor reservation year remains the first working year; reports and balance readers use per-account allocation holds. The next-year settlement validates the allocation units rather than the anchor account. No applied migration changed.
