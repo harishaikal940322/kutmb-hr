@@ -1,3 +1,10 @@
+## 26 November 2026 — withdrawal and pre-start AL cancellation
+
+- Connected CT-DEC-016/017/022 to the existing Vue request detail and approval queue. Linked staff can withdraw future pending AL or request cancellation of future approved AL funded by its original annual account. A distinct, currently assigned GM can confirm or reject the supported cancellation. The workspace refreshes balances, request status and cancellation history. Requests that have started and Tabung-funded cancellation remain outside this flow.
+- Added protected local/testing Inertia POST endpoints at `/leave/annual/requests/{id}/withdraw`, `/leave/annual/requests/{id}/cancellation` and `/leave/annual/requests/{id}/cancellation/decision`. Existing service checks, immutable events, reservation release, exact source reversal, active slots and audit remain authoritative. No new schema or grants.
+- MySQL rollback-only workflow suite passed (29 tests, 346 assertions), covering the linked HTTP lifecycle, wrong actors, replay, original-source restoration and rebooking released dates. Workflow, ledger, cancellation and withdrawal tables remained empty after rollback. Targeted Pint, PHPStan, frontend lint, TypeScript, build and diff checks passed. Chromium rendered the built Vue screens with synthetic Inertia fixtures at desktop/tablet/mobile widths, including light/dark, navigation, EL half-day selection, withdrawal and GM cancellation controls. Authenticated HTTP behavior was verified separately by PHPUnit.
+- Next ready scope: same-unit availability using the existing privacy-scoped projection. Full partial-cancellation UI, corrections/resubmission and HR adjustments remain incomplete.
+
 ## 26 November 2026 — same-year Emergency Leave
 
 - Connected same-year EL through the existing Cuti Tahunan form, history, scoped approval queue and shared AL/Tabung balance. The submit route accepts `leave_type=EL`, requires a reason, accepts current or elapsed dates within the supported year, and applies no additional maximum lookback. The current-year confirmed and credited entitlement and confirmed working calendar remain prerequisites.

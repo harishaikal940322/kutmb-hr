@@ -678,7 +678,8 @@ class LeaveRequestWorkflowService
             }
             $this->assertCancellationOperationKeyAvailable($operationKey);
             if ($request->leave_type !== 'AL' || $request->status !== 'WAITING_CANCELLATION'
-                || $request->current_step_order !== null || (int) $employee->user_id === $actorId) {
+                || $request->current_step_order !== null || (int) $employee->user_id === $actorId
+                || (int) $employee->user_id !== (int) $request->requester_user_id) {
                 throw new DomainException('Only a pending pre-start Annual Leave cancellation can be decided by a distinct General Manager.');
             }
             $this->assertActiveGeneralManager($actorId);

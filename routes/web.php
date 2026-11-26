@@ -82,6 +82,12 @@ Route::middleware(['protected', EnsureLocalHrDevelopment::class])->prefix('leave
     Route::post('/', [AnnualLeaveWorkflowController::class, 'store'])->name('leave.annual.requests.store');
     Route::post('/{leaveRequest}/decision', [AnnualLeaveWorkflowController::class, 'decide'])
         ->whereNumber('leaveRequest')->name('leave.annual.requests.decide');
+    Route::post('/{leaveRequest}/withdraw', [AnnualLeaveWorkflowController::class, 'withdraw'])
+        ->whereNumber('leaveRequest')->name('leave.annual.requests.withdraw');
+    Route::post('/{leaveRequest}/cancellation', [AnnualLeaveWorkflowController::class, 'requestCancellation'])
+        ->whereNumber('leaveRequest')->name('leave.annual.requests.cancellation');
+    Route::post('/{leaveRequest}/cancellation/decision', [AnnualLeaveWorkflowController::class, 'decideCancellation'])
+        ->whereNumber('leaveRequest')->name('leave.annual.requests.cancellation.decide');
 });
 
 Route::middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:hr.organization.manage'])

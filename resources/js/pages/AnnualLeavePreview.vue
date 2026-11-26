@@ -16,6 +16,7 @@ export type AnnualWorkspace = {
     } | null;
     history: RequestPage;
     inbox: RequestPage;
+    cancellations: RequestPage | null;
 };
 
 const props = defineProps<{ workspace?: AnnualWorkspace }>();
@@ -1356,12 +1357,17 @@ const CalendarRow = defineComponent({
                         </div>
                     </header>
 
-                    <AnnualRequestList
-                        v-if="workspace && (screen === 'requests' || screen === 'approvals')"
-                        :key="screen"
-                        :page="screen === 'approvals' ? workspace.inbox : workspace.history"
-                        :approvals="screen === 'approvals'"
-                    />
+                    <template v-if="workspace && (screen === 'requests' || screen === 'approvals')">
+                        <AnnualRequestList
+                            :key="screen"
+                            :page="screen === 'approvals' ? workspace.inbox : workspace.history"
+                            :approvals="screen === 'approvals'"
+                        />
+                        <section v-if="screen === 'approvals' && workspace.cancellations" class="space-y-3">
+                            <h2 class="font-semibold">Pembatalan cuti</h2>
+                            <AnnualRequestList :page="workspace.cancellations" approvals cancellations />
+                        </section>
+                    </template>
 
                     <template v-else-if="screen === 'overview'">
                         <section
@@ -3746,7 +3752,7 @@ const CalendarRow = defineComponent({
                         </section>
                     </template>
 
-                    <footer
+                    <footer v-if="!workspace"
                         class="border-t border-border pt-4 text-xs leading-5 text-muted-foreground"
                     >
                         Reka bentuk Vue MOD-005 · SRS v0.5 · data sintetik ·

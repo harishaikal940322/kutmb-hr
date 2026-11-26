@@ -13,6 +13,9 @@ type Entry = {
     starts_on: string;
     ends_on: string;
     is_final?: boolean;
+    can_withdraw?: boolean;
+    can_request_cancellation?: boolean;
+    cancellation_reason?: string;
     actions: { action_code: string; created_at: string }[];
 };
 export type RequestPage = {
@@ -20,7 +23,11 @@ export type RequestPage = {
     next_page_url: string | null;
     prev_page_url: string | null;
 };
-defineProps<{ page: RequestPage; approvals: boolean }>();
+defineProps<{
+    page: RequestPage;
+    approvals: boolean;
+    cancellations?: boolean;
+}>();
 
 const selected = ref<number>();
 const message = ref('');
@@ -31,6 +38,11 @@ const labels: Record<string, string> = {
     WAITING_GENERAL_MANAGER_FINAL: 'Menunggu kelulusan Pengurus Besar',
     WAITING_SECRETARY_FINAL: 'Menunggu kelulusan Setiausaha ALK',
     APPROVED: 'Diluluskan',
+    WAITING_CANCELLATION: 'Menunggu pembatalan',
+    CANCELLED: 'Dibatalkan',
+    CANCELLATION_REQUESTED: 'Pembatalan dimohon',
+    CANCELLATION_CONFIRMED: 'Pembatalan disahkan',
+    CANCELLATION_REJECTED: 'Pembatalan ditolak',
     REJECTED: 'Ditolak',
     SUPPORT: 'Disokong',
     NOT_SUPPORT: 'Tidak disokong',
@@ -44,10 +56,13 @@ function open(id: number) {
     form.clearErrors();
 }
 
-function decide(id: number) {
+function submit(
+    id: number,
+    action: 'decision' | 'withdraw' | 'cancellation' | 'cancellation/decision',
+) {
     form.key ||= crypto.randomUUID();
     message.value = '';
-    form.post(`/leave/annual/requests/${id}/decision`, {
+    form.post(`/leave/annual/requests/${id}/${action}`, {
         preserveScroll: true,
         onSuccess: () => {
             selected.value = undefined;
@@ -75,6 +90,7 @@ function decide(id: number) {
                 type="button"
                 class="flex w-full flex-wrap items-center justify-between gap-3 p-5 text-left text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                 :aria-expanded="selected === row.id"
+                :disabled="form.processing"
                 @click="open(row.id)"
             >
                 <span>
@@ -102,6 +118,9 @@ function decide(id: number) {
                 <p v-if="row.reason" class="whitespace-pre-wrap">
                     {{ row.reason }}
                 </p>
+                <p v-if="row.cancellation_reason" class="whitespace-pre-wrap">
+                    Alasan pembatalan: {{ row.cancellation_reason }}
+                </p>
                 <ul
                     v-if="row.actions.length"
                     class="space-y-1 text-muted-foreground"
@@ -115,7 +134,14 @@ function decide(id: number) {
                 <form
                     v-if="approvals"
                     class="max-w-xl space-y-3"
-                    @submit.prevent="decide(row.id)"
+                    @submit.prevent="
+                        submit(
+                            row.id,
+                            cancellations
+                                ? 'cancellation/decision'
+                                : 'decision',
+                        )
+                    "
                 >
                     <fieldset :disabled="form.processing" class="space-y-3">
                         <label class="block space-y-1">
@@ -128,17 +154,29 @@ function decide(id: number) {
                                 <option value="" disabled>
                                     Pilih keputusan
                                 </option>
-                                <option v-if="row.is_final" value="APPROVE">
+                                <option v-if="cancellations" value="CONFIRM">
+                                    Sahkan pembatalan
+                                </option>
+                                <option
+                                    v-if="!cancellations && row.is_final"
+                                    value="APPROVE"
+                                >
                                     Luluskan
                                 </option>
-                                <option v-if="row.is_final" value="REJECT">
+                                <option
+                                    v-if="cancellations || row.is_final"
+                                    value="REJECT"
+                                >
                                     Tolak
                                 </option>
-                                <option v-if="!row.is_final" value="SUPPORT">
+                                <option
+                                    v-if="!cancellations && !row.is_final"
+                                    value="SUPPORT"
+                                >
                                     Sokong
                                 </option>
                                 <option
-                                    v-if="!row.is_final"
+                                    v-if="!cancellations && !row.is_final"
                                     value="NOT_SUPPORT"
                                 >
                                     Tidak sokong
@@ -175,6 +213,51 @@ function decide(id: number) {
                             }}
                         </button>
                     </fieldset>
+                </form>
+                <form
+                    v-else-if="row.can_withdraw || row.can_request_cancellation"
+                    class="max-w-xl space-y-3"
+                    @submit.prevent="
+                        submit(
+                            row.id,
+                            row.can_withdraw ? 'withdraw' : 'cancellation',
+                        )
+                    "
+                >
+                    <label
+                        v-if="row.can_request_cancellation"
+                        class="block space-y-1"
+                    >
+                        <span>Alasan pembatalan</span>
+                        <textarea
+                            v-model="form.reason"
+                            required
+                            maxlength="1000"
+                            :disabled="form.processing"
+                            class="block w-full rounded-lg border border-input bg-background p-3"
+                        />
+                    </label>
+                    <p
+                        v-for="error in form.errors"
+                        :key="error"
+                        role="alert"
+                        class="text-destructive"
+                    >
+                        {{ error }}
+                    </p>
+                    <button
+                        type="submit"
+                        :disabled="form.processing"
+                        class="min-h-11 rounded-lg border border-border px-4 font-semibold hover:bg-muted disabled:opacity-50"
+                    >
+                        {{
+                            form.processing
+                                ? 'Merekod…'
+                                : row.can_withdraw
+                                  ? 'Tarik balik permohonan'
+                                  : 'Mohon pembatalan'
+                        }}
+                    </button>
                 </form>
             </div>
         </article>

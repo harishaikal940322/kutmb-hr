@@ -46,25 +46,49 @@ class AnnualLeaveWorkflowController extends Controller
             return [...$posted, ...$projection->project($posted['annual_half_day_units'], $posted['tabung_half_day_units'], $annual, $tabung, 0), 'pending' => $annual + $tabung];
         });
 
-        $requests = $this->requests()->join('employees as employee', 'employee.id', '=', 'leave.employee_id')
-            ->select('leave.id', 'leave.request_key', 'leave.status', 'leave.leave_type', 'employee.display_name', 'revision.requested_units', 'revision.reason')
+        $requests = $this->requests()
+            ->join('leave_reservations as reservation', 'reservation.id', '=', 'revision.reservation_id')
+            ->select('leave.id', 'leave.request_key', 'leave.status', 'leave.leave_type', 'employee.display_name', 'revision.requested_units', 'revision.reason', 'reservation.tabung_units', 'leave.current_step_order')
             ->selectSub(DB::table('leave_request_days')->whereColumn('revision_id', 'revision.id')->selectRaw('MIN(leave_date)'), 'starts_on')
             ->selectSub(DB::table('leave_request_days')->whereColumn('revision_id', 'revision.id')->selectRaw('MAX(leave_date)'), 'ends_on')
             ->orderByDesc('leave.id');
         /** @var Paginator<int, \stdClass> $history */
-        $history = (clone $requests)->where('leave.requester_user_id', $userId)->where('employee.user_id', $userId)
+        $history = $this->owned(clone $requests, $userId)
             ->simplePaginate(20, pageName: 'history_page');
         /** @var Paginator<int, \stdClass> $inbox */
-        $inbox = $this->assigned($requests, $userId)
+        $inbox = $this->assigned(clone $requests, $userId)
             ->addSelect('step.is_final')->simplePaginate(20, pageName: 'approval_page');
 
-        foreach ([$history, $inbox] as $page) {
+        $generalManager = $this->isCurrentGeneralManager($userId);
+        /** @var Paginator<int, \stdClass>|null $cancellations */
+        $cancellations = $generalManager ? $this->cancellations($requests, $userId)
+            ->addSelect('cancellation.reason as cancellation_reason')
+            ->simplePaginate(20, pageName: 'cancellation_page') : null;
+
+        foreach ([$history, $inbox, $cancellations] as $page) {
+            if ($page === null) {
+                continue;
+            }
+            $ids = $page->getCollection()->pluck('id');
             $actions = DB::table('leave_workflow_actions as action')
                 ->join('leave_request_revisions as revision', 'revision.id', '=', 'action.revision_id')
-                ->whereIn('revision.request_id', $page->getCollection()->pluck('id'))
+                ->whereIn('revision.request_id', $ids)
                 ->orderBy('action.id')->get(['revision.request_id', 'action.action_code', 'action.created_at'])
                 ->groupBy('request_id');
-            $page->through(fn ($row) => [...(array) $row, 'actions' => $actions->get($row->id, collect())->values()]);
+            $cancellationActions = $page !== $inbox ? DB::table('leave_request_cancellation_actions')->whereIn('request_id', $ids)
+                ->select('request_id', 'created_at')->selectRaw("CONCAT('CANCELLATION_', action_code) AS action_code")
+                ->orderBy('id')->get()->groupBy('request_id') : collect();
+            $page->through(static function ($row) use ($actions, $cancellationActions, $page, $history, $today): array {
+                $ownFutureAnnual = $page === $history && $row->leave_type === 'AL' && $row->starts_on > $today;
+                $capabilities = [
+                    'can_withdraw' => $ownFutureAnnual && $row->current_step_order !== null,
+                    'can_request_cancellation' => $ownFutureAnnual && $row->status === 'APPROVED' && (int) $row->tabung_units === 0,
+                ];
+                $result = (array) $row;
+                unset($result['current_step_order'], $result['tabung_units']);
+
+                return [...$result, ...$capabilities, 'actions' => $actions->get($row->id, collect())->concat($cancellationActions->get($row->id, collect()))->sortBy('created_at')->values()];
+            });
         }
 
         return [
@@ -72,8 +96,9 @@ class AnnualLeaveWorkflowController extends Controller
             'approver' => self::isApprover($userId, $today),
             'linked' => DB::table('employees')->where('user_id', $userId)->exists(),
             'balance' => $balance,
-            'history' => $history->appends(['view' => 'workflow', ...request()->only('approval_page')]),
-            'inbox' => $inbox->appends(['view' => 'workflow', ...request()->only('history_page')]),
+            'history' => $history->appends(['view' => 'workflow', ...request()->only(['approval_page', 'cancellation_page'])]),
+            'cancellations' => $cancellations?->appends(['view' => 'workflow', ...request()->only(['history_page', 'approval_page'])]),
+            'inbox' => $inbox->appends(['view' => 'workflow', ...request()->only(['history_page', 'cancellation_page'])]),
         ];
     }
 
@@ -142,6 +167,89 @@ class AnnualLeaveWorkflowController extends Controller
         return back()->with('success', 'Tindakan direkodkan.');
     }
 
+    public function withdraw(Request $request, int $leaveRequest, LeaveRequestWorkflowService $workflow): RedirectResponse
+    {
+        $actor = $request->user()->id;
+        abort_unless($this->owned($this->requests(), $actor)->where('leave.id', $leaveRequest)->exists(), 404);
+        $data = $request->validate(['key' => ['required', 'uuid']]);
+
+        try {
+            $workflow->withdrawPendingAnnualLeave($actor, $leaveRequest, $data['key']);
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages(['key' => $exception->getMessage()]);
+        }
+
+        return back();
+    }
+
+    public function requestCancellation(Request $request, int $leaveRequest, LeaveRequestWorkflowService $workflow): RedirectResponse
+    {
+        $actor = $request->user()->id;
+        abort_unless($this->owned($this->requests(), $actor)->where('leave.id', $leaveRequest)->exists(), 404);
+        $data = $request->validate(['key' => ['required', 'uuid'], 'reason' => ['required', 'string', 'max:1000']]);
+
+        try {
+            $workflow->requestApprovedAnnualLeaveCancellation($actor, $leaveRequest, $data['key'], $data['reason']);
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages(['reason' => $exception->getMessage()]);
+        }
+
+        return back();
+    }
+
+    public function decideCancellation(Request $request, int $leaveRequest, LeaveRequestWorkflowService $workflow): RedirectResponse
+    {
+        $actor = $request->user()->id;
+        abort_unless($this->isCurrentGeneralManager($actor), 404);
+        $data = $request->validate([
+            'key' => ['required', 'uuid'],
+            'decision' => ['required', 'in:CONFIRM,REJECT'],
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+        $pending = $this->cancellations($this->requests(), $actor)->where('leave.id', $leaveRequest)->exists();
+        $replay = DB::table('leave_request_cancellation_actions')->where('request_id', $leaveRequest)
+            ->where('actor_id', $actor)->where('operation_key', $data['key'])->whereNotNull('assignment_id')->exists();
+        abort_unless($pending || $replay, 404);
+
+        try {
+            $workflow->decideApprovedAnnualLeaveCancellation($actor, $leaveRequest, $data['key'], $data['decision'], $data['reason'] ?? null);
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages(['decision' => $exception->getMessage()]);
+        }
+
+        return back();
+    }
+
+    private function owned(Builder $query, int $actor): Builder
+    {
+        return $query->where('leave.requester_user_id', $actor)->where('employee.user_id', $actor);
+    }
+
+    private function cancellations(Builder $query, int $actor): Builder
+    {
+        return $query->join('leave_request_cancellation_actions as cancellation', fn ($join) => $join
+            ->on('cancellation.revision_id', '=', 'revision.id')->where('cancellation.action_code', 'REQUESTED'))
+            ->where('leave.leave_type', 'AL')->where('leave.status', 'WAITING_CANCELLATION')
+            ->where('leave.requester_user_id', '<>', $actor)->where('employee.user_id', '<>', $actor)
+            ->whereColumn('employee.user_id', 'leave.requester_user_id')
+            ->whereNotExists(fn (Builder $decision) => $decision->from('leave_request_cancellation_actions as completed')
+                ->whereColumn('completed.request_id', 'leave.id')->whereColumn('completed.cycle', 'cancellation.cycle')
+                ->whereIn('completed.action_code', ['CONFIRMED', 'REJECTED']))
+            ->whereNotExists(fn (Builder $day) => $day->from('leave_request_days')
+                ->whereColumn('revision_id', 'revision.id')->where('leave_date', '<=', now('Asia/Kuala_Lumpur')->toDateString()));
+    }
+
+    private function isCurrentGeneralManager(int $actor): bool
+    {
+        $today = now('Asia/Kuala_Lumpur')->toDateString();
+        $generalManagers = DB::table('approval_assignments')->where('office_code', 'PB')
+            ->where('effective_from', '<=', $today)
+            ->where(fn (Builder $query) => $query->whereNull('effective_to')->orWhere('effective_to', '>=', $today))
+            ->limit(2)->pluck('user_id');
+
+        return $generalManagers->count() === 1 && (int) $generalManagers->first() === $actor;
+    }
+
     private function accounts(int $userId, int $year): ?\stdClass
     {
         return DB::table('employees as employee')
@@ -158,6 +266,7 @@ class AnnualLeaveWorkflowController extends Controller
     private function requests(): Builder
     {
         return DB::table('leave_requests as leave')
+            ->join('employees as employee', 'employee.id', '=', 'leave.employee_id')
             ->join('leave_request_revisions as revision', fn ($join) => $join
                 ->on('revision.request_id', '=', 'leave.id')->on('revision.revision', '=', 'leave.current_revision'))
             ->whereIn('leave.leave_type', ['AL', 'EL']);
@@ -170,8 +279,7 @@ class AnnualLeaveWorkflowController extends Controller
         return $query->join('leave_approval_steps as step', fn ($join) => $join
             ->on('step.revision_id', '=', 'revision.id')->on('step.step_order', '=', 'leave.current_step_order'))
             ->join('approval_assignments as office', 'office.id', '=', 'step.assignment_id')
-            ->join('employees as applicant', 'applicant.id', '=', 'leave.employee_id')
-            ->whereColumn('applicant.user_id', 'leave.requester_user_id')
+            ->whereColumn('employee.user_id', 'leave.requester_user_id')
             ->where('step.assignee_user_id', $actor)->where('office.user_id', $actor)
             ->where('leave.requester_user_id', '<>', $actor)
             ->whereColumn('office.office_code', 'step.office_code')

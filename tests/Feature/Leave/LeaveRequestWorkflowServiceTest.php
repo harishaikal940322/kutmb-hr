@@ -75,6 +75,32 @@ class LeaveRequestWorkflowServiceTest extends TestCase
             ->where('workspace.balance.pending', 0)->where('workspace.balance.annual_half_day_units', 16)
             ->where('workspace.history.data.0.status', 'APPROVED')->has('workspace.history.data.0.actions', 2));
 
+        $cancelUrl = $url.'/requests/'.$requestId.'/cancellation';
+        $cancellation = ['key' => (string) Str::uuid(), 'reason' => 'Synthetic cancellation'];
+        $this->actingAs($outsider)->post($cancelUrl, $cancellation)->assertNotFound();
+        $this->actingAs($staff)->post($cancelUrl, $cancellation)->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->actingAs($approvers['pu'])->get($url)->assertInertia(fn (Assert $page) => $page->where('workspace.cancellations', null));
+        $cancelDecision = ['key' => (string) Str::uuid(), 'decision' => 'CONFIRM'];
+        $this->post($cancelUrl.'/decision', $cancelDecision)->assertNotFound();
+        $this->actingAs($approvers['pb'])->get($url)->assertInertia(fn (Assert $page) => $page
+            ->where('workspace.cancellations.data.0.id', $requestId)
+            ->where('workspace.cancellations.data.0.cancellation_reason', 'Synthetic cancellation'));
+        $this->post($cancelUrl.'/decision', $cancelDecision)->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->post($cancelUrl.'/decision', $cancelDecision)->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->actingAs($staff)->get($url)->assertInertia(fn (Assert $page) => $page
+            ->where('workspace.balance.annual_half_day_units', 20)
+            ->where('workspace.history.data.0.status', 'CANCELLED')->has('workspace.history.data.0.actions', 4));
+
+        $nextSubmission = [...$submission, 'key' => (string) Str::uuid()];
+        $this->post($url.'/requests', $nextSubmission)->assertRedirect($url)->assertSessionHasNoErrors();
+        $nextId = DB::table('leave_requests')->where('submission_key', $nextSubmission['key'])->value('id');
+        $withdraw = ['key' => (string) Str::uuid()];
+        $this->actingAs($outsider)->post($url.'/requests/'.$nextId.'/withdraw', $withdraw)->assertNotFound();
+        $this->actingAs($staff)->post($url.'/requests/'.$nextId.'/withdraw', $withdraw)->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->post($url.'/requests/'.$nextId.'/withdraw', $withdraw)->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->get($url)->assertInertia(fn (Assert $page) => $page
+            ->where('workspace.balance.pending', 0)->where('workspace.history.data.0.status', 'CANCELLED'));
+
         $env = app()->environment();
         try {
             app()->instance('env', 'production');
