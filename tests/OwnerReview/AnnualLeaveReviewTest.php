@@ -475,6 +475,37 @@ class AnnualLeaveReviewTest extends TestCase
         $this->assertSame(1, DB::table('leave_late_reconciliations')->where('annual_account_id', $f['annual'])->count());
     }
 
+    public function test_historical_deficit_report_does_not_offset_new_year_or_allow_negative_adjustment(): void
+    {
+        $f = $this->fixture();
+        $maker = $this->actor('deficit-report-maker', ['leave.adjustment.prepare']);
+        $adjustments = app(LeaveAdjustmentService::class);
+        $id = $adjustments->prepare($maker->id, ['employee' => $f['employee'], 'bucket' => 'AL',
+            'units' => -40, 'reason' => 'Synthetic current-year correction', 'evidence_reference' => 'SYNTHETIC-ZERO',
+            'key' => $this->key()]);
+        $adjustments->decide($f['hr']->id, $id, ['decision' => 'APPROVED', 'reason' => 'Verified', 'key' => $this->key()]);
+        $date = $this->workingDate($this->year.'-12-21', $this->year.'-12-24');
+        $workflow = app(LeaveRequestWorkflowService::class);
+        $leave = $workflow->submit($f['staff']->id, $f['annual'], $f['tabung'], $this->key(), 'AL',
+            [['date' => $date, 'session' => 'AM']]);
+        $workflow->decide($f['pu']->id, $leave['request_id'], $this->key(), 'SUPPORT', 'Synthetic support');
+        $workflow->decide($f['pb']->id, $leave['request_id'], $this->key(), 'APPROVE', 'Synthetic deficit approved');
+        $this->assertSame(-1, $this->annual($f['annual']));
+        Carbon::setTestNow(Carbon::parse(($this->year + 1).'-01-01 09:00:00', 'Asia/Kuala_Lumpur'));
+        $url = '/leave/annual/reports?year='.$this->year.'&deficits_only=1';
+        $this->actingAs($f['staff'])->get($url)->assertForbidden();
+        $this->actingAs($f['hr'])->get($url)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('leave/Operations')->where('deficitsOnly', true)
+                ->has('accounts.data')
+                ->where('accounts.data', fn ($rows) => collect($rows)->every(fn ($row) => (int) data_get($row, 'historical_deficit_units') > 0)));
+        $this->denied(fn () => $adjustments->prepare($maker->id, ['employee' => $f['employee'], 'bucket' => 'AL',
+            'leave_year' => $this->year, 'historical_eligible' => true, 'units' => -1, 'reason' => 'Synthetic historical correction',
+            'evidence_reference' => 'SYNTHETIC-HISTORIC-NEGATIVE', 'key' => $this->key()]));
+        $this->assertSame(-1, $this->annual($f['annual']));
+        $this->assertSame(0, $this->annual($f['next']));
+        $this->assertSame(0, $this->tabung($f['tabung']));
+    }
+
     public function test_tb_05_historical_special_adjustment_reconciles_only_original_unused_session(): void
     {
         $f = $this->fixture();

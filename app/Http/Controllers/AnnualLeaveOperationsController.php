@@ -49,6 +49,9 @@ class AnnualLeaveOperationsController extends Controller
     public function reports(Request $request): Response
     {
         $year = $this->year($request);
+        $request->validate(['deficits_only' => ['sometimes', 'boolean']]);
+        $historical = $year < $this->currentYear();
+        $deficitsOnly = $historical && $request->boolean('deficits_only');
         $base = DB::table('leave_requests as request')
             ->join('leave_request_revisions as revision', function ($join): void {
                 $join->on('revision.request_id', '=', 'request.id')->on('revision.revision', '=', 'request.current_revision');
@@ -92,11 +95,24 @@ class AnnualLeaveOperationsController extends Controller
             unset($row->reservation_id, $row->requested_units, $row->annual_units, $row->tabung_units, $row->outcome_id);
         }
 
-        $accounts = $this->accountRows($year)->orderBy('employee.display_name')->orderBy('employee.id')
+        $accounts = $this->accountRows($year)
+            ->when($deficitsOnly, fn ($query) => $query->whereNotNull('annual.id')
+                ->whereRaw('(SELECT COALESCE(SUM(entry.signed_half_day_units), 0) FROM leave_ledger_entries AS entry WHERE entry.annual_account_id = annual.id) < 0'))
+            ->orderBy('employee.display_name')->orderBy('employee.id')
             ->paginate(25, pageName: 'balance_page')->withQueryString()
-            ->through(function ($row) {
+            ->through(function ($row) use ($historical) {
+                $row->historical_deficit_units = null;
+                $row->historical_projected_shortfall_units = null;
+                $row->historical_closed = null;
                 if ($row->annual_account_id !== null) {
                     $row->annual_pending = (int) $row->annual_pending + app(LedgerPostedTotals::class)->pendingHistoricalReviewUnits((int) $row->annual_account_id);
+                    if ($historical) {
+                        $posted = (int) $row->annual_posted;
+                        $row->historical_deficit_units = max(0, -$posted);
+                        $row->historical_projected_shortfall_units = max(0, (int) $row->annual_pending - $posted);
+                        $row->historical_closed = (int) DB::table('leave_annual_year_closes')
+                            ->where('annual_account_id', $row->annual_account_id)->exists();
+                    }
                 }
                 unset($row->annual_account_id);
                 return $row;
@@ -106,6 +122,7 @@ class AnnualLeaveOperationsController extends Controller
             'access' => AnnualLeaveWorkflowController::capabilities($request->user()),
             'mode' => 'reports', 'year' => $year, 'currentYear' => $this->currentYear(),
             'summary' => $summary, 'reviews' => $reviews, 'accounts' => $accounts, 'reviewSlots' => $reviewSlots,
+            'deficitsOnly' => $deficitsOnly,
         ]);
     }
 

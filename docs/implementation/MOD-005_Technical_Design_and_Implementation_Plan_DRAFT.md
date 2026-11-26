@@ -475,3 +475,7 @@ Existing HR all-session non-use transaction may reconstruct a missing original-s
 ## 8AH. TB-05 historical after-end special adjustment
 
 CR-Q03/04 now reuses existing approved-source refund and 000056 reconciliation for historical after-end preparation, including supported posted historical/current cross-year sources. Exact session allocation and original debit, closed historical AL accounts, confirmed current cap and settled commitments where applicable required. Distinct maker/reviewer/GM unchanged; no balance movement until GM confirms. Existing final transaction validates current capacity, original cohort and replay. No new schema; runtime unverified.
+
+## 8AI. TB-05D historical deficit visibility; negative posting gated
+
+Existing HR reports expose actual posted AL deficits separately from projected shortfall (including protected holds), filtered by historical year, with posted-deficit-only filter and close status. Read only; no entitlement or Tabung changes. TB-Q04/05 do not specify historical over-credit recovery once funds are transferred, burned or consumed. Negative historical adjustment posting and inter-year offset remain gated pending explicit source/disposition decision. TB-Q06 is a separate post-exit residual settlement scope. Runtime unverified.

@@ -1,3 +1,9 @@
+## 26 November 2026 — TB-05D historical deficit visibility; mutation gated
+
+- Added report-only historical AL posted deficit filter, year-close status, and projected shortfall including active/historical protected holds. Missing annual account is explicitly distinguished; posted deficit and projected shortfall are not additive. HR adjustment screen links to the existing permission-gated report. No ledger write, no automatic transfer/offset, no payroll claim or settlement status; existing historical-negative adjustment guard remains.
+- TB-Q04/05 and CT-DEC-039 establish newly eligible positive transfers, not recovery of previous over-credit or use of historical burned/transferred/consumed units. Negative historical correction posting and inter-year deficit offset require an explicit source/disposition rule. TB-Q06 covers post-exit residual settlement separately and does not authorize arbitrary historic debit. Next independent ready scope: TB-06 under documented bounds.
+- Source only; no schema change. Added opt-in synthetic report/permission/negative-adjustment guard scenario; not run. No lint, runtime, build or database execution. No normative SRS change.
+
 ## 26 November 2026 — TB-05 historical after-end special adjustment
 
 - Owner confirmed local migration completed and Annual Leave page opens. Enabled CR-Q03/04 historical and historical/current cross-year special preparation when the approved original session allocation and posted debit match, historical annual source accounts are closed and current confirmed full cap exists. Unsettled commitments, incomplete legacy maps, missing debit/close/cap and prior confirmed partial cases remain gated. Existing HR maker, independent HR reviewer and distinct GM workflow and atomic 000056 original-source reversal/transfer/burn reused. No new migration. Historical candidates and transfer/burn summary exposed in Pelarasan Baki; final posting rechecks balances.

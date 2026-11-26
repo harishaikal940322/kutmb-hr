@@ -27,3 +27,5 @@ Do not treat these as approval of unstated exact entitlement-band boundaries, pa
 - TB-05 partial non-use: 000059 records exact original historical AL sessions independently of protected residual claims. Confirmed unused subset alone is eligible; unselected sessions remain protected. No absence debit, payroll or reopening. Complete historical annual-only sources with existing claims only. Runtime unverified.
 
 - TB-05 historical special adjustment: enabled CR-Q03/04 historical posted cases under existing independent approval route and 000056 reconciliation. Complete original allocation/debit, historical closure and current cap required. No migration; runtime unverified.
+
+- TB-05D: historical posted-deficit report and projected shortfall visibility added; no ledger mutation. Historical negative corrections against previously transferred/burned/consumed units and inter-year offset remain policy-gated. TB-Q06 post-exit settlement remains separate. No migration; runtime unverified.

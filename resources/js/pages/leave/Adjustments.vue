@@ -46,6 +46,8 @@ function days(value: number | null) { return value === null ? '—' : (Number(va
                     <label class="block space-y-1 text-sm font-medium">Tahun akaun AL<input v-model.number="prepare.leave_year" type="number" min="1900" :max="year" required :class="input" /></label>
                     <div v-if="prepare.leave_year < year" class="space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-sm">
                         <p>Tahun tertutup: hanya pelarasan AL positif yang baru layak. Rekonsiliasi mengikut kapasiti Tabung sebenar ketika diluluskan; lebihan burn.</p>
+                        <p>Pengurangan AL sejarah belum dibenarkan: kaedah menangani baki yang telah dipindah, diburn atau digunakan masih perlu disahkan. Tiada debit automatik.</p>
+                        <Link v-if="access.can_view_reports" :href="'/leave/annual/reports?year=' + prepare.leave_year + '&deficits_only=1'" class="text-sm font-medium text-primary underline">Lihat defisit dipos tahun ini dalam laporan HR</Link>
                         <label class="flex items-start gap-2"><input v-model="prepare.historical_eligible" type="checkbox" required class="mt-1 accent-primary" /> <span>Saya mengesahkan bukti ini mewakili kelayakan baru yang belum pernah dipindahkan atau diburn, bukan pembatalan cuti/semakan kehadiran yang memerlukan laluan khusus.</span></label>
                     </div>
                     <label class="space-y-1 text-sm font-medium">Sebab<textarea v-model="prepare.reason" required maxlength="1000" :class="input" /></label><label class="space-y-1 text-sm font-medium">Rujukan bukti<input v-model="prepare.evidence_reference" required maxlength="120" :class="input" /></label>
