@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
 import AnnualRequestList, { type RequestPage } from '@/pages/leave/AnnualRequestList.vue';
+import TeamAvailabilityPanel from '@/pages/leave/TeamAvailabilityPanel.vue';
 
 export type AnnualWorkspace = {
     today: string;
     linked: boolean;
     approver: boolean;
+    can_view_team: boolean;
     balance: {
         annual_half_day_units: number;
         tabung_half_day_units: number;
@@ -191,7 +193,8 @@ const icons: Partial<Record<Screen, Component>> = {
 const activeTitle = computed(() => screens[screen.value].label);
 const visibleNav = computed<Screen[]>(() => props.workspace
     ? [...(props.workspace.linked ? ['apply', 'requests'] as const : []),
-        ...(props.workspace.approver ? ['approvals'] as const : [])]
+        ...(props.workspace.approver ? ['approvals'] as const : []),
+        ...(props.workspace.linked && props.workspace.can_view_team ? ['team'] as const : [])]
     : navByRole[role.value]);
 const currentNavScreen = computed(() =>
     screen.value === 'detail' ? lastNavScreen.value : screen.value,
@@ -2454,6 +2457,7 @@ const CalendarRow = defineComponent({
                         </div>
                     </template>
 
+                    <TeamAvailabilityPanel v-else-if="workspace && screen === 'team'" :today="workspace.today" />
                     <template v-else-if="screen === 'team'">
                         <div class="grid gap-5 @min-[960px]/leave-content:grid-cols-[1.2fr_0.8fr]">
                             <section

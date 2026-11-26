@@ -22,7 +22,10 @@ class AnnualLeaveController extends Controller
         if ($canWork && ($request->query('view') === 'workflow' || (! $canView && $request->query('view') !== 'design'))) {
             return Inertia::render('leave/AnnualLeave', [
                 'canViewEntitlements' => $canView,
-                'workspace' => $workflow->workspace($user->id, $totals, $projection),
+                'workspace' => [
+                    ...$workflow->workspace($user->id, $totals, $projection),
+                    'can_view_team' => $user->can('leave.calendar.team.view'),
+                ],
             ]);
         }
 

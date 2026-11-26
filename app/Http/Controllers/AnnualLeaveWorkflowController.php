@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Services\Leave\BalanceProjection;
 use App\Services\Leave\LeaveRequestWorkflowService;
 use App\Services\Leave\LedgerPostedTotals;
+use App\Services\Leave\TeamAvailabilityCalendar;
 use DomainException;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
@@ -100,6 +102,19 @@ class AnnualLeaveWorkflowController extends Controller
             'cancellations' => $cancellations?->appends(['view' => 'workflow', ...request()->only(['history_page', 'approval_page'])]),
             'inbox' => $inbox->appends(['view' => 'workflow', ...request()->only(['history_page', 'cancellation_page'])]),
         ];
+    }
+
+    public function team(Request $request, TeamAvailabilityCalendar $calendar): JsonResponse
+    {
+        $data = $request->validate(['month' => ['required', 'date_format:Y-m']]);
+
+        try {
+            $slots = $calendar->forCurrentUnitMonth($request->user()->id, $data['month']);
+        } catch (DomainException) {
+            abort(403);
+        }
+
+        return response()->json(['month' => $data['month'], 'slots' => $slots], headers: ['Cache-Control' => 'private, no-store']);
     }
 
     public function store(Request $request, LeaveRequestWorkflowService $workflow): RedirectResponse

@@ -1,3 +1,9 @@
+## 26 November 2026 — unit availability calendar
+
+- CT-DEC-052 is connected to the existing Jadual unit submodule. `GET /leave/annual/team?month=YYYY-MM` requires protected local/testing access, existing `leave.calendar.team.view` permission and a linked staff record with one active unit. The private, non-cacheable response contains only staff name, working leave date and session for valid approved AL/EL slots. Pending cancellation retains committed approved slots until confirmation. Pending, rejected, other-unit and refunded slots are excluded. The service audits the access.
+- MySQL consolidated Leave feature/unit suites passed under `APP_ENV=testing` with rollback-only fixtures (83 tests, 990 assertions). The first consolidated run inherited `APP_ENV=local` when loading the development DB environment and six legacy HTTP tests hit CSRF before validation. Rerunning in PHPUnit's intended testing environment resolved the harness issue. Targeted Pint, PHPStan, Vue lint, TypeScript and build passed. Chromium exercised the built mobile dark-mode calendar with synthetic responses, including month navigation, date filters and empty results.
+- No schema, grants or live data. Next ready scope is explicit synthetic entitlement confirmation using the existing HR permission and January 1 service boundaries.
+
 ## 26 November 2026 — withdrawal and pre-start AL cancellation
 
 - Connected CT-DEC-016/017/022 to the existing Vue request detail and approval queue. Linked staff can withdraw future pending AL or request cancellation of future approved AL funded by its original annual account. A distinct, currently assigned GM can confirm or reject the supported cancellation. The workspace refreshes balances, request status and cancellation history. Requests that have started and Tabung-funded cancellation remain outside this flow.

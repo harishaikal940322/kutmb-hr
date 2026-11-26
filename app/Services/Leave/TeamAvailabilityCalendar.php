@@ -11,7 +11,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-/** Internal local/testing-only approved absence projection; intentionally not connected to a route or UI. */
+/** Internal local/testing-only approved absence projection. */
 class TeamAvailabilityCalendar
 {
     /** @return list<array{name:string,date:string,session:string}> */
@@ -74,7 +74,7 @@ class TeamAvailabilityCalendar
                         ->on('slot.session_code', '=', 'request_day.session_code');
                 })
                 ->whereIn('request.employee_id', $memberIds)
-                ->where('request.status', 'APPROVED')
+                ->whereIn('request.status', ['APPROVED', 'WAITING_CANCELLATION'])
                 ->where('reservation.status', 'COMMITTED')
                 ->where('slot.status', 'COMMITTED')
                 ->whereBetween('request_day.leave_date', [$firstDate, $lastDate])
@@ -103,13 +103,12 @@ class TeamAvailabilityCalendar
     {
         $query = DB::table('employee_assignments as assignment')
             ->join('employees as employee', 'employee.id', '=', 'assignment.employee_id')
-            ->where('assignment.unit_id', $unitId)
             ->where('assignment.effective_from', '<=', $today)
             ->where(fn ($builder) => $builder->whereNull('assignment.effective_to')->orWhere('assignment.effective_to', '>=', $today))
             ->where('employee.service_start', '<=', $today)
             ->where(fn ($builder) => $builder->whereNull('employee.service_end')->orWhere('employee.service_end', '>=', $today));
 
-        return array_values($query->groupBy('employee.id')->havingRaw('COUNT(assignment.id) = 1')->orderBy('employee.id')
+        return array_values($query->groupBy('employee.id')->havingRaw('COUNT(assignment.id) = 1 AND MIN(assignment.unit_id) = ?', [$unitId])->orderBy('employee.id')
             ->pluck('employee.id')->map(fn (mixed $id): int => (int) $id)->all());
     }
 

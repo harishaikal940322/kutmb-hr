@@ -78,6 +78,10 @@ Route::get('/leave/annual', AnnualLeaveController::class)
     ->middleware(['protected', EnsureLocalHrDevelopment::class])
     ->name('leave.annual.index');
 
+Route::get('/leave/annual/team', [AnnualLeaveWorkflowController::class, 'team'])
+    ->middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:leave.calendar.team.view'])
+    ->name('leave.annual.team');
+
 Route::middleware(['protected', EnsureLocalHrDevelopment::class])->prefix('leave/annual/requests')->group(function (): void {
     Route::post('/', [AnnualLeaveWorkflowController::class, 'store'])->name('leave.annual.requests.store');
     Route::post('/{leaveRequest}/decision', [AnnualLeaveWorkflowController::class, 'decide'])

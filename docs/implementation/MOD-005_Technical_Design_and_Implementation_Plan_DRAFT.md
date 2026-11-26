@@ -400,6 +400,10 @@ CT-DEC-026–029/041/042/049 use the same approved workflow hierarchy, working c
 
 CT-DEC-016/017/022 connect the future pending AL withdrawal and annual-funded pre-start cancellation service subsets. All three POST routes use authenticated active accounts and local/testing middleware, per-target authorization and UUID operation keys. Withdrawal releases the pending hold. A cancellation request requires a reason and enters the current GM queue. Confirmation reverses the original committed annual ledger entry and frees the slots atomically, and rejection restores the approved state. The Vue detail and queue use backend capabilities. PHPUnit verifies protected routes and balance/slot changes with synthetic rollback-only records, and Chromium verifies the built UI using synthetic Inertia fixtures. No migration required.
 
+## 8R. Local unit availability (26 November 2026)
+
+CT-DEC-052 uses the existing read service through `GET /leave/annual/team?month=YYYY-MM` and the Jadual unit screen. Current in-service membership and explicit permission are checked server-side. JSON rows contain only name, approved working date and AM/PM. A pending cancellation continues to show its approved committed sessions until confirmation. A partial refund removes only released slots. Reads are audited. The Vue calendar handles month navigation, selected dates, loading, errors and empty results. HTTP and service checks cover minimum projection, unit boundary, pending and released slots, permission, invalid month and production denial.
+
 ## 9. Verification & implementation handoff
 
 - Local Codex: read AGENTS.md, fetch origin, inspect local main and worktree, preserve unrelated changes. Do not run implementation until authorized. Reconcile this draft with complete DOCX SRS and issue answers; update existing planning/design/handoff only (avoid duplicate reports). Use existing change control for normative scope, synchronize RTM/CSV/XLSX only when approved requirements change. Do not mark existing planned tests passed without evidence.

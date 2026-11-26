@@ -108,6 +108,22 @@ class TeamAvailabilityCalendarTest extends TestCase
             ->where('target_ref', 'organization_unit:'.$unitId.'/leave_calendar:2026-03')->count());
         $this->assertSame(1, DB::table('leave_active_slots')->where('employee_id', $peerEmployeeId)
             ->where('leave_date', '2026-03-09')->where('status', 'RELEASED')->count());
+
+        $viewer->forceFill(['two_factor_secret' => 'synthetic', 'two_factor_confirmed_at' => now()])->save();
+        $this->actingAs($viewer)->getJson('/leave/annual/team?month=2026-03')
+            ->assertOk()->assertHeader('Cache-Control', 'no-store, private')
+            ->assertExactJson(['month' => '2026-03', 'slots' => $rows]);
+        $this->getJson('/leave/annual/team?month=2026-13')->assertUnprocessable();
+        $pendingPeer->forceFill(['two_factor_secret' => 'synthetic', 'two_factor_confirmed_at' => now()])->save();
+        $this->actingAs($pendingPeer)->getJson('/leave/annual/team?month=2026-03')->assertForbidden();
+        $this->actingAs($viewer);
+        $env = app()->environment();
+        try {
+            app()->instance('env', 'production');
+            $this->getJson('/leave/annual/team?month=2026-03')->assertNotFound();
+        } finally {
+            app()->instance('env', $env);
+        }
     }
 
     public function test_calendar_denies_accounts_without_permission_and_rejects_invalid_months(): void
