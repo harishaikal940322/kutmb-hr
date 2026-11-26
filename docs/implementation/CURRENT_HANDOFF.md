@@ -1,3 +1,8 @@
+## 26 November 2026 — new-hire prorata preview
+
+- CT-DEC-003/036: Profil & Kelayakan can preview first-year prorata from the employee’s recorded start date and an explicit HR-confirmed annual rate. It includes the entire starting month, rounds to the nearest half day and holds exact ties for HR direction. Termination-year and other unsupported cases remain gated. The preview does not post entitlement or change balances.
+- PHP syntax and Vue build passed. No new migration, automated tests or authenticated browser results.
+
 ## 26 November 2026 — January 1 credit integration
 
 - CT-DEC-035: an authorized entitlement operator can post a confirmed current-year amount on 1 January from Profil & Kelayakan. The local/testing route requires both entitlement view and credit permissions and delegates to the existing once-only ledger service. No scheduler, missed-date posting, inferred rate, or new migration was added.

@@ -39,6 +39,34 @@ const expanded = ref<number | null>(null);
 const confirmation = useForm({ year: props.filters.year, units: '', reference: '', key: '' });
 const confirmed = ref('');
 const credit = useForm({});
+const annualRate = ref('');
+const prorataLoading = ref(false);
+const prorataResult = ref('');
+const prorataError = ref('');
+
+async function previewProrata(row: Employee) {
+    prorataLoading.value = true;
+    prorataResult.value = '';
+    prorataError.value = '';
+    const year = props.filters.year;
+    const params = new URLSearchParams({ year: String(year), annual_units: annualRate.value });
+    try {
+        const response = await fetch(`/leave/annual/entitlements/${row.id}/prorata?${params}`, {
+            headers: { Accept: 'application/json' },
+        });
+        const result = await response.json();
+        if (expanded.value !== row.id || props.filters.year !== year) return;
+        if (response.ok) {
+            prorataResult.value = `${result.eligible_months} bulan · ${days(result.prorated_half_day_units)}`;
+        } else {
+            prorataError.value = response.status === 422 ? result.message : 'Pratonton tidak tersedia.';
+        }
+    } catch {
+        if (expanded.value === row.id && props.filters.year === year) prorataError.value = 'Pratonton tidak tersedia.';
+    } finally {
+        prorataLoading.value = false;
+    }
+}
 
 function expand(row: Employee) {
     expanded.value = expanded.value === row.id ? null : row.id;
@@ -46,6 +74,9 @@ function expand(row: Employee) {
     confirmation.clearErrors();
     credit.clearErrors();
     confirmed.value = '';
+    annualRate.value = '';
+    prorataResult.value = '';
+    prorataError.value = '';
 }
 
 function postCredit(row: Employee) {
@@ -76,6 +107,9 @@ watch([() => props.filters.search, () => props.filters.year], ([nextSearch, next
     confirmation.clearErrors();
     credit.clearErrors();
     confirmed.value = '';
+    annualRate.value = '';
+    prorataResult.value = '';
+    prorataError.value = '';
 });
 const statusLabels = {
     NO_ACCOUNT: 'Akaun belum tersedia',
@@ -178,6 +212,19 @@ function date(value: string | null) {
                                                 <div><dt class="text-xs text-muted-foreground">Tarikh pengesahan kelayakan</dt><dd class="mt-1 font-medium">{{ date(row.confirmed_at) }}</dd></div>
                                             </dl>
                                             <p v-if="expanded === row.id && confirmed" role="status" class="mt-4 text-sm">{{ confirmed }}</p>
+                                            <form v-if="expanded === row.id && canConfirmEntitlement && Number(row.service_start?.slice(0, 4)) === filters.year"
+                                                class="mt-4 space-y-3 border-t border-border pt-4" @submit.prevent="previewProrata(row)">
+                                                <p class="font-semibold">Pratonton prorata pekerja baharu</p>
+                                                <label class="block max-w-xs space-y-1 text-sm">
+                                                    <span>Kadar tahunan disahkan HR (unit separuh hari)</span>
+                                                    <input v-model="annualRate" type="number" required min="1" step="1" class="block h-10 w-full rounded-lg border border-input bg-background px-3" />
+                                                </label>
+                                                <p v-if="prorataResult" role="status" class="text-sm">{{ prorataResult }}</p>
+                                                <p v-if="prorataError" role="alert" class="text-sm text-destructive">{{ prorataError }}</p>
+                                                <button type="submit" :disabled="prorataLoading" class="min-h-10 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">
+                                                    {{ prorataLoading ? 'Mengira…' : 'Kira prorata' }}
+                                                </button>
+                                            </form>
                                             <form v-if="expanded === row.id && canCreditEntitlement && row.entitlement_status === 'CONFIRMED'"
                                                 class="mt-4 space-y-3 border-t border-border pt-4" @submit.prevent="postCredit(row)">
                                                 <p v-for="error in credit.errors" :key="error" role="alert" class="text-sm text-destructive">{{ error }}</p>

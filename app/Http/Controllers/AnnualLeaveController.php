@@ -6,6 +6,7 @@ use App\Services\Leave\AnnualEntitlementCreditService;
 use App\Services\Leave\BalanceProjection;
 use App\Services\Leave\LedgerPostedTotals;
 use DomainException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -113,6 +114,34 @@ class AnnualLeaveController extends Controller
             'canConfirmEntitlement' => $year >= $currentYear && $user->can('leave.entitlement.confirm'),
             'canManageEmployees' => $user->can('hr.employees.view'),
         ]);
+    }
+
+    public function previewNewHireProrata(Request $request, int $employee): JsonResponse
+    {
+        $data = $request->validate([
+            'year' => ['required', 'integer', 'min:1900', 'max:'.((int) now('Asia/Kuala_Lumpur')->format('Y') + 1)],
+            'annual_units' => ['required', 'integer', 'min:1'],
+        ]);
+        $record = DB::table('employees')->where('id', $employee)->first(['service_start', 'service_end']);
+        abort_if($record === null, 404);
+
+        $year = (int) $data['year'];
+        if ((int) substr((string) $record->service_start, 0, 4) !== $year
+            || ($record->service_end !== null && $record->service_end < sprintf('%04d-12-31', $year))) {
+            throw ValidationException::withMessages(['year' => 'Pratonton ini untuk tahun mula berkhidmat sehingga 31 Disember.']);
+        }
+
+        $months = 13 - (int) substr($record->service_start, 5, 2);
+        $annualUnits = (int) $data['annual_units'];
+        $remainder = ($annualUnits % 12) * $months;
+        if ($remainder % 12 === 6) {
+            throw ValidationException::withMessages(['annual_units' => 'Hasil tepat di antara dua unit separuh hari memerlukan keputusan pembundaran HR.']);
+        }
+
+        return response()->json([
+            'eligible_months' => $months,
+            'prorated_half_day_units' => intdiv($annualUnits, 12) * $months + intdiv($remainder + 6, 12),
+        ], headers: ['Cache-Control' => 'private, no-store']);
     }
 
     public function credit(Request $request, int $employee, AnnualEntitlementCreditService $entitlements): RedirectResponse

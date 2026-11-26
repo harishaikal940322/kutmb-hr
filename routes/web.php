@@ -82,6 +82,10 @@ Route::post('/leave/annual/entitlements/{employee}/confirm', [AnnualLeaveControl
     ->middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:leave.entitlement.view', 'permission:leave.entitlement.confirm'])
     ->whereNumber('employee')->name('leave.annual.entitlements.confirm');
 
+Route::get('/leave/annual/entitlements/{employee}/prorata', [AnnualLeaveController::class, 'previewNewHireProrata'])
+    ->middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:leave.entitlement.view', 'permission:leave.entitlement.confirm'])
+    ->whereNumber('employee')->name('leave.annual.entitlements.prorata');
+
 Route::post('/leave/annual/entitlements/{employee}/credit', [AnnualLeaveController::class, 'credit'])
     ->middleware(['protected', EnsureLocalHrDevelopment::class, 'permission:leave.entitlement.view', 'permission:leave.entitlement.credit'])
     ->whereNumber('employee')->name('leave.annual.entitlements.credit');
